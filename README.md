@@ -14,7 +14,7 @@
     cd benchmarks
     ./setup_all.sh
     ```
-    Alternatively, here are steps to setup Darknet and Ligra individually (assuming ):
+    Alternatively, here are steps to setup Darknet and Ligra individually (assuming you're initially in the 'DisaggregatedSystemsUofT' directory):
     - Darknet:
         ```
         cd benchmarks/darknet
