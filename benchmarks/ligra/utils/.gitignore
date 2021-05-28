@@ -1,0 +1,25 @@
+# Built executables
+rMatGraph
+gridGraph
+randLocalGraph
+SNAPtoAdj
+wghSNAPtoAdj
+adjGraphAddWeights
+adjToBinary
+communityToHyperAdj
+hyperAdjToBinary
+adjHypergraphAddWeights
+randHypergraph
+KONECTtoHyperAdj
+KONECTtoClique
+communityToClique
+communityToMESH
+KONECTtoMESH
+
+# Linked files from ligra/ directory
+utils.h
+parseCommandLine.h
+parallel.h
+quickSort.h
+blockRadixSort.h
+transpose.h

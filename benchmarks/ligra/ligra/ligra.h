@@ -40,6 +40,7 @@
 #include "parseCommandLine.h"
 #include "index_map.h"
 #include "edgeMap_utils.h"
+#include "sim_api.h"
 using namespace std;
 
 //*****START FRAMEWORK*****
@@ -490,7 +491,9 @@ int parallel_main(int argc, char* argv[]) {
       Compute(G,P);
       for(int r=0;r<rounds;r++) {
         startTime();
+        SimRoiStart();
         Compute(G,P);
+        SimRoiEnd();
         nextTime("Running time");
       }
       G.del();
@@ -506,7 +509,9 @@ int parallel_main(int argc, char* argv[]) {
       if(G.transposed) G.transpose();
       for(int r=0;r<rounds;r++) {
         startTime();
+	SimRoiStart();
         Compute(G,P);
+	SimRoiEnd();
         nextTime("Running time");
         if(G.transposed) G.transpose();
       }
@@ -524,7 +529,9 @@ int parallel_main(int argc, char* argv[]) {
       Compute(G,P);
       for(int r=0;r<rounds;r++) {
         startTime();
+	SimRoiStart();
         Compute(G,P);
+	SimRoiEnd();
         nextTime("Running time");
       }
       G.del();
@@ -540,7 +547,9 @@ int parallel_main(int argc, char* argv[]) {
       if(G.transposed) G.transpose();
       for(int r=0;r<rounds;r++) {
         startTime();
+	SimRoiStart();
         Compute(G,P);
+	SimRoiEnd();
         nextTime("Running time");
         if(G.transposed) G.transpose();
       }

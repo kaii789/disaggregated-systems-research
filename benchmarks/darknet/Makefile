@@ -29,6 +29,9 @@ LDFLAGS= -lm -pthread
 COMMON= -Iinclude/ -Isrc/
 CFLAGS=-Wall -Wno-unused-result -Wno-unknown-pragmas -Wfatal-errors -fPIC
 
+# Add directory containing the sim_api.h file as an include path
+CFLAGS+= -I ../../include
+
 ifeq ($(OPENMP), 1) 
 CFLAGS+= -fopenmp
 endif

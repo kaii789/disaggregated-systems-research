@@ -45,6 +45,10 @@ COMMON= ligra.h graph.h compressedVertex.h vertex.h utils.h IO.h parallel.h gett
 
 ALL= encoder decoder BFS BC BellmanFord Components Components-Shortcut Radii PageRank PageRankDelta BFSCC BFS-Bitvector KCore MIS Triangle CF
 
+
+# Add directory containing the sim_api.h file as an include path
+PCFLAGS+= -I ../../../include
+
 all: $(ALL)
 
 % : %.C $(COMMON)
