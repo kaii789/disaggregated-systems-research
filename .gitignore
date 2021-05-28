@@ -3,7 +3,8 @@ mbuild/
 mcpat/
 pin_kit/
 python_kit/
-riscv/
+riscv/*
+!riscv/build-riscv.sh
 xed/
 xed_kit/
 
@@ -49,7 +50,8 @@ sift/recorder/sift/*.h
 tools/pinversion
 
 sift/recorder/sift/libsift.a
-frontend/pin-frontend/sift/
+frontend/pin-frontend/sift/*
+!frontend/pin-frontend/sift/makefile
 
 # emacs temp files
 *~

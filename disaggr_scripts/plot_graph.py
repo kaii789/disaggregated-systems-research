@@ -26,7 +26,7 @@ def run_from_experiment(output_directory_path, config_param_category, config_par
     ipc_line_no = 3  # Indexing start from 0, not 1
     # StatSetting line_beginning's: case sensitive, not sensitive to leading whitespace
     stat_settings = [StatSetting("IPC", float),
-                     StatSetting("Idle time (%)", lambda s: float(s.strip("%"))),
+                    #  StatSetting("Idle time (%)", lambda s: float(s.strip("%"))),
                     #  StatSetting("average dram access latency", float, name_for_legend="avg dram access latency (ns)"),
                     #  StatSetting("num local evictions", lambda s: int(s) / 1000, name_for_legend="local evictions (1000s)"),
                     #  StatSetting("DDR page hits", int),
@@ -67,7 +67,7 @@ def run_from_experiment(output_directory_path, config_param_category, config_par
             out_file_path = os.path.join(
                 output_directory_path, "{}_sim.out".format(file_num))
 
-    save_graph(output_directory_path, config_param_values,
+    save_graph(output_directory_path, config_param_name, config_param_values,
                y_values, stat_settings)
 
 
@@ -78,6 +78,8 @@ def run_from_cmdline(output_directory_path, config_param_category, config_param_
     # StatSetting line_beginning's: case sensitive, not sensitive to leading whitespace
     stat_settings = [StatSetting("IPC", float),
                     #  StatSetting("Idle time (%)", lambda s: float(s.strip("%"))),
+                    #  StatSetting("remote dram avg access latency", float, name_for_legend="remote dram avg access latency (ns)"),
+                    #  StatSetting("local dram avg access latency", float, name_for_legend="local dram avg access latency (ns)"),
                     #  StatSetting("average dram access latency", float, name_for_legend="avg dram access latency (ns)"),
                     #  StatSetting("num local evictions", lambda s: int(s) / 1000, name_for_legend="local evictions (1000s)"),
                     #  StatSetting("DDR page hits", int),
@@ -137,11 +139,12 @@ def run_from_cmdline(output_directory_path, config_param_category, config_param_
         out_file_path = os.path.join(
             output_directory_path, "{}_sim.out".format(file_num))
 
-    save_graph(output_directory_path, config_param_values,
+    save_graph(output_directory_path, config_param_name, config_param_values,
                y_values, stat_settings)
 
 
-def save_graph(output_directory_path, config_param_values, y_values, stat_settings):
+def save_graph(output_directory_path, config_param_name, config_param_values, y_values, stat_settings):
+    plt.clf()
     # Plot graph
     print("X values:\n", config_param_values)
     print("Y values:")
@@ -161,13 +164,15 @@ def save_graph(output_directory_path, config_param_values, y_values, stat_settin
                  line_style, label=stat_settings[i].name_for_legend)
     # title_str = "IPC vs Remote Memory Additional Latency"
     # title_str = "IPC vs Remote Memory Bandwidth"
-    title_str = "IPC vs Local DRAM Size"
+    # title_str = "IPC vs Local DRAM Size"
+    title_str = "Stats vs {}".format(config_param_name)
     plt.title(title_str)
     # plt.xlabel("Remote Memory Additional Latency (ns)")
     # plt.xlabel("Remote Memory Bandwidth Scale Factor")
-    plt.xlabel("Local DRAM Size (B)")
-    plt.ylabel("IPC")
-    plt.axvline(x=70000000)  # For local DRAM size graph
+    # plt.xlabel("Local DRAM Size (B)")
+    plt.xlabel("{}".format(config_param_name))
+    plt.ylabel("Stats")
+    # plt.axvline(x=70000000)  # For local DRAM size graph
     plt.legend()
     plt.savefig("{}-{}.jpg".format(output_directory_path, title_str))  # Note: .png files are deleted by 'make clean'
     # plt.show()

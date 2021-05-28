@@ -64,7 +64,7 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
   template = [
     ('  Instructions', 'performance_model.instruction_count', str),
     ('  Cycles',       'performance_model.cycle_count_fixed', format_int),
-    ('  IPC',          'performance_model.ipc', format_float(2)),
+    ('  IPC',          'performance_model.ipc', format_float(4)),
     ('  Time (ns)',    'performance_model.elapsed_time_fixed', format_ns(0)),
     ('  Idle time (ns)', 'performance_model.idle_elapsed_time', format_ns(0)),
     ('  Idle time (%)',  'performance_model.idle_elapsed_percent', format_pct),

@@ -14,8 +14,6 @@ sys.path.insert(0, os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..")))
 print(sys.path)
 
-command_str = "../../run-sniper -n 1 -c nandita_cache.cfg -c l3cache.cfg -c repeat_testing.cfg --roi -- ./mem_test"
-
 # def execute():
 #   global cmd, usage
 
@@ -43,7 +41,7 @@ command_str = "../../run-sniper -n 1 -c nandita_cache.cfg -c l3cache.cfg -c repe
 #   return rc
 
 
-def run_experiment(experiment_name, config_param_category, config_param_name, config_param_values):
+def run_experiment(experiment_name, config_param_category, config_param_name, config_param_values, command_str):
     """config_param_category shouldn't include the square brackets; config_param_values should be an iterable of values"""
     output_files_directory = experiment_name + "_output_files"
 
@@ -88,24 +86,45 @@ def run_experiment(experiment_name, config_param_category, config_param_name, co
     return output_files_directory
 
 
-if __name__ == "__main__":
-    # latency is in nanoseconds?
-    config_param_category = "perf_model/dram"  # Don't include the square brackets
-    
-    # config_param_name = "remote_mem_add_lat"
-    # config_param_values = list(range(0, 100, 20)) + list(range(100, 1000, 100)) + list(range(1000, 10000, 1000)) + [10000]
-    # experiment_name = "remote_additional_latency"
-    
-    # config_param_name = "remote_mem_bw_scalefactor"
-    # config_param_values = [0.5, 1, 4, 8, 32, 128, 512, 2048]
-    # experiment_name = "remote_bw_scalefactor"
-
-    config_param_name = "localdram_size"
-    config_param_values = [16384, 163840] + list(range(1000000, 7000000, 1000000)) + list(range(7000000, 77000001, 7000000))
-    experiment_name = "localdram_size"
-    
+def run_experiment_and_graph(experiment_name, config_param_category, config_param_name, config_param_values, command_str):
+    """config_param_category should NOT include the square brackets"""
     output_directory = run_experiment(
-        experiment_name, config_param_category, config_param_name, config_param_values)
+        experiment_name, config_param_category, config_param_name, config_param_values, command_str)
 
-    plot_graph.run_from_experiment(output_directory, config_param_category, config_param_name, config_param_values)
-    # os.system("python3 plot_graph.py -d {}".format(output_directory))  # Note that this is using Python 3
+    plot_graph.run_from_experiment(
+        output_directory, config_param_category, config_param_name, config_param_values)
+
+
+if __name__ == "__main__":
+    command_str1a = "../../run-sniper -n 1 -c nandita_cache.cfg -c l3cache.cfg -c repeat_testing.cfg --roi -- ./mem_test"
+    command_str1b = "../../run-sniper -n 1 -c nandita_cache.cfg -c l3cache.cfg -c repeat_testing.cfg --roi -- ./mem_test_varied"
+    command_str2a = "../../run-sniper -c nandita_cache.cfg -c l3cache.cfg -c repeat_testing.cfg -- ../crono/apps/sssp/sssp ../crono/inputs/bcsstk05.mtx 1"
+    command_str2b = "../../run-sniper -c nandita_cache.cfg -c l3cache.cfg -c repeat_testing.cfg -- ../crono/apps/sssp/sssp ../crono/inputs/bcsstk25.mtx 1"
+
+    # latency is in nanoseconds
+
+    # run_experiment_and_graph(experiment_name="remote_bw_scalefactor",
+    #                          config_param_category="perf_model/dram", config_param_name="remote_mem_bw_scalefactor",
+    #                          config_param_values=[
+    #                              1, 2, 4, 8, 16, 32, 64],
+    #                          command_str=command_str1a)
+
+    command_str = command_str2b
+
+    run_experiment_and_graph(experiment_name="bcsstk25_remote_additional_latency",
+                             config_param_category="perf_model/dram", config_param_name="remote_mem_add_lat",
+                             config_param_values=list(range(
+                                 0, 100, 20)) + list(range(100, 1000, 100)) + list(range(1000, 10000, 1000)) + [10000],
+                             command_str=command_str)
+
+    run_experiment_and_graph(experiment_name="bcsstk25_remote_bw_scalefactor",
+                             config_param_category="perf_model/dram", config_param_name="remote_mem_bw_scalefactor",
+                             config_param_values=[1, 2, 4, 8, 16, 32, 64, 128],
+                             command_str=command_str)
+
+    run_experiment_and_graph(experiment_name="bcsstk25_localdram_size",
+                             config_param_category="perf_model/dram", config_param_name="localdram_size",
+                             #  config_param_values=[16384, 163840] + list(range(1000000, 7000000, 1000000)) + list(range(7000000, 77000001, 7000000)))
+                             config_param_values=[
+                                 4096, 16384, 65536, 262144, 524288, 950000, 1048576],
+                             command_str=command_str)  # 950000 is approx the working set size for bcsstk05

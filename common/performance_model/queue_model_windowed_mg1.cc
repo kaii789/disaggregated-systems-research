@@ -46,8 +46,9 @@ QueueModelWindowedMG1::computeQueueDelay(SubsecondTime pkt_time, SubsecondTime p
       double service_time_Es2 = m_service_time_sum2 / m_num_arrivals;
 
       // If requesters do not throttle based on returned latency, it's their problem, not ours
-      if (utilization > .99)
-         utilization = .99;
+      if (utilization > .9999) { // number here changed from .99 to .9999; still needed?
+         utilization = .9999;
+      }
 
       t_queue = SubsecondTime::PS(arrival_rate * service_time_Es2 / (2 * (1. - utilization)));
       if (m_name == "dram-datamovement-queue")
@@ -68,6 +69,7 @@ QueueModelWindowedMG1::computeQueueDelay(SubsecondTime pkt_time, SubsecondTime p
    return t_queue;
 }
 
+/* Get estimate of queue delay without adding the packet to the queue */
 SubsecondTime
 QueueModelWindowedMG1::computeQueueDelayNoEffect(SubsecondTime pkt_time, SubsecondTime processing_time, core_id_t requester)
 {
