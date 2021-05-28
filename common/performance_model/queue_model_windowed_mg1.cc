@@ -34,7 +34,9 @@ QueueModelWindowedMG1::computeQueueDelay(SubsecondTime pkt_time, SubsecondTime p
    }
    // Advance the window based on the global (barrier) time, as this guarantees the earliest time any thread may be at.
    // Use a backup value of 10 window sizes before the current request to avoid excessive memory usage in case something fishy is going on.
-   removeItems(std::max(Sim()->getClockSkewMinimizationServer()->getGlobalTime() - m_window_size, pkt_time - 10*m_window_size));
+   SubsecondTime backup = pkt_time > 10*m_window_size ? pkt_time - 10*m_window_size : SubsecondTime::Zero();
+   SubsecondTime main = Sim()->getClockSkewMinimizationServer()->getGlobalTime() > m_window_size ? Sim()->getClockSkewMinimizationServer()->getGlobalTime() - m_window_size : SubsecondTime::Zero();
+   removeItems(std::max(main, backup));
 
    if (m_name == "dram-datamovement-queue")
       LOG_PRINT("QueueModelWindowedMG1::computeQueueDelay(): m_num_arrivals=%ld before if statement", m_num_arrivals);
@@ -77,7 +79,9 @@ QueueModelWindowedMG1::computeQueueDelayNoEffect(SubsecondTime pkt_time, Subseco
 
    // Advance the window based on the global (barrier) time, as this guarantees the earliest time any thread may be at.
    // Use a backup value of 10 window sizes before the current request to avoid excessive memory usage in case something fishy is going on.
-   removeItems(std::max(Sim()->getClockSkewMinimizationServer()->getGlobalTime() - m_window_size, pkt_time - 10*m_window_size));
+   SubsecondTime backup = pkt_time > 10*m_window_size ? pkt_time - 10*m_window_size : SubsecondTime::Zero();
+   SubsecondTime main = Sim()->getClockSkewMinimizationServer()->getGlobalTime() > m_window_size ? Sim()->getClockSkewMinimizationServer()->getGlobalTime() - m_window_size : SubsecondTime::Zero();
+   removeItems(std::max(main, backup));
 
    if (m_num_arrivals > 1)
    {
