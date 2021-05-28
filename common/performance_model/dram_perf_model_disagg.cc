@@ -452,11 +452,6 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         else
             page_datamovement_queue_delay = SubsecondTime::Zero(); 
 
-        /* 
-         * //Removing the TLB overhead part for now
-           if (m_r_simulate_tlb_overhead && std::find(m_memory_manager->m_invalid_PTE.begin(), m_memory_manager->m_invalid_PTE.end(), phys_page) == m_memory_manager->m_invalid_PTE.end())
-                m_memory_manager->m_invalid_PTE.push_back(phys_page);
-        */ 
 
         assert(std::find(m_local_pages.begin(), m_local_pages.end(), phys_page) == m_local_pages.end()); 
         assert(std::find(m_remote_pages.begin(), m_remote_pages.end(), phys_page) != m_remote_pages.end()); 
@@ -475,7 +470,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         t_now += possiblyEvict(phys_page, pkt_time, requester);
     }
 
-    // Update Memory Counters -- Nandita: Removing for now as I'm not sure that it's really used anywhere
+    // Update Memory Counters?
     //queue_delay = ddr_queue_delay;
 
     //std::cout << "Remote Latency: " << t_now - pkt_time << std::endl;
@@ -637,7 +632,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
     t_now += ddr_processing_time;
     perf->updateTime(t_now, ShmemPerf::DRAM_BUS);
 
-    // Update Memory Counters -- Nandita:Removing this for now... not sure it's used anywhere
+    // Update Memory Counters? 
     //queue_delay = ddr_queue_delay;
 
     // If the phys_page is not included in m_inflight_pages, then total_access_latency = t_now - pkt_time
@@ -822,12 +817,6 @@ DramPerfModelDisagg::possiblyPrefetch(UInt64 phys_page, SubsecondTime t_now, cor
             page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*4096), requester);
         } 
 
-        /* 
-         * // Again removing for now
-           if (m_r_simulate_tlb_overhead && std::find(m_memory_manager->m_invalid_PTE.begin(), m_memory_manager->m_invalid_PTE.end(), pref_page) == m_memory_manager->m_invalid_PTE.end())
-             m_memory_manager->m_invalid_PTE.push_back(pref_page);
-       */ 
-        
         assert(std::find(m_local_pages.begin(), m_local_pages.end(), pref_page) == m_local_pages.end()); 
         assert(std::find(m_remote_pages.begin(), m_remote_pages.end(), pref_page) != m_remote_pages.end()); 
         m_local_pages.push_back(pref_page);
