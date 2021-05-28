@@ -174,7 +174,10 @@ def save_graph(output_directory_path, config_param_name, config_param_values, y_
     plt.ylabel("Stats")
     # plt.axvline(x=70000000)  # For local DRAM size graph
     plt.legend()
-    plt.savefig("{}-{}.jpg".format(output_directory_path, title_str))  # Note: .png files are deleted by 'make clean'
+    # Note: .png files are deleted by 'make clean'
+    # graph_filename = "{}-{}.jpg".format(output_directory_path, title_str)
+    graph_filename = "{}.jpg".format(title_str)
+    plt.savefig(os.path.join(output_directory_path, graph_filename))  
     # plt.show()
 
 

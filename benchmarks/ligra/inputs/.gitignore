@@ -1,0 +1,6 @@
+*
+!.gitignore
+
+# Exceptions for files from original repo 
+!rMatGraph_J_5_100
+!rMatGraph_WJ_5_100
