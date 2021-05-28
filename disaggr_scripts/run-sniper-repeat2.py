@@ -10,9 +10,7 @@ import plot_graph
 sys.path.append(os.path.join(os.path.dirname(__file__), "tools"))
 
 # Add root Sniper directory to path
-sys.path.insert(
-    0, os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 # print(sys.path)
 
 # def execute():
@@ -57,9 +55,7 @@ def run_experiment(
         # Find another directory name that doesn't already exist
         num = 2
         while os.path.exists(output_files_directory):
-            output_files_directory = (
-                experiment_name + "_output_files_" + str(num)
-            )
+            output_files_directory = experiment_name + "_output_files_" + str(num)
             num += 1
     os.makedirs(output_files_directory)
 
@@ -145,40 +141,75 @@ class Experiment:
 
 if __name__ == "__main__":
     # Assumes the program is compiled
-    command_str1a = "../run-sniper -n 1 -c ../disaggr_config/nandita_cache.cfg -c ../disaggr_config/l3cache.cfg -c repeat_testing.cfg --roi -- ../test/a_disagg_test/mem_test"
-    command_str1b = "../run-sniper -n 1 -c ../disaggr_config/nandita_cache.cfg -c ../disaggr_config/l3cache.cfg -c repeat_testing.cfg --roi -- ./test/a_disagg_test/mem_test_varied"
-    command_str2a = "../run-sniper -c ../disaggr_config/nandita_cache.cfg -c ../disaggr_config/l3cache.cfg -c repeat_testing.cfg -- ../test/crono/apps/sssp/sssp ../test/crono/inputs/bcsstk05.mtx 1"
-    command_str2b = "../run-sniper -c ../disaggr_config/nandita_cache.cfg -c ../disaggr_config/l3cache.cfg -c repeat_testing.cfg -- ../test/crono/apps/sssp/sssp ../test/crono/inputs/bcsstk25.mtx 1"
+    command_str1a = "../run-sniper -n 1 -c ../disaggr_config/local_memory_cache.cfg -c ../disaggr_config/l3cache.cfg -c repeat_testing.cfg --roi -- ../test/a_disagg_test/mem_test"
+    command_str1b = "../run-sniper -n 1 -c ../disaggr_config/local_memory_cache.cfg -c ../disaggr_config/l3cache.cfg -c repeat_testing.cfg --roi -- ./test/a_disagg_test/mem_test_varied"
+    command_str2a = "../run-sniper -c ../disaggr_config/local_memory_cache.cfg -c ../disaggr_config/l3cache.cfg -c repeat_testing.cfg -- ../test/crono/apps/sssp/sssp ../test/crono/inputs/bcsstk05.mtx 1"
+    command_str2b = "../run-sniper -c ../disaggr_config/local_memory_cache.cfg -c ../disaggr_config/l3cache.cfg -c repeat_testing.cfg -- ../test/crono/apps/sssp/sssp ../test/crono/inputs/bcsstk25.mtx 1"
 
-    command_str = command_str2b
+    darknet_home = "../benchmarks/darknet"  # relative to disaggr_scripts directory
+    ligra_home = "../benchmarks/ligra"  # relative to disaggr_scripts directory
 
-    experiments = [
+    command_strs = {}
+    command_strs[
+        "darknet_tiny"
+    ] = "../run-sniper -c ../disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg -- {0}/darknet classifier predict {0}/cfg/imagenet1k.data {0}/cfg/tiny.cfg {0}/tiny.weights {0}/data/dog.jpg".format(
+        darknet_home
+    )
+    command_strs[
+        "ligra_bfs"
+    ] = "../run-sniper -c ../disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg -- {0}/apps/BFS -s {0}/inputs/rMat_1000000".format(
+        ligra_home
+    )
+
+    experiments = []
+    experiments.append(
         Experiment(
-            experiment_name="bcsstk25_remote_additional_latency",
-            command_str=command_str,
+            experiment_name="darknet_tiny_remote_additional_latency",
+            command_str=command_strs["darknet_tiny"],
             config_param_category="perf_model/dram",
             config_param_name="remote_mem_add_lat",
-            config_param_values=list(range(0, 100, 20))
-            + list(range(100, 1000, 100))
-            + list(range(1000, 10000, 1000))
-            + [10000],  # latency is in nanoseconds
-        ),
+            config_param_values=[0, 100],  # latency is in nanoseconds
+        )
+    )
+    experiments.append(
         Experiment(
-            experiment_name="bcsstk25_remote_bw_scalefactor",
-            command_str=command_str,
+            experiment_name="ligra_bfs_remote_additional_latency",
+            command_str=command_strs["ligra_bfs"],
             config_param_category="perf_model/dram",
-            config_param_name="remote_mem_bw_scalefactor",
-            config_param_values=[1, 2, 4, 8, 16, 32, 64, 128],
-        ),
-        Experiment(
-            experiment_name="bcsstk25_localdram_size",
-            command_str=command_str,
-            config_param_category="perf_model/dram",
-            config_param_name="localdram_size",
-            # config_param_values=[16384, 163840] + list(range(1000000, 7000000, 1000000)) + list(range(7000000, 77000001, 7000000)))
-            config_param_values=[4096, 16384, 65536, 262144, 524288, 1048576],
-        ),  # 950000 is approx the working set size for bcsstk05
-    ]
+            config_param_name="remote_mem_add_lat",
+            config_param_values=[0, 100],  # latency is in nanoseconds
+        )
+    )
+
+    # # Remote memory testing experiments
+    # command_str = command_str1a
+    # experiments = [
+    #     Experiment(
+    #         experiment_name="bcsstk25_remote_additional_latency",
+    #         command_str=command_str,
+    #         config_param_category="perf_model/dram",
+    #         config_param_name="remote_mem_add_lat",
+    #         config_param_values=list(range(0, 100, 20))
+    #         + list(range(100, 1000, 100))
+    #         + list(range(1000, 10000, 1000))
+    #         + [10000],  # latency is in nanoseconds
+    #     ),
+    #     Experiment(
+    #         experiment_name="bcsstk25_remote_bw_scalefactor",
+    #         command_str=command_str,
+    #         config_param_category="perf_model/dram",
+    #         config_param_name="remote_mem_bw_scalefactor",
+    #         config_param_values=[1, 2, 4, 8, 16, 32, 64, 128],
+    #     ),
+    #     Experiment(
+    #         experiment_name="bcsstk25_localdram_size",
+    #         command_str=command_str,
+    #         config_param_category="perf_model/dram",
+    #         config_param_name="localdram_size",
+    #         # config_param_values=[16384, 163840] + list(range(1000000, 7000000, 1000000)) + list(range(7000000, 77000001, 7000000)))
+    #         config_param_values=[4096, 16384, 65536, 262144, 524288, 1048576],
+    #     ),  # 950000 is approx the working set size for bcsstk05
+    # ]
 
     for experiment in experiments:
         experiment.run_and_graph()
