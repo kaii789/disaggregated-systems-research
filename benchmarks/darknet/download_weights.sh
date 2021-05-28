@@ -19,7 +19,7 @@ wget -N https://pjreddie.com/media/files/vgg-16.weights
 wget -N https://pjreddie.com/media/files/tiny.weights
 
 # Resnet 50
-# wget -N https://pjreddie.com/media/files/resnet50.weights
+wget -N https://pjreddie.com/media/files/resnet50.weights
 
 # Resnet 152
-wget -N https://pjreddie.com/media/files/resnet152.weights
+# wget -N https://pjreddie.com/media/files/resnet152.weights
