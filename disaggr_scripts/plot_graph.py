@@ -6,6 +6,8 @@ import subprocess
 import getopt
 from tqdm import tqdm
 import numpy as np
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 # Plots graph based on files in output_directory
@@ -174,9 +176,9 @@ def save_graph(output_directory_path, config_param_name, config_param_values, y_
     plt.ylabel("Stats")
     # plt.axvline(x=70000000)  # For local DRAM size graph
     plt.legend()
-    # Note: .png files are deleted by 'make clean'
-    # graph_filename = "{}-{}.jpg".format(output_directory_path, title_str)
-    graph_filename = "{}.jpg".format(title_str)
+    # Note: .png files are deleted by 'make clean' in the test/shared Makefile in the original repo
+    # graph_filename = "{}-{}.png".format(output_directory_path, title_str)
+    graph_filename = "{}.png".format(title_str)
     plt.savefig(os.path.join(output_directory_path, graph_filename))  
     # plt.show()
 
