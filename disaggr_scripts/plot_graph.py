@@ -4,7 +4,7 @@ import os
 import time
 import subprocess
 import getopt
-from tqdm import tqdm
+# from tqdm import tqdm
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")

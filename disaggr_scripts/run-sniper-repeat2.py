@@ -238,79 +238,83 @@ if __name__ == "__main__":
     # )
     darknet_experiments = []
     command_selection = "darknet_tiny"
-    darknet_experiments.append(
-        Experiment(
-            experiment_name=command_selection + "_remote_additional_latency",
-            command_str=command_strs[command_selection],
-            config_param_category="perf_model/dram",
-            config_param_name="remote_mem_add_lat",
-            config_param_values=[
-                0,
-                100,
-                200,
-                500,
-                1000,
-                2000,
-                3000,
-                5000,
-                10000,
-            ],  # latency is in nanoseconds
-            output_directory=".",
-        ),
-        Experiment(
-            experiment_name=command_selection + "_remote_bw_scalefactor",
-            command_str=command_strs[command_selection],
-            config_param_category="perf_model/dram",
-            config_param_name="remote_mem_bw_scalefactor",
-            config_param_values=[1, 2, 4, 8, 16, 32, 64, 128],
-            output_directory=".",
-        ),
-        Experiment(
-            experiment_name=command_selection + "_localdram_size",
-            command_str=command_strs[command_selection],
-            config_param_category="perf_model/dram",
-            config_param_name="localdram_size",
-            config_param_values=[4096, 16384, 65536, 262144, 524288, 1048576],
-            output_directory=".",
-        ),
+    darknet_experiments.extend(
+        [
+            Experiment(
+                experiment_name=command_selection + "_remote_additional_latency",
+                command_str=command_strs[command_selection],
+                config_param_category="perf_model/dram",
+                config_param_name="remote_mem_add_lat",
+                config_param_values=[
+                    0,
+                    100,
+                    200,
+                    500,
+                    1000,
+                    2000,
+                    3000,
+                    5000,
+                    10000,
+                ],  # latency is in nanoseconds
+                output_directory=".",
+            ),
+            Experiment(
+                experiment_name=command_selection + "_remote_bw_scalefactor",
+                command_str=command_strs[command_selection],
+                config_param_category="perf_model/dram",
+                config_param_name="remote_mem_bw_scalefactor",
+                config_param_values=[1, 2, 4, 8, 16, 32, 64, 128],
+                output_directory=".",
+            ),
+            Experiment(
+                experiment_name=command_selection + "_localdram_size",
+                command_str=command_strs[command_selection],
+                config_param_category="perf_model/dram",
+                config_param_name="localdram_size",
+                config_param_values=[4096, 16384, 65536, 262144, 524288, 1048576],
+                output_directory=".",
+            ),
+        ]
     )
     ligra_experiments = []
     command_selection = "ligra_bfs_small_input"
-    ligra_experiments.append(
-        Experiment(
-            experiment_name=command_selection + "_remote_additional_latency",
-            command_str=command_strs[command_selection],
-            config_param_category="perf_model/dram",
-            config_param_name="remote_mem_add_lat",
-            config_param_values=[
-                0,
-                100,
-                200,
-                500,
-                1000,
-                2000,
-                3000,
-                5000,
-                10000,
-            ],  # latency is in nanoseconds
-            output_directory=".",
-        ),
-        Experiment(
-            experiment_name=command_selection + "_remote_bw_scalefactor",
-            command_str=command_strs[command_selection],
-            config_param_category="perf_model/dram",
-            config_param_name="remote_mem_bw_scalefactor",
-            config_param_values=[1, 2, 4, 8, 16, 32, 64, 128],
-            output_directory=".",
-        ),
-        Experiment(
-            experiment_name=command_selection + "_localdram_size",
-            command_str=command_strs[command_selection],
-            config_param_category="perf_model/dram",
-            config_param_name="localdram_size",
-            config_param_values=[4096, 16384, 65536, 262144, 524288, 1048576],
-            output_directory=".",
-        ),
+    ligra_experiments.extend(
+        [
+            Experiment(
+                experiment_name=command_selection + "_remote_additional_latency",
+                command_str=command_strs[command_selection],
+                config_param_category="perf_model/dram",
+                config_param_name="remote_mem_add_lat",
+                config_param_values=[
+                    0,
+                    100,
+                    200,
+                    500,
+                    1000,
+                    2000,
+                    3000,
+                    5000,
+                    10000,
+                ],  # latency is in nanoseconds
+                output_directory=".",
+            ),
+            Experiment(
+                experiment_name=command_selection + "_remote_bw_scalefactor",
+                command_str=command_strs[command_selection],
+                config_param_category="perf_model/dram",
+                config_param_name="remote_mem_bw_scalefactor",
+                config_param_values=[1, 2, 4, 8, 16, 32, 64, 128],
+                output_directory=".",
+            ),
+            Experiment(
+                experiment_name=command_selection + "_localdram_size",
+                command_str=command_strs[command_selection],
+                config_param_category="perf_model/dram",
+                config_param_name="localdram_size",
+                config_param_values=[4096, 16384, 65536, 262144, 524288, 1048576],
+                output_directory=".",
+            ),
+        ]
     )
 
     experiments.extend(ligra_experiments)
