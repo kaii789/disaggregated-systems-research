@@ -122,8 +122,7 @@ def run_experiment(
                 )
             )
 
-        if experiment_no % 4 == 0:
-            print("Experiment {} done.".format(experiment_no + 1))
+        print("Experiment {} run {} done.".format(experiment_name, experiment_no + 1))
 
     end_time = time.time()
     print(
@@ -194,50 +193,128 @@ if __name__ == "__main__":
 
     command_strs = {}
     # Note: using os.system(), the 'cd' of working directory doesn't persist to the next call to os.system()
-    command_strs[
-        "darknet_tiny"
-    ] = "cd {1} && ../../run-sniper -d {2} -c ../../disaggr_config/local_memory_cache.cfg -c ../../disaggr_scripts/repeat_testing.cfg -- {0}/darknet classifier predict {0}/cfg/imagenet1k.data {0}/cfg/tiny.cfg {0}/tiny.weights {0}/data/dog.jpg".format(
+    darknet_base_str = "cd {1} && ../../run-sniper -d {2} -c ../../disaggr_config/local_memory_cache.cfg -c {2}/repeat_testing.cfg -- {0}/darknet classifier predict {0}/cfg/imagenet1k.data {0}/cfg/{{0}}.cfg {0}/{{0}}.weights {0}/data/dog.jpg".format(
         ".", darknet_home, this_file_containing_dir_abspath
     )
+    command_strs["darknet_tiny"] = darknet_base_str.format("tiny")
+    command_strs["darknet_darknet19"] = darknet_base_str.format("darknet19")
+    command_strs["darknet_vgg-16"] = darknet_base_str.format("vgg-16")
+    command_strs["darknet_resnet50"] = darknet_base_str.format("resnet50")
     # cd ../benchmarks/darknet && ../../run-sniper -c ../../disaggr_config/local_memory_cache.cfg -g perf_model/dram/remote_mem_add_lat=200 -- ./darknet classifier predict ./cfg/imagenet1k.data ./cfg/tiny.cfg ./tiny.weights ./data/dog.jpg
-    command_strs[
-        "ligra_bfs"
-    ] = "../run-sniper -c ../disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg -- {0}/apps/BFS -s {0}/inputs/rMat_1000000".format(
-        ligra_home
+
+    ligra_base_str = "../run-sniper -d {1} -c ../disaggr_config/local_memory_cache.cfg -c {1}/repeat_testing.cfg -- {0}/apps/{{0}} -s {0}/inputs/{{1}}".format(
+        ligra_home, this_file_containing_dir_abspath
+    )
+    command_strs["ligra_bfs"] = ligra_base_str.format("BFS", "rMat_1000000")
+    command_strs["ligra_pagerank"] = ligra_base_str.format("PageRank", "rMat_1000000")
+
+    # Small input: first run some tests with smaller input size
+    command_strs["ligra_bfs_small_input"] = ligra_base_str.format("BFS", "rMat_100000")
+    command_strs["ligra_pagerank_small_input"] = ligra_base_str.format(
+        "PageRank", "rMat_100000"
     )
     # ../run-sniper -c ../disaggr_config/local_memory_cache.cfg -g perf_model/dram/remote_mem_add_lat=200 -- ../benchmarks/ligra/apps/BFS -s ../benchmarks/ligra/inputs/rMat_1000000
 
     experiments = []
-    experiments.append(
-        Experiment(
-            experiment_name="darknet_tiny_remote_additional_latency",
-            command_str=command_strs["darknet_tiny"],
-            config_param_category="perf_model/dram",
-            config_param_name="remote_mem_add_lat",
-            config_param_values=[100],  # latency is in nanoseconds
-            output_directory=".",
-        )
-    )
     # experiments.append(
     #     Experiment(
-    #         experiment_name="darknet_tiny_remote_additional_latency",
+    #         experiment_name="darknet_tiny_remote_additional_latency_test",
     #         command_str=command_strs["darknet_tiny"],
     #         config_param_category="perf_model/dram",
     #         config_param_name="remote_mem_add_lat",
-    #         config_param_values=[0, 100, 200, 500, 1000, 2000, 3000, 5000, 10000],  # latency is in nanoseconds
+    #         config_param_values=[100],  # latency is in nanoseconds
     #         output_directory=".",
     #     )
     # )
     # experiments.append(
     #     Experiment(
-    #         experiment_name="ligra_bfs_remote_additional_latency",
+    #         experiment_name="ligra_bfs_remote_additional_latency_test",
     #         command_str=command_strs["ligra_bfs"],
     #         config_param_category="perf_model/dram",
     #         config_param_name="remote_mem_add_lat",
-    #         config_param_values=[0, 100, 200, 500, 1000, 2000, 3000, 5000, 10000],  # latency is in nanoseconds
+    #         config_param_values=[100],  # latency is in nanoseconds
     #         output_directory=".",
     #     )
     # )
+    darknet_experiments = []
+    command_selection = "darknet_tiny"
+    darknet_experiments.append(
+        Experiment(
+            experiment_name=command_selection + "_remote_additional_latency",
+            command_str=command_strs[command_selection],
+            config_param_category="perf_model/dram",
+            config_param_name="remote_mem_add_lat",
+            config_param_values=[
+                0,
+                100,
+                200,
+                500,
+                1000,
+                2000,
+                3000,
+                5000,
+                10000,
+            ],  # latency is in nanoseconds
+            output_directory=".",
+        ),
+        Experiment(
+            experiment_name=command_selection + "_remote_bw_scalefactor",
+            command_str=command_strs[command_selection],
+            config_param_category="perf_model/dram",
+            config_param_name="remote_mem_bw_scalefactor",
+            config_param_values=[1, 2, 4, 8, 16, 32, 64, 128],
+            output_directory=".",
+        ),
+        Experiment(
+            experiment_name=command_selection + "_localdram_size",
+            command_str=command_strs[command_selection],
+            config_param_category="perf_model/dram",
+            config_param_name="localdram_size",
+            config_param_values=[4096, 16384, 65536, 262144, 524288, 1048576],
+            output_directory=".",
+        ),
+    )
+    ligra_experiments = []
+    command_selection = "ligra_bfs_small_input"
+    ligra_experiments.append(
+        Experiment(
+            experiment_name=command_selection + "_remote_additional_latency",
+            command_str=command_strs[command_selection],
+            config_param_category="perf_model/dram",
+            config_param_name="remote_mem_add_lat",
+            config_param_values=[
+                0,
+                100,
+                200,
+                500,
+                1000,
+                2000,
+                3000,
+                5000,
+                10000,
+            ],  # latency is in nanoseconds
+            output_directory=".",
+        ),
+        Experiment(
+            experiment_name=command_selection + "_remote_bw_scalefactor",
+            command_str=command_strs[command_selection],
+            config_param_category="perf_model/dram",
+            config_param_name="remote_mem_bw_scalefactor",
+            config_param_values=[1, 2, 4, 8, 16, 32, 64, 128],
+            output_directory=".",
+        ),
+        Experiment(
+            experiment_name=command_selection + "_localdram_size",
+            command_str=command_strs[command_selection],
+            config_param_category="perf_model/dram",
+            config_param_name="localdram_size",
+            config_param_values=[4096, 16384, 65536, 262144, 524288, 1048576],
+            output_directory=".",
+        ),
+    )
+
+    experiments.extend(ligra_experiments)
+    # experiments.extend(darknet_experiments)
 
     # # Remote memory testing experiments
     # command_str = command_str1a
@@ -281,13 +358,17 @@ if __name__ == "__main__":
         num += 1
 
     with open(log_filename, "w") as log_file:
-        print(
-            "Script start time: {}".format(datetime.datetime.now().astimezone()),
-            file=log_file,
-        )
+        log_str = "Script start time: {}".format(datetime.datetime.now().astimezone())
+        print(log_str)
+        print(log_str, file=log_file)
         for experiment in experiments:
             try:
                 # Run experiment
+                log_str = "Starting experiment {} at {}".format(
+                    experiment.experiment_name, datetime.datetime.now().astimezone()
+                )
+                print(log_str)
+                print(log_str, file=log_file)
                 experiment.run_and_graph()
             except Exception as e:
                 # Print exception traceback to both stdout and log file
@@ -298,7 +379,6 @@ if __name__ == "__main__":
                 traceback.print_exc()
                 print(file=log_file)
                 traceback.print_exc(file=log_file)
-        print(
-            "Script end time: {}".format(datetime.datetime.now().astimezone()),
-            file=log_file,
-        )
+        log_str = "Script end time: {}".format(datetime.datetime.now().astimezone())
+        print(log_str)
+        print(log_str, file=log_file)
