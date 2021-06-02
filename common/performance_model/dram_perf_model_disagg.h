@@ -122,6 +122,8 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_local_evictions;
         UInt64 m_extra_pages;
         UInt64 m_redundant_moves;
+        UInt64 m_redundant_moves_temp1;
+        UInt64 m_redundant_moves_temp2;
         UInt64 m_max_bufferspace;
 
         SubsecondTime m_total_queueing_delay;

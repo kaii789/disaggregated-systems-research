@@ -170,7 +170,9 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     ('  num local evictions', 'dram.local-evictions', str),
     ('  num pages disturbed by extra traffic', 'dram.extra-traffic', str),
     ('  num redundant moves', 'dram.redundant-moves', str),
-    ('  num times # inflight pages larger than bufferspace', 'dram.max-bufferspace', str),
+    ('    num redundant moves temp1', 'dram.redundant-moves-temp1', str),
+    ('    num redundant moves temp2', 'dram.redundant-moves-temp2', str),
+    ('  max simultaneous # inflight pages (bufferspace)', 'dram.max-bufferspace', str),
   ]
   if 'dram.total-read-queueing-delay' in results:
     results['dram.avgqueueread'] = map(lambda (a,b): a/(b or 1), zip(results['dram.total-read-queueing-delay'], results['dram.reads']))

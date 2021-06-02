@@ -84,6 +84,8 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_local_evictions     (0)
     , m_extra_pages         (0)
     , m_redundant_moves     (0)
+    , m_redundant_moves_temp1  (0)
+    , m_redundant_moves_temp2  (0)
     , m_max_bufferspace     (0)
     , m_total_queueing_delay(SubsecondTime::Zero())
     , m_total_access_latency(SubsecondTime::Zero())
@@ -158,6 +160,8 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     registerStatsMetric("dram", core_id, "local-evictions", &m_local_evictions);
     registerStatsMetric("dram", core_id, "extra-traffic", &m_extra_pages);
     registerStatsMetric("dram", core_id, "redundant-moves", &m_redundant_moves);
+    registerStatsMetric("dram", core_id, "redundant-moves-temp1", &m_redundant_moves_temp1);
+    registerStatsMetric("dram", core_id, "redundant-moves-temp2", &m_redundant_moves_temp2);
     registerStatsMetric("dram", core_id, "max-bufferspace", &m_max_bufferspace);
 }
 
@@ -385,7 +389,8 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     SubsecondTime datamovement_queue_delay;
     if (m_r_partition_queues == 1) { 
         datamovement_queue_delay = m_data_movement_2->computeQueueDelay(t_now, m_r_part2_bandwidth.getRoundedLatency(8*pkt_size), requester);
-        m_redundant_moves++; 
+        ++m_redundant_moves;
+        ++m_redundant_moves_temp1;
     } else
         datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*pkt_size), requester);
 
@@ -443,6 +448,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             //try again
             if(m_r_partition_queues) {
                 page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_part_bandwidth.getRoundedLatency(8*4096), requester);
+                LOG_PRINT("partition_queue=1 resulted in savings of approx %lu ns in getAccessLatencyRemote", m_data_movement->computeQueueDelayNoEffect(t_now, m_r_bus_bandwidth.getRoundedLatency(8*4096), requester).getNS());
             } else {
                 page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*4096), requester);
                 t_now += page_datamovement_queue_delay;
@@ -638,6 +644,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
     // If the phys_page is not included in m_inflight_pages, then total_access_latency = t_now - pkt_time
     if((m_inflight_pages.find(phys_page) == m_inflight_pages.end()) || m_r_enable_selective_moves) {
         m_total_local_access_latency += (t_now - pkt_time);
+        LOG_PRINT("getAccessLatency branch 1: %lu ns", (t_now - pkt_time).getNS());
         return t_now - pkt_time;
     } else {
         //SubsecondTime current_time = std::min(Sim()->getClockSkewMinimizationServer()->getGlobalTime(), t_now);
@@ -652,19 +659,23 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                     if ((datamov_queue_delay + t_now - pkt_time) < access_latency) {
                         datamov_queue_delay = m_data_movement_2->computeQueueDelay(t_now, m_r_part2_bandwidth.getRoundedLatency(8*pkt_size), requester);
                         access_latency = datamov_queue_delay + t_now - pkt_time;
-                        m_redundant_moves++; 
+                        ++m_redundant_moves;
+                        ++m_redundant_moves_temp2;
                     } 
                 } else {
                     SubsecondTime datamov_queue_delay = m_data_movement_2->computeQueueDelay(t_now, m_r_part2_bandwidth.getRoundedLatency(8*pkt_size), requester);
                     if ((datamov_queue_delay + t_now - pkt_time) < access_latency) {
+                        LOG_PRINT("getAccessLatency (local dram) inflight page saving of %lu ns", (access_latency-(datamov_queue_delay + t_now - pkt_time)).getNS());
                         access_latency = datamov_queue_delay + t_now - pkt_time;
-                        m_redundant_moves++; 
+                        ++m_redundant_moves;
+                        ++m_redundant_moves_temp2;
                         m_inflight_redundant[phys_page] = m_inflight_redundant[phys_page] + 1; 
                     } 
                 }
             }
         }
         m_total_local_access_latency += access_latency;
+        LOG_PRINT("getAccessLatency branch 2: %lu ns", access_latency.getNS());
         return access_latency;  
     }
 }
