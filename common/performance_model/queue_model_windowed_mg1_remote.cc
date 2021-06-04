@@ -1,10 +1,15 @@
-#include "queue_model_windowed_mg1.h"
+/** This file is based off of the modified queue_model_windowed_mg1. 
+ * At the time of writing, the main difference is the inclusion of remote_mem_add_lat
+ * in the returned latency
+*/
+
+#include "queue_model_windowed_mg1_remote.h"
 #include "simulator.h"
 #include "config.hpp"
 #include "log.h"
 #include "stats.h"
 
-QueueModelWindowedMG1::QueueModelWindowedMG1(String name, UInt32 id)
+QueueModelWindowedMG1Remote::QueueModelWindowedMG1Remote(String name, UInt32 id)
    : m_window_size(SubsecondTime::NS(Sim()->getCfg()->getInt("queue_model/windowed_mg1/window_size")))
    , m_total_requests(0)
    , m_total_utilized_time(SubsecondTime::Zero())
@@ -12,18 +17,19 @@ QueueModelWindowedMG1::QueueModelWindowedMG1(String name, UInt32 id)
    , m_num_arrivals(0)
    , m_service_time_sum(0)
    , m_service_time_sum2(0)
+   , m_r_added_latency(SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/remote_mem_add_lat"))) // Network latency for remote DRAM access 
    , m_name(name)
-{
+{  
    registerStatsMetric(name, id, "num-requests", &m_total_requests);
    registerStatsMetric(name, id, "total-time-used", &m_total_utilized_time);
    registerStatsMetric(name, id, "total-queue-delay", &m_total_queue_delay);
 }
 
-QueueModelWindowedMG1::~QueueModelWindowedMG1()
+QueueModelWindowedMG1Remote::~QueueModelWindowedMG1Remote()
 {}
 
 SubsecondTime
-QueueModelWindowedMG1::computeQueueDelay(SubsecondTime pkt_time, SubsecondTime processing_time, core_id_t requester)
+QueueModelWindowedMG1Remote::computeQueueDelay(SubsecondTime pkt_time, SubsecondTime processing_time, core_id_t requester)
 {
    SubsecondTime t_queue = SubsecondTime::Zero();
 
@@ -38,7 +44,7 @@ QueueModelWindowedMG1::computeQueueDelay(SubsecondTime pkt_time, SubsecondTime p
    removeItems(std::max(main, backup));
 
    if (m_name == "dram-datamovement-queue")
-      LOG_PRINT("QueueModelWindowedMG1::computeQueueDelay(): m_num_arrivals=%ld before if statement", m_num_arrivals);
+      LOG_PRINT("m_num_arrivals=%ld before if statement", m_num_arrivals);
    if (m_num_arrivals > 1)
    {
       double utilization = (double)m_service_time_sum / m_window_size.getPS();
@@ -60,6 +66,8 @@ QueueModelWindowedMG1::computeQueueDelay(SubsecondTime pkt_time, SubsecondTime p
       if (t_queue > m_window_size)
          t_queue = m_window_size;
    }
+   // Add additional network latency
+   t_queue += m_r_added_latency;  // is it ok for t_queue to potentially be larger than m_window_size?
 
    addItem(pkt_time, processing_time);
 
@@ -72,7 +80,7 @@ QueueModelWindowedMG1::computeQueueDelay(SubsecondTime pkt_time, SubsecondTime p
 
 /* Get estimate of queue delay without adding the packet to the queue */
 SubsecondTime
-QueueModelWindowedMG1::computeQueueDelayNoEffect(SubsecondTime pkt_time, SubsecondTime processing_time, core_id_t requester)
+QueueModelWindowedMG1Remote::computeQueueDelayNoEffect(SubsecondTime pkt_time, SubsecondTime processing_time, core_id_t requester)
 {
    SubsecondTime t_queue = SubsecondTime::Zero();
 
@@ -99,13 +107,16 @@ QueueModelWindowedMG1::computeQueueDelayNoEffect(SubsecondTime pkt_time, Subseco
       if (t_queue > m_window_size)
          t_queue = m_window_size;
    }
+   // Add additional network latency
+   t_queue += m_r_added_latency;  // is it ok for t_queue to potentially be larger than m_window_size?
+
    // removed addItem() call and calls that updated stats
 
    return t_queue;
 }
 
 void
-QueueModelWindowedMG1::addItem(SubsecondTime pkt_time, SubsecondTime service_time)
+QueueModelWindowedMG1Remote::addItem(SubsecondTime pkt_time, SubsecondTime service_time)
 {
    m_window.insert(std::pair<SubsecondTime, SubsecondTime>(pkt_time, service_time));
    m_num_arrivals ++;
@@ -114,7 +125,7 @@ QueueModelWindowedMG1::addItem(SubsecondTime pkt_time, SubsecondTime service_tim
 }
 
 void
-QueueModelWindowedMG1::removeItems(SubsecondTime earliest_time)
+QueueModelWindowedMG1Remote::removeItems(SubsecondTime earliest_time)
 {
    while(!m_window.empty() && m_window.begin()->first < earliest_time)
    {

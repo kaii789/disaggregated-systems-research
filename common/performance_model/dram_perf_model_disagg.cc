@@ -69,6 +69,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_r_reserved_bufferspace      (Sim()->getCfg()->getInt("perf_model/dram/remote_reserved_buffer_space")) // % Reserved space in local DRAM for pages in transit
     , m_r_limit_redundant_moves      (Sim()->getCfg()->getInt("perf_model/dram/remote_limit_redundant_moves"))
     , m_r_throttle_redundant_moves      (Sim()->getCfg()->getBool("perf_model/dram/remote_throttle_redundant_moves"))
+    , m_r_use_separate_queuemodel      (Sim()->getCfg()->getBool("perf_model/dram/queue_model/use_separate_remote_queuemodel")) // Whether to use the separate remote queue model
     , m_banks               (m_total_banks)
     , m_r_banks               (m_total_banks)
     , m_page_hits           (0)
@@ -105,19 +106,26 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
         } 
     }
 
-    if(Sim()->getCfg()->getInt("perf_model/dram/remote_partitioned_queues") == 1) {
+    String data_movement_queue_model_type;
+    if (m_r_use_separate_queuemodel) {
+        data_movement_queue_model_type = "windowed_mg1_remote";  // currently only one separate model is supported
+    } else {
+        data_movement_queue_model_type = Sim()->getCfg()->getString("perf_model/dram/queue_model/type");
+    }
+    if(m_r_partition_queues == 1) {
         m_data_movement = QueueModel::create(
-                name + "-datamovement-queue", core_id, Sim()->getCfg()->getString("perf_model/dram/queue_model/type"),
+                name + "-datamovement-queue", core_id, data_movement_queue_model_type,
                 m_r_part_bandwidth.getRoundedLatency(8)); // bytes to bits
         m_data_movement_2 = QueueModel::create(
-                name + "-datamovement-queue-2", core_id, Sim()->getCfg()->getString("perf_model/dram/queue_model/type"),
+                name + "-datamovement-queue-2", core_id, data_movement_queue_model_type,
                 m_r_part2_bandwidth.getRoundedLatency(8)); // bytes to bits
     } else {
         m_data_movement = QueueModel::create(
-                name + "-datamovement-queue", core_id, Sim()->getCfg()->getString("perf_model/dram/queue_model/type"),
+                name + "-datamovement-queue", core_id, data_movement_queue_model_type,
                 m_r_bus_bandwidth.getRoundedLatency(8)); // bytes to bits
+        // Note: currently m_data_movement_2 is not used anywhere when m_r_partition_queues != 1
         m_data_movement_2 = QueueModel::create(
-                name + "-datamovement-queue-2", core_id, Sim()->getCfg()->getString("perf_model/dram/queue_model/type"),
+                name + "-datamovement-queue-2", core_id, data_movement_queue_model_type,
                 m_r_bus_bandwidth.getRoundedLatency(8)); // bytes to bits	
     }
 
@@ -172,7 +180,8 @@ DramPerfModelDisagg::~DramPerfModelDisagg()
         for(UInt32 channel = 0; channel < m_num_channels; ++channel)
             delete m_queue_model[channel];
     }
-    delete m_data_movement; 
+    delete m_data_movement;
+    delete m_data_movement_2; 
 
     if (m_rank_avail.size())
     {
@@ -403,7 +412,10 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     // LOG_PRINT("Processing time before remote added latency: %ld ns; datamovement_queue_delay: %ld ns",
     //           (t_now - pkt_time).getNS(), datamovement_queue_delay.getNS());
     // LOG_PRINT("m_r_bus_bandwidth getRoundedLatency=%ld ns; getLatency=%ld ns", m_r_bus_bandwidth.getRoundedLatency(8*pkt_size).getNS(), m_r_bus_bandwidth.getLatency(8*pkt_size).getNS());
-    t_now += m_r_added_latency;
+    
+    if (!m_r_use_separate_queuemodel) {  // when a separate remote QueueModel is used, the network latency is added there
+        t_now += m_r_added_latency;
+    }
     if(m_r_mode != 4 && !m_r_enable_selective_moves) {
         t_now += datamovement_queue_delay;
     } 
@@ -448,7 +460,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             //try again
             if(m_r_partition_queues) {
                 page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_part_bandwidth.getRoundedLatency(8*4096), requester);
-                LOG_PRINT("partition_queue=1 resulted in savings of approx %lu ns in getAccessLatencyRemote", m_data_movement->computeQueueDelayNoEffect(t_now, m_r_bus_bandwidth.getRoundedLatency(8*4096), requester).getNS());
+                LOG_PRINT("partition_queue=1 resulted in savings of APPROX %lu ns in getAccessLatencyRemote", (m_data_movement->computeQueueDelayNoEffect(t_now, m_r_bus_bandwidth.getRoundedLatency(8*4096), requester) - m_r_added_latency).getNS());
             } else {
                 page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*4096), requester);
                 t_now += page_datamovement_queue_delay;
@@ -641,19 +653,22 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
     // Update Memory Counters? 
     //queue_delay = ddr_queue_delay;
 
-    // If the phys_page is not included in m_inflight_pages, then total_access_latency = t_now - pkt_time
     if((m_inflight_pages.find(phys_page) == m_inflight_pages.end()) || m_r_enable_selective_moves) {
+        // The phys_page is not included in m_inflight_pages or m_r_enable_selective_moves is true, then total access latency = t_now - pkt_time
         m_total_local_access_latency += (t_now - pkt_time);
         LOG_PRINT("getAccessLatency branch 1: %lu ns", (t_now - pkt_time).getNS());
         return t_now - pkt_time;
     } else {
+        // The phys_age is an inflight page and m_r_enable_selective_moves is false
         //SubsecondTime current_time = std::min(Sim()->getClockSkewMinimizationServer()->getGlobalTime(), t_now);
         SubsecondTime access_latency = m_inflight_pages[phys_page] > t_now ? (m_inflight_pages[phys_page] - pkt_time): (t_now - pkt_time);
 
         if(access_latency > (t_now - pkt_time)) {
+            // The page is still in transit from remote to local memory
             m_inflight_hits++; 
 
             if(m_r_partition_queues == 1 && m_inflight_redundant[phys_page] < m_r_limit_redundant_moves) {
+                // Compare the arrival time of the inflight page vs requesting the cache line using the cacheline queue
                 if(m_r_throttle_redundant_moves) {
                     SubsecondTime datamov_queue_delay = m_data_movement_2->computeQueueDelayNoEffect(t_now, m_r_part2_bandwidth.getRoundedLatency(8*pkt_size), requester);
                     if ((datamov_queue_delay + t_now - pkt_time) < access_latency) {
@@ -663,8 +678,9 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                         ++m_redundant_moves_temp2;
                     } 
                 } else {
-                    SubsecondTime datamov_queue_delay = m_data_movement_2->computeQueueDelay(t_now, m_r_part2_bandwidth.getRoundedLatency(8*pkt_size), requester);
+                    SubsecondTime datamov_queue_delay = m_data_movement_2->computeQueueDelayNoEffect(t_now, m_r_part2_bandwidth.getRoundedLatency(8*pkt_size), requester);
                     if ((datamov_queue_delay + t_now - pkt_time) < access_latency) {
+                        datamov_queue_delay = m_data_movement_2->computeQueueDelay(t_now, m_r_part2_bandwidth.getRoundedLatency(8*pkt_size), requester);
                         LOG_PRINT("getAccessLatency (local dram) inflight page saving of %lu ns", (access_latency-(datamov_queue_delay + t_now - pkt_time)).getNS());
                         access_latency = datamov_queue_delay + t_now - pkt_time;
                         ++m_redundant_moves;
@@ -787,7 +803,6 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
                     page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*64), requester);
                 else
                     page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*4096), requester);
-
 
             }
             if (std::find(m_remote_pages.begin(), m_remote_pages.end(), evicted_page) == m_remote_pages.end()) {
