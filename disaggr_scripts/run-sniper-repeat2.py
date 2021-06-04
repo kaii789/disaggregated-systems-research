@@ -114,7 +114,7 @@ def run_experiment(
             continue
 
         # Save a copy of the output for later reference
-        files_to_save = ["sim.cfg", "sim.out"]
+        files_to_save = ["sim.cfg", "sim.out", "sim.stats.sqlite3"]
         for filename in files_to_save:
             os.system(
                 "cp {0} {1}/{2}_{0}".format(
@@ -202,7 +202,8 @@ if __name__ == "__main__":
     command_strs["darknet_resnet50"] = darknet_base_str.format("resnet50")
     # cd ../benchmarks/darknet && ../../run-sniper -c ../../disaggr_config/local_memory_cache.cfg -g perf_model/dram/remote_mem_add_lat=200 -- ./darknet classifier predict ./cfg/imagenet1k.data ./cfg/tiny.cfg ./tiny.weights ./data/dog.jpg
 
-    ligra_base_str = "../run-sniper -d {1} -c ../disaggr_config/local_memory_cache.cfg -c {1}/repeat_testing.cfg -- {0}/apps/{{0}} -s {0}/inputs/{{1}}".format(
+    # Do only 1 timed round to save time during initial experiments
+    ligra_base_str = "../run-sniper -d {1} -c ../disaggr_config/local_memory_cache.cfg -c {1}/repeat_testing.cfg -- {0}/apps/{{0}} -s -rounds 1 {0}/inputs/{{1}}".format(
         ligra_home, this_file_containing_dir_abspath
     )
     command_strs["ligra_bfs"] = ligra_base_str.format("BFS", "rMat_1000000")
@@ -214,6 +215,25 @@ if __name__ == "__main__":
         "PageRank", "rMat_100000"
     )
     # ../run-sniper -c ../disaggr_config/local_memory_cache.cfg -g perf_model/dram/remote_mem_add_lat=200 -- ../benchmarks/ligra/apps/BFS -s ../benchmarks/ligra/inputs/rMat_1000000
+
+    ligra_base_str_sniper_options = "../run-sniper -d {1} -c ../disaggr_config/local_memory_cache.cfg -c {1}/repeat_testing.cfg {{2}} -- {0}/apps/{{0}} -s -rounds 1 {0}/inputs/{{1}}".format(
+        ligra_home, this_file_containing_dir_abspath
+    )
+    # Stop around 100 Million instructions after entering ROI (magic = true in config so don't need --roi flag)
+    command_strs["ligra_bfs_limit_instrs"] = ligra_base_str_sniper_options.format(
+        "BFS", "rMat_1000000", "-s stop-by-icount:100000000"
+    )
+
+    # 16 MB for ligra_bfs + rMat_1000000
+    command_strs["ligra_bfs_localdram_adjusted"] = ligra_base_str_sniper_options.format(
+        "BFS", "rMat_1000000", "-g perf_model/dram/localdram_size=16777216"
+    )
+    # 2 MB for ligra_bfs + rMat_100000
+    command_strs[
+        "ligra_bfs_small_input_localdram_adjusted"
+    ] = ligra_base_str_sniper_options.format(
+        "BFS", "rMat_100000", "-g perf_model/dram/localdram_size=2097152"
+    )
 
     experiments = []
     # experiments.append(
@@ -236,6 +256,63 @@ if __name__ == "__main__":
     #         output_directory=".",
     #     )
     # )
+
+    # Remote off + PQ=0 + PQ=1
+    partition_queue_series_ligra_bfs_small_input_localdram_adjusted = [
+        Experiment(
+            experiment_name="ligra_bfs_small_input_localdram_adjusted_remote_off",
+            command_str=command_strs["ligra_bfs_small_input_localdram_adjusted"],
+            config_param_category="perf_model/dram",
+            config_param_name="enable_remote_mem",
+            config_param_values=["false"],
+            output_directory=".",
+        ),
+        Experiment(
+            experiment_name="ligra_bfs_small_input_localdram_adjusted_remote_on_pq0",
+            command_str=command_strs["ligra_bfs_small_input_localdram_adjusted"],
+            config_param_category="perf_model/dram",
+            config_param_name="remote_partitioned_queues",
+            config_param_values=[0],
+            output_directory=".",
+        ),
+        Experiment(
+            experiment_name="ligra_bfs_small_input_localdram_adjusted_remote_on_pq1",
+            command_str=command_strs["ligra_bfs_small_input_localdram_adjusted"],
+            config_param_category="perf_model/dram",
+            config_param_name="remote_partitioned_queues",
+            config_param_values=[1],
+            output_directory=".",
+        ),
+    ]
+    partition_queue_series_ligra_bfs_localdram_adjusted = [
+        Experiment(
+            experiment_name="ligra_bfs_localdram_adjusted_remote_off",
+            command_str=command_strs["ligra_bfs_localdram_adjusted"],
+            config_param_category="perf_model/dram",
+            config_param_name="enable_remote_mem",
+            config_param_values=["false"],
+            output_directory=".",
+        ),
+        Experiment(
+            experiment_name="ligra_bfs_localdram_adjusted_remote_on_pq0",
+            command_str=command_strs["ligra_bfs_localdram_adjusted"],
+            config_param_category="perf_model/dram",
+            config_param_name="remote_partitioned_queues",
+            config_param_values=[0],
+            output_directory=".",
+        ),
+        Experiment(
+            experiment_name="ligra_bfs_localdram_adjusted_remote_on_pq1",
+            command_str=command_strs["ligra_bfs_localdram_adjusted"],
+            config_param_category="perf_model/dram",
+            config_param_name="remote_partitioned_queues",
+            config_param_values=[1],
+            output_directory=".",
+        ),
+    ]
+    experiments.extend(partition_queue_series_ligra_bfs_localdram_adjusted)
+    # experiments.extend(partition_queue_series_ligra_bfs_small_input_localdram_adjusted)
+
     darknet_experiments = []
     command_selection = "darknet_tiny"
     darknet_experiments.extend(

@@ -149,6 +149,12 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     results['dram.remoteavglatency'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.total-remote-access-latency'], results['dram.remote-accesses']))
   results['dram.avglatency'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.total-access-latency'], results['dram.accesses']))
 
+  if 'dram-datamovement-queue.num-requests' in results and sum(results['dram-datamovement-queue.num-requests']) > 0:
+    results['dram.remotequeuemodel_datamovement_avgdelay'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram-datamovement-queue.total-queue-delay'], results['dram-datamovement-queue.num-requests']))
+  if 'dram-datamovement-queue-2.num-requests' in results and sum(results['dram-datamovement-queue-2.num-requests']) > 0:
+    results['dram.remotequeuemodel_datamovement2_avgdelay'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram-datamovement-queue-2.total-queue-delay'], results['dram-datamovement-queue-2.num-requests']))
+
+
   template += [
     ('DRAM summary', '', ''),
     ('  num dram accesses', 'dram.accesses', str),
@@ -163,6 +169,8 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     ('  average dram access latency (ns)', 'dram.avglatency', format_ns(2)),
     ('    local dram avg access latency (ns)', 'dram.localavglatency', format_ns(2)),
     ('    remote dram avg access latency (ns)', 'dram.remoteavglatency', format_ns(2)),
+    ('      remote datamovement queue model avg access latency (ns)', 'dram.remotequeuemodel_datamovement_avgdelay', format_ns(2)),
+    ('      remote datamovement2 queue model avg access latency (ns)', 'dram.remotequeuemodel_datamovement2_avgdelay', format_ns(2)),
     ('  num data moves', 'dram.data-moves', str),
     ('  num page prefetches', 'dram.page-prefetches', str),
     ('  num inflight hits', 'dram.inflight-hits', str),
@@ -171,6 +179,7 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     ('  num pages disturbed by extra traffic', 'dram.extra-traffic', str),
     ('  num redundant moves', 'dram.redundant-moves', str),
     ('    num redundant moves temp1', 'dram.redundant-moves-temp1', str),
+    ('      num temp1 cache slower than page', 'redundant-moves-temp1-cache-slower-than-page', str),
     ('    num redundant moves temp2', 'dram.redundant-moves-temp2', str),
     ('  max simultaneous # inflight pages (bufferspace)', 'dram.max-bufferspace', str),
   ]
@@ -185,6 +194,13 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
   if 'dram-queue.total-time-used' in results:
     results['dram.bandwidth'] = map(lambda a: 100*a/time0 if time0 else float('inf'), results['dram-queue.total-time-used'])
     template.append(('  average dram bandwidth utilization', 'dram.bandwidth', lambda v: '%.2f%%' % v))
+
+  # if 'dram.redundant-moves-temp1-time-savings' in results:
+  template.extend([
+      ('Experiment stats', '', ''),
+      ('  PQ=1 temp1 time savings (ns)', 'dram.redundant-moves-temp1-time-savings', format_ns(2)),
+      ('  PQ=1 temp2 time savings (ns)', 'dram.redundant-moves-temp2-time-savings', format_ns(2)),
+  ])
 
   if 'ddr.page-hits' in results:
     template.extend([
