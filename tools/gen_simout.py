@@ -179,7 +179,7 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     ('  num pages disturbed by extra traffic', 'dram.extra-traffic', str),
     ('  num redundant moves', 'dram.redundant-moves', str),
     ('    num redundant moves temp1', 'dram.redundant-moves-temp1', str),
-    ('      num temp1 cache slower than page', 'redundant-moves-temp1-cache-slower-than-page', str),
+    ('      num temp1 cache slower than page', 'dram.redundant-moves-temp1-cache-slower-than-page', str),
     ('    num redundant moves temp2', 'dram.redundant-moves-temp2', str),
     ('  max simultaneous # inflight pages (bufferspace)', 'dram.max-bufferspace', str),
   ]
