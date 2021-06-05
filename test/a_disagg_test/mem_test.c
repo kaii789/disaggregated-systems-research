@@ -16,7 +16,7 @@ int main(int argc, char **argv) {
 
     SimRoiStart();
     struct Node head;
-    long int num_nodes = 4096;  // 4096 means working set is a little over 4096 * 16384 ~= 70 000 000
+    long int num_nodes = 4096;  // 4096 means total lifetime memory usage is a little over 4096 * 16384 = 64 MB
 
     // Allocation
     struct Node *p_prev = &head;
@@ -30,28 +30,58 @@ int main(int argc, char **argv) {
         p_prev = p_new_node;
     }
     p_prev->next = NULL;  // p_prev points to the tail of the linked list
-    
-    // Reads
+
+    //SimRoiEnd();
+
     struct Node *p_cur = &head;
-    long int a;
+    long int a = 1;
+
+    //SimRoiStart();
+
+    // Reads
+    p_cur = &head;
     while (p_cur != NULL) {
         // Access one long int from each 4KB page
         a = p_cur->contents[3];
+        for (long int k = 0; k < 10; ++k) {
+            a /= 2;  // Drain some time
+        }
         a = p_cur->contents[515];
+        for (long int k = 0; k < 10; ++k) {
+            a /= 2;  // Drain some time
+        }
         a = p_cur->contents[1027];
+        for (long int k = 0; k < 10; ++k) {
+            a /= 2;  // Drain some time
+        }
         a = p_cur->contents[1539];
+        for (long int k = 0; k < 10; ++k) {
+            a /= 2;  // Drain some time
+        }
         p_cur = p_cur->next;
     }
 
     // Writes
     p_cur = &head;
-    a = 0;
+    a = 1;
     while (p_cur != NULL) {
         // Write one long int to each 4KB page?
         p_cur->contents[2] = a;
+        for (long int k = 0; k < 100; ++k) {
+            a /= 2;  // Drain some time
+        }
         p_cur->contents[514] = a + 2;
+        for (long int k = 0; k < 100; ++k) {
+            a /= 2;  // Drain some time
+        }
         p_cur->contents[1026] = a + 5;
+        for (long int k = 0; k < 100; ++k) {
+            a /= 2;  // Drain some time
+        }
         p_cur->contents[1538] = a + 7;
+        for (long int k = 0; k < 200; ++k) {
+            a /= 2;  // Drain some time
+        }
         p_cur = p_cur->next;
         a++;  // have some changes for a bit more variability
     }
