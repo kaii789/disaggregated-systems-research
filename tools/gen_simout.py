@@ -149,6 +149,12 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     results['dram.remoteavglatency'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.total-remote-access-latency'], results['dram.remote-accesses']))
   results['dram.avglatency'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.total-access-latency'], results['dram.accesses']))
 
+  if 'dram-datamovement-queue.num-requests' in results and sum(results['dram-datamovement-queue.num-requests']) > 0:
+    results['dram.remotequeuemodel_datamovement_avgdelay'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram-datamovement-queue.total-queue-delay'], results['dram-datamovement-queue.num-requests']))
+  if 'dram-datamovement-queue-2.num-requests' in results and sum(results['dram-datamovement-queue-2.num-requests']) > 0:
+    results['dram.remotequeuemodel_datamovement2_avgdelay'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram-datamovement-queue-2.total-queue-delay'], results['dram-datamovement-queue-2.num-requests']))
+
+
   template += [
     ('DRAM summary', '', ''),
     ('  num dram accesses', 'dram.accesses', str),
@@ -163,6 +169,8 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     ('  average dram access latency (ns)', 'dram.avglatency', format_ns(2)),
     ('    local dram avg access latency (ns)', 'dram.localavglatency', format_ns(2)),
     ('    remote dram avg access latency (ns)', 'dram.remoteavglatency', format_ns(2)),
+    ('      remote datamovement queue model avg access latency (ns)', 'dram.remotequeuemodel_datamovement_avgdelay', format_ns(2)),
+    ('      remote datamovement2 queue model avg access latency (ns)', 'dram.remotequeuemodel_datamovement2_avgdelay', format_ns(2)),
     ('  num data moves', 'dram.data-moves', str),
     ('  num page prefetches', 'dram.page-prefetches', str),
     ('  num inflight hits', 'dram.inflight-hits', str),
@@ -170,7 +178,7 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     ('  num local evictions', 'dram.local-evictions', str),
     ('  num pages disturbed by extra traffic', 'dram.extra-traffic', str),
     ('  num redundant moves', 'dram.redundant-moves', str),
-    ('  num times # inflight pages larger than bufferspace', 'dram.max-bufferspace', str),
+    ('  max simultaneous # inflight pages (bufferspace)', 'dram.max-bufferspace', str),
   ]
   if 'dram.total-read-queueing-delay' in results:
     results['dram.avgqueueread'] = map(lambda (a,b): a/(b or 1), zip(results['dram.total-read-queueing-delay'], results['dram.reads']))
