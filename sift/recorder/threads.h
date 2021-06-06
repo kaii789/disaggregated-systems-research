@@ -10,6 +10,8 @@
 
 typedef struct {
    Sift::Writer *output;
+   // Get Application Data
+   PIN_THREAD_UID thread_sift_data_server;
    UINT64 dyn_addresses[Sift::MAX_DYNAMIC_ADDRESSES];
    UINT32 num_dyn_addresses;
    Bbv *bbv;
@@ -38,5 +40,8 @@ typedef struct {
 extern thread_data_t *thread_data;
 
 void initThreads();
+
+// Get Application Data
+extern void thread_data_server(VOID *arg);
 
 #endif // __THREAD_INFO_H

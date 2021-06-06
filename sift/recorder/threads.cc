@@ -7,6 +7,10 @@
 #include <syscall.h>
 #include <linux/futex.h>
 
+// Get Application Data
+#include "zfstream.h"
+#include <fstream>
+
 // Enable the below to print out sizeof(thread_data_t) at compile time
 #if 0
 // http://stackoverflow.com/questions/7931358/printing-sizeoft-at-compile-time
@@ -18,6 +22,40 @@ void print_size() { char(_<sizeof(thread_data_t)>()); }
 static_assert((sizeof(thread_data_t) % LINE_SIZE_BYTES) == 0, "Error: Thread data should be a multiple of the line size to prevent false sharing");
 
 thread_data_t *thread_data;
+
+// Get Application Data
+VOID thread_data_server(VOID *arg){
+   int* thread_id = static_cast<int*>(arg);
+   int thread_id_temp = *thread_id;
+   printf("[SIFT] Hello from spawned data server for Thread %d\n",thread_id_temp);
+   std::cerr << "[SIFT] Hello from spawned data server for Thread" << std::endl;
+
+   char request_filename[1024];
+   sprintf(request_filename,"data_request_pipe.th%d", thread_id_temp/2);
+   vistream *data_server_request = new vifstream(request_filename, std::ios::in);
+
+   char response_filename[1024];
+   sprintf(response_filename,"data_response_pipe.th%d", thread_id_temp/2);
+   vostream *data_server_response = new vofstream(response_filename, std::ios::out);
+
+   while (true)
+   {
+      uint64_t addr;
+      uint32_t data_size;
+      data_server_request->read(reinterpret_cast<char*>(&addr), sizeof(addr));
+      data_server_request->read(reinterpret_cast<char*>(&data_size), sizeof(data_size));
+
+      char buffer[data_size];
+      PIN_SafeCopy(buffer, reinterpret_cast<void*>(addr), data_size);
+      data_server_response->write(buffer, data_size);
+      data_server_response->flush();
+
+      // Test
+      // data_server_response->write(reinterpret_cast<char*>(&addr), sizeof(addr));
+      // data_server_response->write(reinterpret_cast<char*>(&data_size), sizeof(data_size));
+      // data_server_response->flush();
+   }
+}
 
 // The thread that watched this new thread start is responsible for setting up the connection with the simulator
 static VOID threadStart(THREADID threadid, CONTEXT *ctxt, INT32 flags, VOID *v)
@@ -45,6 +83,11 @@ static VOID threadStart(THREADID threadid, CONTEXT *ctxt, INT32 flags, VOID *v)
       // Sending EmuTypeSetThreadInfo requires the response channel to be opened,
       // which is done by TraceThread but not any time soon if we aren't scheduled on a core.
       thread_data[threadid].should_send_threadinfo = true;
+
+      // Get Application Data
+      PIN_THREAD_UID threadUid;
+      void * threadArg = (void *) (&threadid);
+      thread_data[threadid].thread_sift_data_server = PIN_SpawnInternalThread(thread_data_server, threadArg, 0, &threadUid);
    }
 
    thread_data[threadid].running = true;

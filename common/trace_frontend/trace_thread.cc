@@ -874,6 +874,45 @@ UInt64 TraceThread::getProgressValue()
    return m_trace.getPosition();
 }
 
+// Get Application Data
+void TraceThread::handleGetApplicationData(Core::lock_signal_t lock_signal, Core::mem_op_t mem_op_type, IntPtr d_addr, char* data_buffer, UInt32 data_size)
+{
+   Sift::MemoryLockType sift_lock_signal;
+   Sift::MemoryOpType sift_mem_op;
+
+   switch (lock_signal)
+   {
+      case (Core::NONE):
+         sift_lock_signal = Sift::MemNoLock;
+         break;
+      case (Core::LOCK):
+         sift_lock_signal = Sift::MemLock;
+         break;
+      case (Core::UNLOCK):
+         sift_lock_signal = Sift::MemUnlock;
+         break;
+      default:
+         sift_lock_signal = Sift::MemInvalidLock;
+         break;
+   }
+
+   switch (mem_op_type)
+   {
+      case (Core::READ):
+      case (Core::READ_EX):
+         sift_mem_op = Sift::MemRead;
+         break;
+      case (Core::WRITE):
+         sift_mem_op = Sift::MemWrite;
+         break;
+      default:
+         sift_mem_op = Sift::MemInvalidOp;
+         break;
+   }
+
+   m_trace.GetApplicationData(sift_lock_signal, sift_mem_op, d_addr, (uint8_t*)data_buffer, data_size);
+}
+
 void TraceThread::handleAccessMemory(Core::lock_signal_t lock_signal, Core::mem_op_t mem_op_type, IntPtr d_addr, char* data_buffer, UInt32 data_size)
 {
    Sift::MemoryLockType sift_lock_signal;

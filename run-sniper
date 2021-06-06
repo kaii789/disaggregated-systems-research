@@ -617,6 +617,13 @@ if tracegen:
       filename = '%s%s.app%d.th%d.sift' % (traceprefix, f, r, 0)
       os.mkfifo(filename)
       tracegen['tracefiles_created'].append(filename)
+
+  # Get Application Data
+  os.mkfifo("data_request_pipe.th0")
+  os.mkfifo("data_response_pipe.th0")
+  tracegen['tracefiles_created'].append("data_request_pipe.th0")
+  tracegen['tracefiles_created'].append("data_response_pipe.th0")
+
   # Start app(s) with trace recorder in a thread
   def run_sift_recorder(tracecmd):
     if verbose:

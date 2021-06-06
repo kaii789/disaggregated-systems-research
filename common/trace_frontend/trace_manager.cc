@@ -70,8 +70,22 @@ void TraceManager::init()
 String TraceManager::getFifoName(app_id_t app_id, UInt64 thread_num, bool response, bool create)
 {
    String filename = m_trace_prefix + (response ? "_response" : "") + ".app" + itostr(app_id) + ".th" + itostr(thread_num) + ".sift";
-   if (create)
+   if (create)  {
+
       mkfifo(filename.c_str(), 0600);
+
+      if(response == true) {
+        char request_filename[1024];
+        sprintf(request_filename,"data_request_pipe.th%ld", thread_num);
+        mkfifo(request_filename, 0600);
+      } else {
+        char response_filename[1024];
+        sprintf(response_filename,"data_response_pipe.th%ld", thread_num);
+        mkfifo(response_filename, 0600);
+      }
+
+   }
+
    return filename;
 }
 
@@ -306,6 +320,28 @@ UInt64 TraceManager::getProgressValue()
       }
    }
    return value;
+}
+
+// Get Application Data
+void TraceManager::getApplicationData(int core_id, Core::lock_signal_t lock_signal, Core::mem_op_t mem_op_type, IntPtr d_addr, char* data_buffer, UInt32 data_size) 
+{
+   for(std::vector<TraceThread *>::iterator it = m_threads.begin(); it != m_threads.end(); ++it)
+   {
+      TraceThread *tthread = *it;
+      assert(tthread != NULL);
+      if (tthread->getThread() && tthread->getThread()->getCore() && core_id == tthread->getThread()->getCore()->getId())
+      {
+         if (tthread->m_stopped)
+         {
+            // FIXME: should we try doing the memory access through another thread in the same application?
+            LOG_PRINT_WARNING_ONCE("accessMemory() called but thread already killed since application ended");
+            return;
+         }
+         tthread->handleGetApplicationData(lock_signal, mem_op_type, d_addr, data_buffer, data_size);
+         return;
+      }
+   }
+   LOG_PRINT_ERROR("Unable to find core %d", core_id);
 }
 
 // This should only be called when already holding the thread lock to prevent migrations while we scan for a core id match

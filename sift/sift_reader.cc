@@ -39,7 +39,7 @@ Sift::Reader::Reader(const char *filename, const char *response_filename, uint32
    , handleEmuArg(NULL)
    , handleRoutineChangeFunc(NULL)
    , handleRoutineAnnounceFunc(NULL)
-   , handleRoutineArg(NULL)   
+   , handleRoutineArg(NULL)
    , filesize(0)
    , last_address(0)
    , icache()
@@ -542,6 +542,81 @@ bool Sift::Reader::Read(Instruction &inst)
 
    // We should not return false (no more instructions) unless we get the End packet.
    // Return true in case we get to this point (which we shouldn't).
+   return true;
+}
+
+// Get Application Data
+FILE *fptr = NULL;
+bool Sift::Reader::GetApplicationData(MemoryLockType lock_signal, MemoryOpType mem_op, uint64_t d_addr, uint8_t *data_buffer, uint32_t data_size)
+{
+    for(unsigned int i = 0; i < data_size; i++) {
+        data_buffer[i] = 'c';
+    }
+
+   #if VERBOSE > 0
+   if (mem_op == MemWrite)
+      std::cerr << "[DEBUG:" << m_id << "] Write MemoryRequest - Write" << std::endl;
+   if (mem_op == MemWrite)
+      std::cerr << "[DEBUG:" << m_id << "] Write MemoryRequest - Read" << std::endl;
+   #endif
+
+   if (!initRequestDataServer()) {
+      return false;
+   }
+
+   if (!initResponseDataServer()) {
+      return false;
+   }
+
+   // Send data request
+   data_server_request->write(reinterpret_cast<char*>(&d_addr), sizeof(d_addr));
+   data_server_request->write(reinterpret_cast<char*>(&data_size), sizeof(data_size));
+   data_server_request->flush();
+
+   // Get data
+   data_server_response->read((char*)data_buffer, data_size);
+
+   // Test
+   // uint64_t addr_response_test;
+   // uint32_t size_response_test;
+   // data_server_response->read(reinterpret_cast<char*>(&addr_response_test), sizeof(addr_response_test));
+   // data_server_response->read(reinterpret_cast<char*>(&size_response_test), sizeof(size_response_test));
+   // printf("[SIFT_READER] addr response test %ld\n", addr_response_test);
+   // printf("[SIFT_READER] size response test %u\n", size_response_test);
+   // printf("[SIFT_READER: Thread Test %d] expected value: %ld, actual value: %ld\n", m_id, d_addr, addr_response_test);
+
+    return true;
+}
+
+bool Sift::Reader::initRequestDataServer()
+{
+   if (!data_server_request)
+   {
+      char request_filename[1024];
+      sprintf(request_filename,"data_request_pipe.th%d", m_id);
+      data_server_request = new vofstream(request_filename, std::ios::out);
+
+      if ((!data_server_request->is_open()) || data_server_request->fail())
+      {
+         return false;
+      }
+   }
+   return true;
+}
+
+bool Sift::Reader::initResponseDataServer()
+{
+   if (!data_server_response)
+   {
+      char response_filename[1024];
+      sprintf(response_filename,"data_response_pipe.th%d", m_id);
+      data_server_response = new vifstream(response_filename, std::ios::in);
+
+      if (data_server_response->fail())
+      {
+         return false;
+      }
+   }
    return true;
 }
 

@@ -149,10 +149,20 @@ int main(int argc, char **argv)
       in_roi = true;
       setInstrumentationMode(Sift::ModeDetailed);
       openFile(0);
+      // Get Application Data
+      int threadid = 0;
+      PIN_THREAD_UID threadUid;
+      void * threadArg = (void *) (&threadid);
+      thread_data[threadid].thread_sift_data_server = PIN_SpawnInternalThread(thread_data_server, threadArg, 0, &threadUid);
    }
    else if (KnobEmulateSyscalls.Value())
    {
       openFile(0);
+      // Get Application Data
+      int threadid = 0;
+      PIN_THREAD_UID threadUid;
+      void * threadArg = (void *) (&threadid);
+      thread_data[threadid].thread_sift_data_server = PIN_SpawnInternalThread(thread_data_server, threadArg, 0, &threadUid);
    }
 
    // When attaching with --pid, there could be a number of threads already running.

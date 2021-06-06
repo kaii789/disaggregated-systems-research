@@ -114,12 +114,12 @@ class TraceThread : public Runnable
       void unblock();
 
       SubsecondTime getCurrentTime() const;
-      
+
       dl::DecoderFactory *m_factory;  // we need a factory here to be able to create instructions of any kind
       const dl::DecodedInst* staticDecode(Sift::Instruction &inst);
 
       long long *m_papi_counters;
-      
+
       Lock m_lock;
 
    public:
@@ -134,6 +134,9 @@ class TraceThread : public Runnable
       UInt64 getProgressValue();
       Thread* getThread() const { return m_thread; }
       void handleAccessMemory(Core::lock_signal_t lock_signal, Core::mem_op_t mem_op_type, IntPtr d_addr, char* data_buffer, UInt32 data_size);
+
+      // Get Application Data
+      void handleGetApplicationData(Core::lock_signal_t lock_signal, Core::mem_op_t mem_op_type, IntPtr d_addr, char* data_buffer, UInt32 data_size);
 };
 
 #endif // __TRACE_THREAD_H
