@@ -23,19 +23,26 @@ static_assert((sizeof(thread_data_t) % LINE_SIZE_BYTES) == 0, "Error: Thread dat
 
 thread_data_t *thread_data;
 
+unsigned int thread_num = 0;
+unsigned int get_tid()
+{
+   return __sync_fetch_and_add(&thread_num, 1); // Atomic addition is needed since multiple PIN threads access this variable
+}
+
 // Get Application Data
 VOID thread_data_server(VOID *arg){
-   int* thread_id = static_cast<int*>(arg);
-   int thread_id_temp = *thread_id;
+   // int* thread_id = static_cast<int*>(arg);
+   // int thread_id_temp = *thread_id;
+   int thread_id_temp = get_tid();
    printf("[SIFT] Hello from spawned data server for Thread %d\n",thread_id_temp);
    std::cerr << "[SIFT] Hello from spawned data server for Thread" << std::endl;
 
    char request_filename[1024];
-   sprintf(request_filename,"data_request_pipe.th%d", thread_id_temp/2);
+   sprintf(request_filename,"data_request_pipe.th%d", thread_id_temp);
    vistream *data_server_request = new vifstream(request_filename, std::ios::in);
 
    char response_filename[1024];
-   sprintf(response_filename,"data_response_pipe.th%d", thread_id_temp/2);
+   sprintf(response_filename,"data_response_pipe.th%d", thread_id_temp);
    vostream *data_server_response = new vofstream(response_filename, std::ios::out);
 
    while (true)
@@ -87,7 +94,7 @@ static VOID threadStart(THREADID threadid, CONTEXT *ctxt, INT32 flags, VOID *v)
       // Get Application Data
       PIN_THREAD_UID threadUid;
       void * threadArg = (void *) (&threadid);
-      thread_data[threadid].thread_sift_data_server = PIN_SpawnInternalThread(thread_data_server, threadArg, 0, &threadUid);
+      PIN_SpawnInternalThread(thread_data_server, threadArg, 0, &threadUid);
    }
 
    thread_data[threadid].running = true;
