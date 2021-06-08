@@ -619,11 +619,18 @@ if tracegen:
       tracegen['tracefiles_created'].append(filename)
 
   # Get Application Data
-  os.mkfifo("data_request_pipe.th0")
-  os.mkfifo("data_response_pipe.th0")
-  for i in range(16):
-    tracegen['tracefiles_created'].append("data_request_pipe.th%d" % i)
-    tracegen['tracefiles_created'].append("data_response_pipe.th%d" % i)
+  for r in range(tracegen['num_apps']):
+      filename_data_req = 'data_request_pipe.app%d.th%d' % (r, 0)
+      filename_data_resp = 'data_response_pipe.app%d.th%d' % (r, 0)
+      os.mkfifo(filename_data_req)
+      os.mkfifo(filename_data_resp)
+
+  ##os.mkfifo("data_request_pipe.th0")
+  ##os.mkfifo("data_response_pipe.th0")
+  for r in range(tracegen['num_apps']):
+      for i in range(16):
+        tracegen['tracefiles_created'].append("data_request_pipe.app%d.th%d" % (r, i))
+        tracegen['tracefiles_created'].append("data_response_pipe.app%d.th%d" % (r, i))
 
   # Start app(s) with trace recorder in a thread
   def run_sift_recorder(tracecmd):

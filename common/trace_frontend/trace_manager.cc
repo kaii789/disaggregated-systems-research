@@ -75,13 +75,11 @@ String TraceManager::getFifoName(app_id_t app_id, UInt64 thread_num, bool respon
       mkfifo(filename.c_str(), 0600);
 
       if(response == true) {
-        char request_filename[1024];
-        sprintf(request_filename,"data_request_pipe.th%ld", thread_num);
-        mkfifo(request_filename, 0600);
+        String request_filename = "data_request_pipe.app" + itostr(app_id) + ".th" + itostr(thread_num);
+        mkfifo(request_filename.c_str(), 0600);
       } else {
-        char response_filename[1024];
-        sprintf(response_filename,"data_response_pipe.th%ld", thread_num);
-        mkfifo(response_filename, 0600);
+        String response_filename = "data_response_pipe.app" + itostr(app_id) + ".th" + itostr(thread_num);
+        mkfifo(response_filename.c_str(), 0600);
       }
 
    }

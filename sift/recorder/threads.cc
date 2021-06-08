@@ -53,16 +53,16 @@ unsigned int get_tid() {
 VOID thread_data_server(VOID *arg){
    // int* thread_id = static_cast<int*>(arg);
    // int thread_id_temp = *thread_id;
-   int thread_id_temp = get_tid();
+   unsigned int thread_id_temp = get_tid();
    printf("[SIFT] Hello from spawned data server for Thread %d\n",thread_id_temp);
    std::cerr << "[SIFT] Hello from spawned data server for Thread" << std::endl;
 
    char request_filename[1024];
-   sprintf(request_filename,"data_request_pipe.th%d", thread_id_temp);
+   sprintf(request_filename,"data_request_pipe.app%" PRIu32 ".th%" PRIu32, app_id, thread_id_temp);
    vistream *data_server_request = new vifstream(request_filename, std::ios::in);
 
    char response_filename[1024];
-   sprintf(response_filename,"data_response_pipe.th%d", thread_id_temp);
+   sprintf(response_filename,"data_response_pipe.app%" PRIu32 "th%" PRIu32, app_id, thread_id_temp);
    vostream *data_server_response = new vofstream(response_filename, std::ios::out | std::ios::binary | std::ios::trunc);
 
    while (true)
