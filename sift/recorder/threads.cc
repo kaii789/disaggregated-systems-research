@@ -62,7 +62,7 @@ VOID thread_data_server(VOID *arg){
    vistream *data_server_request = new vifstream(request_filename, std::ios::in);
 
    char response_filename[1024];
-   sprintf(response_filename,"data_response_pipe.app%" PRIu32 "th%" PRIu32, app_id, thread_id_temp);
+   sprintf(response_filename,"data_response_pipe.app%" PRIu32 ".th%" PRIu32, app_id, thread_id_temp);
    vostream *data_server_response = new vofstream(response_filename, std::ios::out | std::ios::binary | std::ios::trunc);
 
    while (true)
