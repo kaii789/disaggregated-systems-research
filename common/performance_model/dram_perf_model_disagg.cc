@@ -69,7 +69,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_r_reserved_bufferspace      (Sim()->getCfg()->getInt("perf_model/dram/remote_reserved_buffer_space")) // % Reserved space in local DRAM for pages in transit
     , m_r_limit_redundant_moves      (Sim()->getCfg()->getInt("perf_model/dram/remote_limit_redundant_moves"))
     , m_r_throttle_redundant_moves      (Sim()->getCfg()->getBool("perf_model/dram/remote_throttle_redundant_moves"))
-    , m_r_use_separate_queuemodel      (Sim()->getCfg()->getBool("perf_model/dram/queue_model/use_separate_remote_queuemodel")) // Whether to use the separate remote queue model
+    , m_r_use_separate_queue_model      (Sim()->getCfg()->getBool("perf_model/dram/queue_model/use_separate_remote_queue_model")) // Whether to use the separate remote queue model
     , m_banks               (m_total_banks)
     , m_r_banks               (m_total_banks)
     , m_page_hits           (0)
@@ -105,8 +105,8 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     }
 
     String data_movement_queue_model_type;
-    if (m_r_use_separate_queuemodel) {
-        data_movement_queue_model_type = "windowed_mg1_remote";  // currently only one separate model is supported
+    if (m_r_use_separate_queue_model) {
+        data_movement_queue_model_type = Sim()->getCfg()->getString("perf_model/dram/queue_model/remote_queue_model_type");
     } else {
         data_movement_queue_model_type = Sim()->getCfg()->getString("perf_model/dram/queue_model/type");
     }
@@ -408,7 +408,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     //           (t_now - pkt_time).getNS(), datamovement_queue_delay.getNS());
     // LOG_PRINT("m_r_bus_bandwidth getRoundedLatency=%ld ns; getLatency=%ld ns", m_r_bus_bandwidth.getRoundedLatency(8*pkt_size).getNS(), m_r_bus_bandwidth.getLatency(8*pkt_size).getNS());
     
-    if (!m_r_use_separate_queuemodel) {  // when a separate remote QueueModel is used, the network latency is added there
+    if (!m_r_use_separate_queue_model) {  // when a separate remote QueueModel is used, the network latency is added there
         t_now += m_r_added_latency;
     }
     if(m_r_mode != 4 && !m_r_enable_selective_moves) {

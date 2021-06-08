@@ -76,7 +76,7 @@ class DramPerfModelDisagg : public DramPerfModel
         const UInt32 m_r_reserved_bufferspace; 
         const UInt32 m_r_limit_redundant_moves; 
         const bool m_r_throttle_redundant_moves;
-        const bool m_r_use_separate_queuemodel;  // Whether to use the separate remote queue model
+        const bool m_r_use_separate_queue_model;  // Whether to use the separate remote queue model
 
         //Local Memory
         std::vector<QueueModel*> m_queue_model;
