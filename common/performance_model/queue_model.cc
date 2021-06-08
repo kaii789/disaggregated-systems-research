@@ -6,6 +6,7 @@
 #include "queue_model_contention.h"
 #include "queue_model_windowed_mg1.h"
 #include "queue_model_windowed_mg1_remote.h"
+#include "queue_model_network_latency_only.h"
 #include "log.h"
 #include "config.hpp"
 
@@ -34,6 +35,10 @@ QueueModel::create(String name, UInt32 id, String model_type, SubsecondTime min_
    else if (model_type == "windowed_mg1_remote")
    {
       return new QueueModelWindowedMG1Remote(name, id);
+   }
+   else if (model_type == "network_latency_only")
+   {
+      return new QueueModelNetworkLatencyOnly(name, id);
    }
    else
    {
