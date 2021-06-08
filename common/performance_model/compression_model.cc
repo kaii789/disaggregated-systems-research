@@ -1,20 +1,21 @@
+#include "config.h"
+#include "log.h"
+#include "config.hpp"
+#include "simulator.h"
 #include "compression_model.h"
+#include "compression_model_bdi.h"
 
-void
-CompressionModel::compress(IntPtr addr, size_t data_size, core_id_t core_id)
+CompressionModel* 
+CompressionModel::create(String name, UInt32 page_size, UInt32 cache_line_size, String compression_type)
 {
-    // Get Data
-    char *buffer = (char*)malloc(data_size * sizeof(char));
-    Core *core = Sim()->getCoreManager()->getCoreFromID(core_id);
-    core->getApplicationData(Core::NONE, Core::READ, addr, buffer, data_size, Core::MEM_MODELED_NONE);
+    if (compression_type == "bdi")
+	{
+        return new CompressionModelBDI(name, page_size, cache_line_size);
+	}
+    else
+    {
+        LOG_PRINT_ERROR("Unrecognized Compression Model(%s)", compression_type.c_str());
+        return (CompressionModel*) NULL;
 
-    // Log
-    FILE *fp;
-    fp = fopen("compression.log", "a");
-    for (int i = 0; i < (int)data_size; i++) {
-        fprintf(fp, "%c ", buffer[i]);
     }
-    fprintf(fp, "\n\n");
-
-    free(buffer);
 }

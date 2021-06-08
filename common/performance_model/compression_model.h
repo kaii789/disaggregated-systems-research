@@ -10,7 +10,12 @@
 class CompressionModel
 {
     public:
-        void compress(IntPtr addr, size_t data_size, core_id_t core_id);
+        CompressionModel() {}
+        virtual ~CompressionModel() {}
+        virtual UInt32 compress(IntPtr addr, size_t data_size, core_id_t core_id) = 0;
+        virtual UInt32 decompress(IntPtr addr, size_t data_size, core_id_t core_id) = 0;
+
+        static CompressionModel* create(String name, UInt32 page_size, UInt32 cache_line_size, String compression_type);
 };
 
 #endif /* __COMPRESSION_MODEL_H__ */
