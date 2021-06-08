@@ -27,11 +27,11 @@
 
 int TraceThread::m_isa = 0;
 
-TraceThread::TraceThread(Thread *thread, SubsecondTime time_start, String tracefile, String responsefile, app_id_t app_id, bool cleanup)
+TraceThread::TraceThread(Thread *thread, SubsecondTime time_start, String tracefile, String responsefile, String data_request_filename, String data_response_filename, app_id_t app_id, bool cleanup)
    : m__thread(NULL)
    , m_thread(thread)
    , m_time_start(time_start)
-   , m_trace(tracefile.c_str(), responsefile.c_str(), thread->getId())
+   , m_trace(tracefile.c_str(), responsefile.c_str(), data_request_filename.c_str(), data_response_filename.c_str(), thread->getId())
    , m_trace_has_pa(false)
    , m_address_randomization(Sim()->getCfg()->getBool("traceinput/address_randomization"))
    , m_appid_from_coreid(Sim()->getCfg()->getString("scheduler/type") == "sequential" ? true : false)

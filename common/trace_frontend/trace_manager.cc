@@ -131,9 +131,13 @@ thread_id_t TraceManager::newThread(app_id_t app_id, bool first, bool init_fifo,
          responsefile = getFifoName(app_id, thread_num, true /*response*/, true /*create*/);
    }
 
+   // Get Application Data
+   String data_request_filename = "data_request_pipe.app" + itostr(app_id) + ".th" + itostr(thread_num);
+   String data_response_filename = "data_response_pipe.app" + itostr(app_id) + ".th" + itostr(thread_num);
+
    m_num_threads_running++;
    Thread *thread = Sim()->getThreadManager()->createThread(app_id, creator_thread_id);
-   TraceThread *tthread = new TraceThread(thread, time, tracefile, responsefile, app_id, init_fifo /*cleaup*/);
+   TraceThread *tthread = new TraceThread(thread, time, tracefile, responsefile, data_request_filename, data_response_filename, app_id, init_fifo /*cleaup*/);
    m_threads.push_back(tthread);
 
    if (spawn)

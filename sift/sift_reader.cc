@@ -16,7 +16,7 @@
 #define VERBOSE_HEX 0
 #define VERBOSE_ICACHE 0
 
-Sift::Reader::Reader(const char *filename, const char *response_filename, uint32_t id)
+Sift::Reader::Reader(const char *filename, const char *response_filename, const char *data_request_filename, const char *data_response_filename, uint32_t id)
    : input(NULL)
    , response(NULL)
    , handleInstructionCountFunc(NULL)
@@ -51,6 +51,9 @@ Sift::Reader::Reader(const char *filename, const char *response_filename, uint32
 {
    m_filename = strdup(filename);
    m_response_filename = strdup(response_filename);
+   m_filename_data_request = strdup(data_request_filename);
+   m_filename_data_response =  strdup(data_response_filename);
+
 
    // initing stream here could cause deadlock when using pipes, as this should be able to be new()ed from
    // a thread that should not block
@@ -60,6 +63,8 @@ Sift::Reader::~Reader()
 {
    free(m_filename);
    free(m_response_filename);
+   free(m_filename_data_request);
+   free(m_filename_data_response);
    if (input)
       delete input;
    if (response)
@@ -581,9 +586,13 @@ bool Sift::Reader::initRequestDataServer()
 {
    if (!data_server_request)
    {
-      char request_filename[1024];
-      sprintf(request_filename,"data_request_pipe.th%d", m_id);
-      data_server_request = new vofstream(request_filename, std::ios::out);
+      if (strcmp(m_filename_data_request, "") == 0)
+      {
+         std::cerr << "[SIFT:" << m_id << "] Request filename not set\n";
+         return false;
+      }
+
+      data_server_request = new vofstream(m_filename_data_request, std::ios::out);
 
       if ((!data_server_request->is_open()) || data_server_request->fail())
       {
@@ -597,9 +606,13 @@ bool Sift::Reader::initResponseDataServer()
 {
    if (!data_server_response)
    {
-      char response_filename[1024];
-      sprintf(response_filename,"data_response_pipe.th%d", m_id);
-      data_server_response = new vifstream(response_filename, std::ios::in);
+      if (strcmp(m_filename_data_response, "") == 0)
+      {
+         std::cerr << "[SIFT:" << m_id << "] Request filename not set\n";
+         return false;
+      }
+
+      data_server_response = new vifstream(m_filename_data_response, std::ios::in);
 
       if (data_server_response->fail())
       {

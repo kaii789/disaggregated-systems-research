@@ -125,7 +125,7 @@ class TraceThread : public Runnable
    public:
       bool m_stopped;
 
-      TraceThread(Thread *thread, SubsecondTime time_start, String tracefile, String responsefile, app_id_t app_id, bool cleanup);
+      TraceThread(Thread *thread, SubsecondTime time_start, String tracefile, String responsefile, String data_request_filename, String data_response_filename, app_id_t app_id, bool cleanup);
       ~TraceThread();
 
       void spawn();

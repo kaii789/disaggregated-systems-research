@@ -81,6 +81,8 @@ namespace Sift
 
          char *m_filename;
          char *m_response_filename;
+         char *m_filename_data_request;
+         char *m_filename_data_response;
 
          uint64_t last_address;
          std::unordered_map<uint64_t, const uint8_t*> icache;
@@ -109,7 +111,7 @@ namespace Sift
          bool initResponseDataServer();
 
       public:
-         Reader(const char *filename, const char *response_filename = "", uint32_t id = 0);
+         Reader(const char *filename, const char *response_filename = "", const char *data_request_filename = "", const char *data_response_filename = "", uint32_t id = 0);
          ~Reader();
          bool initStream();
          bool Read(Instruction&);
