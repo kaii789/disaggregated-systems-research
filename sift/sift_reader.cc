@@ -546,13 +546,8 @@ bool Sift::Reader::Read(Instruction &inst)
 }
 
 // Get Application Data
-FILE *fptr = NULL;
 bool Sift::Reader::GetApplicationData(MemoryLockType lock_signal, MemoryOpType mem_op, uint64_t d_addr, uint8_t *data_buffer, uint32_t data_size)
 {
-    for(unsigned int i = 0; i < data_size; i++) {
-        data_buffer[i] = 'c';
-    }
-
    #if VERBOSE > 0
    if (mem_op == MemWrite)
       std::cerr << "[DEBUG:" << m_id << "] Write MemoryRequest - Write" << std::endl;
@@ -571,21 +566,15 @@ bool Sift::Reader::GetApplicationData(MemoryLockType lock_signal, MemoryOpType m
    // Send data request
    data_server_request->write(reinterpret_cast<char*>(&d_addr), sizeof(d_addr));
    data_server_request->write(reinterpret_cast<char*>(&data_size), sizeof(data_size));
+   data_server_request->write(reinterpret_cast<char*>(&lock_signal), sizeof(lock_signal));
    data_server_request->flush();
 
    // Get data
-   data_server_response->read((char*)data_buffer, data_size);
+   uint64_t addr;
+   data_server_response->read(reinterpret_cast<char*>(&addr), sizeof(addr));
+   data_server_response->read(reinterpret_cast<char*>(data_buffer), data_size);
 
-   // Test
-   // uint64_t addr_response_test;
-   // uint32_t size_response_test;
-   // data_server_response->read(reinterpret_cast<char*>(&addr_response_test), sizeof(addr_response_test));
-   // data_server_response->read(reinterpret_cast<char*>(&size_response_test), sizeof(size_response_test));
-   // printf("[SIFT_READER] addr response test %ld\n", addr_response_test);
-   // printf("[SIFT_READER] size response test %u\n", size_response_test);
-   // printf("[SIFT_READER: Thread Test %d] expected value: %ld, actual value: %ld\n", m_id, d_addr, addr_response_test);
-
-    return true;
+   return true;
 }
 
 bool Sift::Reader::initRequestDataServer()

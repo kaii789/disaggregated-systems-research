@@ -9,6 +9,7 @@
 
 // Get Application Data
 #include "zfstream.h"
+#include "pin.H"
 #include <fstream>
 
 // Enable the below to print out sizeof(thread_data_t) at compile time
@@ -23,9 +24,28 @@ static_assert((sizeof(thread_data_t) % LINE_SIZE_BYTES) == 0, "Error: Thread dat
 
 thread_data_t *thread_data;
 
-unsigned int thread_num = 0;
-unsigned int get_tid()
+bool handleAccessMemoryDataServer(Sift::MemoryLockType lock_signal, uint64_t d_addr, uint8_t* data_buffer, uint32_t data_size)
 {
+   // Lock memory globally if requested
+   // This operation does not occur very frequently, so this should not impact performance
+   if (lock_signal == Sift::MemLock)
+   {
+      PIN_GetLock(&access_memory_lock, 0);
+   }
+
+      PIN_SafeCopy(data_buffer, reinterpret_cast<void*>(d_addr), data_size);
+
+
+   if (lock_signal == Sift::MemUnlock)
+   {
+      PIN_ReleaseLock(&access_memory_lock);
+   }
+
+   return true;
+}
+
+unsigned int thread_num = 0;
+unsigned int get_tid() {
    return __sync_fetch_and_add(&thread_num, 1); // Atomic addition is needed since multiple PIN threads access this variable
 }
 
@@ -43,24 +63,25 @@ VOID thread_data_server(VOID *arg){
 
    char response_filename[1024];
    sprintf(response_filename,"data_response_pipe.th%d", thread_id_temp);
-   vostream *data_server_response = new vofstream(response_filename, std::ios::out);
+   vostream *data_server_response = new vofstream(response_filename, std::ios::out | std::ios::binary | std::ios::trunc);
 
    while (true)
    {
       uint64_t addr;
       uint32_t data_size;
+      Sift::MemoryLockType lock_signal;
+
       data_server_request->read(reinterpret_cast<char*>(&addr), sizeof(addr));
       data_server_request->read(reinterpret_cast<char*>(&data_size), sizeof(data_size));
+      data_server_request->read(reinterpret_cast<char*>(&lock_signal), sizeof(lock_signal));
 
-      char buffer[data_size];
-      PIN_SafeCopy(buffer, reinterpret_cast<void*>(addr), data_size);
-      data_server_response->write(buffer, data_size);
+      char *read_data = new char[data_size];
+      bzero(read_data, data_size);
+      handleAccessMemoryDataServer(lock_signal, addr,(uint8_t*) read_data, data_size);
+
+      data_server_response->write(reinterpret_cast<char*>(&addr), sizeof(addr));
+      data_server_response->write(read_data, data_size);
       data_server_response->flush();
-
-      // Test
-      // data_server_response->write(reinterpret_cast<char*>(&addr), sizeof(addr));
-      // data_server_response->write(reinterpret_cast<char*>(&data_size), sizeof(data_size));
-      // data_server_response->flush();
    }
 }
 
