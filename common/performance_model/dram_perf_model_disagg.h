@@ -73,6 +73,7 @@ class DramPerfModelDisagg : public DramPerfModel
         const bool m_r_dontevictdirty; // Do not evict dirty data
         const bool m_r_enable_selective_moves; 
         const UInt32 m_r_partition_queues; // Enable partitioned queues
+        double m_r_cacheline_queue_fraction; // The fraction of remote bandwidth used for the cacheline queue (decimal between 0 and 1) 
         const bool m_r_cacheline_gran; // Move data and operate in cacheline granularity
         const UInt32 m_r_reserved_bufferspace; // Max % of local DRAM that can be reserved for pages in transit
         const UInt32 m_r_limit_redundant_moves; 
