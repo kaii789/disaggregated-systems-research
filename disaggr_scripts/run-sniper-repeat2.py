@@ -180,7 +180,7 @@ class Experiment:
             files_to_save = ["sim.cfg", "sim.out", "sim.stats.sqlite3"]
             for filename in files_to_save:
                 os.system(
-                    "cp {0} {1}/{2}_{0}".format(
+                    'cp "{0}" "{1}"/"{2}_{0}"'.format(
                         filename, experiment_output_directory, experiment_no + 1
                     )
                 )
@@ -317,12 +317,42 @@ if __name__ == "__main__":
     experiments = []
 
     partition_queue_series_experiment_run_configs = [
+        # 1) Remote off
         ExperimentRunConfig(
             [
                 ConfigEntry("perf_model/dram", "enable_remote_mem", "false"),
                 ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
             ]
         ),
+        # 2) Remote on, don't simulate page movement time
+        ExperimentRunConfig(
+            [
+                ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
+                ConfigEntry(
+                    "perf_model/dram", "simulate_datamov_overhead", "false"
+                ),  # default is true
+                ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+                ConfigEntry(
+                    "perf_model/dram", "remote_mem_add_lat", "0"
+                ),  # default is somewhere around 100-3000
+            ]
+        ),
+        # 3) Remote on, simulate page movement time with only network latency (ie ignore bandwidth)
+        ExperimentRunConfig(
+            [
+                ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
+                ConfigEntry(
+                    "perf_model/dram", "simulate_datamov_overhead", "true"
+                ),  # default is true
+                ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+                ConfigEntry(
+                    "perf_model/dram/queue_model",
+                    "remote_queue_model_type",
+                    "network_latency_only",
+                ),  # default is windowed_mg1_remote
+            ]
+        ),
+        # 4) Remote on, simulate page movement time with only bandwidth (ie 0 network latency)
         ExperimentRunConfig(
             [
                 ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
@@ -330,12 +360,14 @@ if __name__ == "__main__":
                 ConfigEntry("perf_model/dram", "remote_mem_add_lat", "0"),
             ]
         ),
+        # 5) Remote on, simulate page movement time with both bandwidth and network latency, PQ = 0
         ExperimentRunConfig(
             [
                 ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
                 ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
             ]
         ),
+        # 6) Remote on, simulate page movement time with both bandwidth and network latency, PQ = 1
         ExperimentRunConfig(
             [
                 ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
@@ -345,7 +377,7 @@ if __name__ == "__main__":
     ]
 
     # Remote off, PQ=0 network lat=0, PQ=0, PQ=1
-    ligra_input_selection = "regular_input"
+    ligra_input_selection = "regular_input"  # "regular_input" OR "small_input"
     ligra_input_file = ligra_input_to_file[ligra_input_selection]
     for num_MB in [2, 4, 8]:
         localdram_size_str = "{}MB".format(num_MB)
@@ -368,6 +400,29 @@ if __name__ == "__main__":
                 output_directory=".",
             )
         )
+
+        # experiments.append(
+        #     Experiment(
+        #         experiment_name="testB_localdram_{}_page_size".format(
+        #             localdram_size_str
+        #         ),
+        #         command_str=command_str1a,
+        #         experiment_run_configs=generate_one_varying_param_experiment_run_configs(
+        #             config_param_category="perf_model/dram",
+        #             config_param_name="page_size",
+        #             config_param_values=[
+        #                 1,
+        #                 2,
+        #                 1024,
+        #                 2048,
+        #                 4096,
+        #                 8192,
+        #                 16384,
+        #             ],  # latency is in nanoseconds
+        #         ),
+        #         output_directory=".",
+        #     )
+        # )
 
     command_selection = "darknet_tiny"
     command_selection = "ligra_bfs_small_input"
