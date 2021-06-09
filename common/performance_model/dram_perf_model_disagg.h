@@ -43,21 +43,22 @@ class DramPerfModelDisagg : public DramPerfModel
         const UInt32 m_randomize_offset;
         const UInt32 m_column_bits_shift; // Position of column bits for closed-page mapping (after cutting interleaving/channel/rank/bank from bottom)
         const ComponentBandwidth m_bus_bandwidth;
-        const ComponentBandwidth m_r_bus_bandwidth; //Remote
-        const ComponentBandwidth m_r_part_bandwidth; // Remote - Partitioned Queues => Page Queue
+        const ComponentBandwidth m_r_bus_bandwidth;   // Remote
+        const ComponentBandwidth m_r_part_bandwidth;  // Remote - Partitioned Queues => Page Queue
         const ComponentBandwidth m_r_part2_bandwidth; // Remote - Partitioned Queues => Cacheline Queue
         const SubsecondTime m_bank_keep_open;
         const SubsecondTime m_bank_open_delay;
         const SubsecondTime m_bank_close_delay;
         const SubsecondTime m_dram_access_cost;
-        const SubsecondTime m_intercommand_delay; // Rank availability
+        const SubsecondTime m_intercommand_delay;       // Rank availability
         const SubsecondTime m_intercommand_delay_short; // Rank availability
-        const SubsecondTime m_intercommand_delay_long; // Bank group availability
-        const SubsecondTime m_controller_delay; // Average pipeline delay for various DDR controller stages
-        const SubsecondTime m_refresh_interval; // tRFCI
-        const SubsecondTime m_refresh_length; // tRFC
+        const SubsecondTime m_intercommand_delay_long;  // Bank group availability
+        const SubsecondTime m_controller_delay;         // Average pipeline delay for various DDR controller stages
+        const SubsecondTime m_refresh_interval;         // tRFCI
+        const SubsecondTime m_refresh_length;           // tRFC
         const SubsecondTime m_r_added_latency; // Additional remote latency
-        const UInt32 m_r_datamov_threshold; // Mov data if greater than yy
+        const UInt32 m_r_datamov_threshold; // Move data if greater than yy
+        const UInt32 m_page_size; // Memory page size (in bytes) in disagg.cc (different from ddr page size)
         const UInt32 m_localdram_size; // Local DRAM size
         const bool m_enable_remote_mem; // Enable remote memory with the same DDR type as local for now
         const bool m_r_simulate_tlb_overhead; // Simulate tlb overhead
@@ -72,13 +73,14 @@ class DramPerfModelDisagg : public DramPerfModel
         const bool m_r_dontevictdirty; // Do not evict dirty data
         const bool m_r_enable_selective_moves; 
         const UInt32 m_r_partition_queues; // Enable partitioned queues
+        double m_r_cacheline_queue_fraction; // The fraction of remote bandwidth used for the cacheline queue (decimal between 0 and 1) 
         const bool m_r_cacheline_gran; // Move data and operate in cacheline granularity
-        const UInt32 m_r_reserved_bufferspace; 
+        const UInt32 m_r_reserved_bufferspace; // Max % of local DRAM that can be reserved for pages in transit
         const UInt32 m_r_limit_redundant_moves; 
         const bool m_r_throttle_redundant_moves;
-        const bool m_r_use_separate_queuemodel;  // Whether to use the separate remote queue model
+        const bool m_r_use_separate_queue_model;  // Whether to use the separate remote queue model
 
-        //Local Memory
+        // Local Memory
         std::vector<QueueModel*> m_queue_model;
         std::vector<QueueModel*> m_rank_avail;
         std::vector<QueueModel*> m_bank_group_avail;
@@ -93,7 +95,7 @@ class DramPerfModelDisagg : public DramPerfModel
         };
         std::vector<BankInfo> m_banks;
 
-        //Remote memory
+        // Remote memory
         std::vector<QueueModel*> m_r_queue_model;
         std::vector<QueueModel*> m_r_rank_avail;
         std::vector<QueueModel*> m_r_bank_group_avail;
@@ -109,11 +111,11 @@ class DramPerfModelDisagg : public DramPerfModel
         std::map<UInt64, SubsecondTime> m_inflightevicted_pages; // Inflight pages that are being transferred from local memory to remote memory
 
 
-
-        UInt64 m_page_hits;
-        UInt64 m_page_empty;
-        UInt64 m_page_closing;
-        UInt64 m_page_misses;
+        // Variables to keep track of stats
+        UInt64 m_dram_page_hits;
+        UInt64 m_dram_page_empty;
+        UInt64 m_dram_page_closing;
+        UInt64 m_dram_page_misses;
         UInt64 m_remote_reads;
         UInt64 m_remote_writes;
         UInt64 m_data_moves;
@@ -130,7 +132,7 @@ class DramPerfModelDisagg : public DramPerfModel
         SubsecondTime m_total_local_access_latency;
         SubsecondTime m_total_remote_access_latency;
 
-        void parseDeviceAddress(IntPtr address, UInt32 &channel, UInt32 &rank, UInt32 &bank_group, UInt32 &bank, UInt32 &column, UInt64 &page);
+        void parseDeviceAddress(IntPtr address, UInt32 &channel, UInt32 &rank, UInt32 &bank_group, UInt32 &bank, UInt32 &column, UInt64 &dram_page);
         UInt64 parseAddressBits(UInt64 address, UInt32 &data, UInt32 offset, UInt32 size, UInt64 base_address);
         SubsecondTime possiblyEvict(UInt64 phys_page, SubsecondTime pkt_time, core_id_t requester); 
         void possiblyPrefetch(UInt64 phys_page, SubsecondTime pkt_time, core_id_t requester); 
