@@ -177,7 +177,7 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     ('  num writeback pages', 'dram.writeback-pages', str),
     ('  num local evictions', 'dram.local-evictions', str),
     ('  num pages disturbed by extra traffic', 'dram.extra-traffic', str),
-    ('  num redundant moves', 'dram.redundant-moves', str),
+    ('  num redundant moves total', 'dram.redundant-moves', str),
     ('    num redundant moves temp1', 'dram.redundant-moves-temp1', str),
     ('      num temp1 cache slower than page', 'dram.redundant-moves-temp1-cache-slower-than-page', str),
     ('    num redundant moves temp2', 'dram.redundant-moves-temp2', str),
