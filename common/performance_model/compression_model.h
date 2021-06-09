@@ -1,6 +1,7 @@
 #ifndef __COMPRESSION_MODEL_H__
 #define __COMPRESSION_MODEL_H__
 
+#include "string.h"
 #include "fixed_types.h"
 #include "log.h"
 #include "core.h"

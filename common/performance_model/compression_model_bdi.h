@@ -6,6 +6,12 @@
 #include "fixed_types.h"
 #include "subsecond_time.h"
 
+// BDI.cc
+#include <climits>
+#include <cstdio>
+#include <cstring>
+#include <boost/tuple/tuple.hpp>
+
 class CompressionModelBDI : public CompressionModel
 {
 public:
@@ -18,7 +24,19 @@ public:
 private:
     String m_name; 
     UInt32 m_page_size; 
-    UInt32 m_cache_line_size; 
+    UInt32 m_cache_line_size = 64; // TODO: may want configurable
+
+    // BDI.cc
+    long int ReadWord( void*, unsigned int,int);
+    void WriteWord(void*, unsigned int,long int,int);
+    boost::tuple<bool,unsigned int> zeros(void* , void* );
+    boost::tuple<bool,unsigned int> repeated(void* , void* );
+    boost::tuple<bool,unsigned int> Specialized_compress(void *, void *, int , int );
+    bool checkDeltalimits(long int,int);
+    UInt32 Compress(void *in, void *out);
+    UInt32 Decompress(void *in, void *out);
+    Byte* MakeCompBuf();
+
 };
 
 #endif /* __COMPRESSION_MODEL_BDI_H__ */
