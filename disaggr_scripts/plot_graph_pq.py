@@ -68,7 +68,7 @@ def run_from_cmdline(output_directory_path):
                         if line.strip().startswith(stat_setting.line_beginning):
                             y_value_line_nos[index] = line_no
                             y_values[index].append(
-                                stat_setting.format_func(line.split()[-1])
+                                stat_setting.format_func(line.split()[-1] if line.split()[-1] != "|" else np.nan)
                             )  # The last entry of the line
                 if (
                     not out_file_lines[ipc_line_no].strip().startswith("IPC")
@@ -81,7 +81,7 @@ def run_from_cmdline(output_directory_path):
                 for index in range(len(y_values)):
                     line = out_file_lines[y_value_line_nos[index]]
                     y_values[index].append(
-                        stat_settings[index].format_func(line.split()[-1])
+                        stat_settings[index].format_func(line.split()[-1] if line.split()[-1] != "|" else np.nan)
                     )  # The last entry of the line
 
         # Associated sim.cfg file

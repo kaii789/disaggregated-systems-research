@@ -246,10 +246,10 @@ def generate_one_varying_param_experiment_run_configs(
 
 if __name__ == "__main__":
     # Assumes the program is compiled
-    command_str1a = "../run-sniper -n 1 -c ../disaggr_config/local_memory_cache.cfg -c ../disaggr_config/l3cache.cfg -c repeat_testing.cfg --roi -- ../test/a_disagg_test/mem_test"
-    command_str1b = "../run-sniper -n 1 -c ../disaggr_config/local_memory_cache.cfg -c ../disaggr_config/l3cache.cfg -c repeat_testing.cfg --roi -- ./test/a_disagg_test/mem_test_varied"
-    command_str2a = "../run-sniper -c ../disaggr_config/local_memory_cache.cfg -c ../disaggr_config/l3cache.cfg -c repeat_testing.cfg -- ../test/crono/apps/sssp/sssp ../test/crono/inputs/bcsstk05.mtx 1"
-    command_str2b = "../run-sniper -c ../disaggr_config/local_memory_cache.cfg -c ../disaggr_config/l3cache.cfg -c repeat_testing.cfg -- ../test/crono/apps/sssp/sssp ../test/crono/inputs/bcsstk25.mtx 1"
+    command_str1a = "../run-sniper -n 1 -c ../disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg --roi -- ../test/a_disagg_test/mem_test"
+    command_str1b = "../run-sniper -n 1 -c ../disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg --roi -- ./test/a_disagg_test/mem_test_varied"
+    command_str2a = "../run-sniper -c ../disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg -- ../test/crono/apps/sssp/sssp ../test/crono/inputs/bcsstk05.mtx 1"
+    command_str2b = "../run-sniper -c ../disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg -- ../test/crono/apps/sssp/sssp ../test/crono/inputs/bcsstk25.mtx 1"
 
     darknet_home = "../benchmarks/darknet"  # relative to disaggr_scripts directory
     ligra_home = "../benchmarks/ligra"  # relative to disaggr_scripts directory
