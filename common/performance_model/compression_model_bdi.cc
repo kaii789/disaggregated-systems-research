@@ -11,15 +11,15 @@ CompressionModelBDI::CompressionModelBDI(String name, UInt32 page_size, UInt32 c
 CompressionModelBDI::~CompressionModelBDI()
 {}
 
-UInt32
-CompressionModelBDI::compress(IntPtr addr, size_t data_size, core_id_t core_id)
+SubsecondTime
+CompressionModelBDI::compress(IntPtr addr, size_t data_size, core_id_t core_id, UInt32 *compressed_page_size)
 {
     // Get Data
     char *buffer = (char*)malloc(data_size * sizeof(char));
     Core *core = Sim()->getCoreManager()->getCoreFromID(core_id);
     core->getApplicationData(Core::NONE, Core::READ, addr, buffer, data_size, Core::MEM_MODELED_NONE);
 
-
+    
     // BDI
     char *compressed_buffer = (char*)malloc(data_size * sizeof(char));
     int cacheline_count = data_size / m_cache_line_size;
@@ -30,7 +30,7 @@ CompressionModelBDI::compress(IntPtr addr, size_t data_size, core_id_t core_id)
     {
         compressed_size[i] = Compress(buffer + i * m_cache_line_size, compressed_buffer + i * m_cache_line_size);
     }
-
+    
     // Log
     FILE *fp;
     fp = fopen("compression.log", "a");
@@ -59,14 +59,25 @@ CompressionModelBDI::compress(IntPtr addr, size_t data_size, core_id_t core_id)
 
     free(buffer);
     free(compressed_buffer);
+   
+    // Return compressed pages size
+    *compressed_page_size = 2048 * 1024; // 4MB  -> 2MB (compressed)
+    // Return compression latency
+    //Core *core = Sim()->getCoreManager()->getCoreFromID(core_id);
+    ComponentLatency compress_latency(ComponentLatency(core->getDvfsDomain(), cacheline_count * 3));
 
-    return data_size; // FIXME return compressed_size in page granularity to be used to simulate bandwidth delay
+    return compress_latency.getLatency();
+
 }
 
-UInt32
-CompressionModelBDI::decompress(IntPtr addr, size_t data_size, core_id_t core_id)
+SubsecondTime
+CompressionModelBDI::decompress(IntPtr addr, UInt32 compressed_cache_lines, core_id_t core_id)
 {
-    return 0;
+    Core *core = Sim()->getCoreManager()->getCoreFromID(core_id);
+    ComponentLatency decompress_latency(ComponentLatency(core->getDvfsDomain(), compressed_cache_lines * 3));
+
+    return decompress_latency.getLatency();
+
 }
 
 
