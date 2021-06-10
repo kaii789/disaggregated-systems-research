@@ -24,13 +24,21 @@ CompressionModelBDI::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
     char *compressed_buffer = (char*)malloc(data_size * sizeof(char));
     int cacheline_count = data_size / m_cache_line_size;
     int compressed_size[cacheline_count];
+    uint32_t total_bytes = 0;
+    uint32_t total_cache_lines = 0;
     memset(compressed_buffer, 0, data_size);
     memset(compressed_size, 0, sizeof(int) * cacheline_count);
     for (int i = 0; i < cacheline_count; i++)
     {
-        compressed_size[i] = Compress(buffer + i * m_cache_line_size, compressed_buffer + i * m_cache_line_size);
+        compressed_size[i] = compress_cache_line(buffer + i * m_cache_line_size, compressed_buffer + i * m_cache_line_size);
+        total_bytes += compressed_size[i];
+        if (compressed_size[i] < m_cache_line_size)
+            total_cache_lines++;
+        //std::cout << "size " << compressed_size[i] << " total_bytes " << total_bytes << " total_cache_lines " << total_cache_lines << std::endl;
     }
-    
+   
+    /*
+     * Log for compressed data
     // Log
     FILE *fp;
     fp = fopen("compression.log", "a");
@@ -59,13 +67,14 @@ CompressionModelBDI::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
 
     free(buffer);
     free(compressed_buffer);
+    *
+    */
    
-    // Return compressed pages size
-    *compressed_page_size = 2048 * 1024; // 4MB  -> 2MB (compressed)
-    // Return compression latency
-    //Core *core = Sim()->getCoreManager()->getCoreFromID(core_id);
-    ComponentLatency compress_latency(ComponentLatency(core->getDvfsDomain(), cacheline_count * 3));
+    // Return compressed pages size in Bytes
+    *compressed_page_size = total_bytes;
 
+    // Return compression latency
+    ComponentLatency compress_latency(ComponentLatency(core->getDvfsDomain(), total_cache_lines * m_compression_latency));
     return compress_latency.getLatency();
 
 }
@@ -74,21 +83,22 @@ SubsecondTime
 CompressionModelBDI::decompress(IntPtr addr, UInt32 compressed_cache_lines, core_id_t core_id)
 {
     Core *core = Sim()->getCoreManager()->getCoreFromID(core_id);
-    ComponentLatency decompress_latency(ComponentLatency(core->getDvfsDomain(), compressed_cache_lines * 3));
+    ComponentLatency decompress_latency(ComponentLatency(core->getDvfsDomain(), compressed_cache_lines * m_decompression_latency));
 
     return decompress_latency.getLatency();
 
 }
 
 
-// BDI.cc
-Byte* CompressionModelBDI::MakeCompBuf()
+Byte* 
+CompressionModelBDI::MakeCompBuf()
 {
    Byte* buf = new Byte[m_cache_line_size+1]();
    return buf;
 }
 
-long int CompressionModelBDI::ReadWord(void *ptr, unsigned int idx, int k)	//idx says which word of input ptr to read ( i from main code/decode loop)
+long int 
+CompressionModelBDI::ReadWord(void *ptr, unsigned int idx, int k) //idx says which word of input ptr to read (i from main code/decode loop)
 {
     long int   x;
 
@@ -120,8 +130,8 @@ long int CompressionModelBDI::ReadWord(void *ptr, unsigned int idx, int k)	//idx
 }
 
 
-
-void CompressionModelBDI::WriteWord( void *ptr, unsigned int idx, long int x ,int Dsize)
+void 
+CompressionModelBDI::WriteWord( void *ptr, unsigned int idx, long int x ,int Dsize)
 {
     
     switch(Dsize)
@@ -149,8 +159,9 @@ void CompressionModelBDI::WriteWord( void *ptr, unsigned int idx, long int x ,in
     }      
 }
 
-bool CompressionModelBDI::checkDeltalimits(long int Delta,int Dsize){
-    
+bool 
+CompressionModelBDI::checkDeltalimits(long int Delta,int Dsize)
+{
     bool check=1;
     switch(Dsize)
     {          
@@ -176,8 +187,8 @@ bool CompressionModelBDI::checkDeltalimits(long int Delta,int Dsize){
 }
 
 
-boost::tuple<bool,unsigned int> CompressionModelBDI::Specialized_compress(void *in, void *out, int k, int Dsize)
-
+boost::tuple<bool,unsigned int> 
+CompressionModelBDI::Specialized_compress(void *in, void *out, int k, int Dsize)
 {
  
     unsigned int i;
@@ -200,7 +211,8 @@ boost::tuple<bool,unsigned int> CompressionModelBDI::Specialized_compress(void *
 
 }
 
-boost::tuple<bool,unsigned int> CompressionModelBDI::zeros(void* in, void* out)
+boost::tuple<bool,unsigned int> 
+CompressionModelBDI::zeros(void* in, void* out)
 {
     char Base;
     unsigned char i;
@@ -220,7 +232,8 @@ boost::tuple<bool,unsigned int> CompressionModelBDI::zeros(void* in, void* out)
     return result;
 }
 
-boost::tuple<bool,unsigned int> CompressionModelBDI::repeated(void* in, void* out)
+boost::tuple<bool,unsigned int> 
+CompressionModelBDI::repeated(void* in, void* out)
 {
     unsigned char i;
     long int Base;
@@ -241,7 +254,8 @@ boost::tuple<bool,unsigned int> CompressionModelBDI::repeated(void* in, void* ou
 }
 
 
-UInt32 CompressionModelBDI::Compress(void* in, void* out)
+UInt32 
+CompressionModelBDI::compress_cache_line(void* in, void* out)
 {
     boost::tuple<bool,unsigned int> Results[8];
     char* pointers[8];
@@ -289,7 +303,8 @@ UInt32 CompressionModelBDI::Compress(void* in, void* out)
 
 
 
-UInt32 CompressionModelBDI::Decompress( void *in, void *out)
+UInt32 
+CompressionModelBDI::decompress_cache_line(void *in, void *out)
 {
     char code;
     unsigned int i;

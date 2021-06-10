@@ -25,6 +25,10 @@ private:
     String m_name; 
     UInt32 m_page_size; 
     UInt32 m_cache_line_size;
+    // Compression latency per cache line - cgiannoula: To be checked
+    UInt32 m_compression_latency = 3; // cgiannoula: Could be given in config file
+    // Decompression latency per cache line
+    UInt32 m_decompression_latency = 3; // cgiannoula: Could be given in config file
 
     // BDI.cc
     long int ReadWord( void*, unsigned int,int);
@@ -33,8 +37,8 @@ private:
     boost::tuple<bool,unsigned int> repeated(void* , void* );
     boost::tuple<bool,unsigned int> Specialized_compress(void *, void *, int , int );
     bool checkDeltalimits(long int,int);
-    UInt32 Compress(void *in, void *out);
-    UInt32 Decompress(void *in, void *out);
+    UInt32 compress_cache_line(void *in, void *out);
+    UInt32 decompress_cache_line(void *in, void *out);
     Byte* MakeCompBuf();
 
 };
