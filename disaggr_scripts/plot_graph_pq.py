@@ -24,11 +24,11 @@ class StatSetting:
         self.name_for_legend = name_for_legend
 
 
-def run_from_experiment(output_directory_path):
+def run_from_experiment(output_directory_path, log_file=None):
     # in this case, the two functions are the same
-    run_from_cmdline(output_directory_path)
+    run_from_cmdline(output_directory_path, log_file)
 
-def run_from_cmdline(output_directory_path):
+def run_from_cmdline(output_directory_path, log_file=None):
     ipc_line_no = 3  # Indexing start from 0, not 1
     # StatSetting line_beginning's: case sensitive, not sensitive to leading whitespace
     stat_settings = [
@@ -39,6 +39,7 @@ def run_from_cmdline(output_directory_path):
          StatSetting("average dram access latency", float, name_for_legend="avg dram access latency (ns)"),
          StatSetting("num data moves", int, name_for_legend="num data moves"),
          StatSetting("num inflight hits", int, name_for_legend="num inflight hits"),
+         # StatSetting("num redundant moves", int, name_for_legend="num redundant moves total"),
          StatSetting("num redundant moves total", int, name_for_legend="num redundant moves total"),
          StatSetting("num redundant moves temp1", int, name_for_legend="num redundant moves temp1"),
          StatSetting("num temp1 cache slower than page", int, name_for_legend="num temp1 cache slower than page"),
@@ -68,20 +69,22 @@ def run_from_cmdline(output_directory_path):
                         if line.strip().startswith(stat_setting.line_beginning):
                             y_value_line_nos[index] = line_no
                             y_values[index].append(
-                                stat_setting.format_func(line.split()[-1] if line.split()[-1] != "|" else np.nan)
+                                stat_setting.format_func(line.split()[-1]) if line.split()[-1] != "|" else np.nan
                             )  # The last entry of the line
-                if (
-                    not out_file_lines[ipc_line_no].strip().startswith("IPC")
-                    or None in y_value_line_nos
-                ):
-                    print("Error: didn't find desired line in .out file")
+                if not out_file_lines[ipc_line_no].strip().startswith("IPC"):
+                    print("Error: didn't find desired line starting with '{}' in .out file".format("IPC"))
+                    sys.exit(-1)
+                elif None in y_value_line_nos:
+                    for index, value in enumerate(y_value_line_nos):
+                        if value is None:
+                            print("Error: didn't find desired line starting with '{}' in .out file".format(stat_settings[index].line_beginning))
                     sys.exit(-1)
             else:
                 # Read the lines of pertinant information
                 for index in range(len(y_values)):
                     line = out_file_lines[y_value_line_nos[index]]
                     y_values[index].append(
-                        stat_settings[index].format_func(line.split()[-1] if line.split()[-1] != "|" else np.nan)
+                        stat_settings[index].format_func(line.split()[-1]) if line.split()[-1] != "|" else np.nan
                     )  # The last entry of the line
 
         # Associated sim.cfg file
@@ -106,10 +109,10 @@ def run_from_cmdline(output_directory_path):
             output_directory_path, "{}_sim.out".format(file_num)
         )
 
-    save_graph_pq(output_directory_path, y_values, stat_settings)
+    save_graph_pq(output_directory_path, y_values, stat_settings, log_file)
 
 
-def save_graph_pq(output_directory_path, y_values, stat_settings):
+def save_graph_pq(output_directory_path, y_values, stat_settings, log_file=None):
     plt.clf()
 
     if len(y_values[0]) == 7:
@@ -140,6 +143,12 @@ def save_graph_pq(output_directory_path, y_values, stat_settings):
     print("Y values:")
     for i, y_value_list in enumerate(y_values):
         print("{}: {}".format(stat_settings[i].name_for_legend, y_value_list))
+
+    if log_file:  # Also print to log file
+        print("X values:\n", [s.replace("\n", " ") for s in x_axis], file=log_file)
+        print("Y values:", file=log_file)
+        for i, y_value_list in enumerate(y_values):
+            print("{}: {}".format(stat_settings[i].name_for_legend, y_value_list), file=log_file)
 
     # Plot as graph
     line_style_list = [".--r", ".--g", ".--b", ".--c", ".--m", ".--y"]

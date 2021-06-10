@@ -1,15 +1,19 @@
 # Python 3
 import sys
 import os
+import stat
 import time
 import traceback
 import datetime
 import getopt
 import subprocess
+from collections import deque
 
-from typing import List, Iterable, Union, TypeVar
+import typing
+from typing import Dict, List, Iterable, Optional, TextIO, Union, TypeVar
 
-import plot_graph
+# import plot_graph
+import plot_graph_pq
 
 PathLike = TypeVar("PathLike", str, bytes, os.PathLike)  # Type for file/directory paths
 
@@ -24,10 +28,15 @@ sys.path.insert(0, os.path.join(this_file_containing_dir_abspath, ".."))
 
 
 class ConfigEntry:
-    def __init__(self, category: str, name: str, value: str) -> None:
-        """category should NOT include the square brackets.
+    """Represent one config entry used to configure Sniper."""
 
-        Example: Config("perf_model/dram", "remote_mem_add_lat", 5)"""
+    def __init__(self, category: str, name: str, value: str) -> None:
+        """Note: value should be a string for the config file (even if it seems
+        like a numeric type), and category should NOT include the square
+        brackets.
+
+        Example: Config("perf_model/dram", "remote_mem_add_lat", 5)
+        """
         self.category = category
         self.name = name
         self.value = value
@@ -38,11 +47,19 @@ class ConfigEntry:
 
 
 class ExperimentRunConfig:
+    """A collection of additional configs to specify for a particular
+    Sniper ExperimentRun.
+    """
+
     def __init__(self, config_entries: Iterable[ConfigEntry]) -> None:
         self.config_tree = {}
         self.add_config_entries(config_entries)
 
     def add_config_entry(self, config_entry: ConfigEntry):
+        """Add a ConfigEntry to this collection. config_entry should not be a
+        duplicate, ie have the same category and name as a ConfigEntry that is
+        already in this collection.
+        """
         if config_entry.category not in self.config_tree:
             self.config_tree[config_entry.category] = {}
         if config_entry.name in self.config_tree[config_entry.category]:
@@ -57,14 +74,18 @@ class ExperimentRunConfig:
         self.config_tree[config_entry.category][config_entry.name] = config_entry.value
 
     def add_config_entries(self, config_entries: Iterable[ConfigEntry]) -> None:
+        """Add the specified ConfigEntry's to this collection. None of the entries
+        should be duplicates, ie none should have the same category and name as a
+        ConfigEntry in config_entries or already in this collection.
+        """
         for config_entry in config_entries:
             self.add_config_entry(config_entry)
 
     def generate_config_file_str(self) -> str:
-        """Write this string to a file to generate a config file from this
-        ConfigEntryCollection's ConfigEntry entries.
+        """Return a string that when written to a file, will constitute a config
+        file containing this ExperimentRunConfig's ConfigEntry entries.
         """
-        lines = []
+        lines = []  # list of lines in the config file
         for category, name_value_dict in self.config_tree.items():
             lines.append("[{}]".format(category))
             lines.extend(
@@ -77,32 +98,208 @@ class ExperimentRunConfig:
         return "\n".join(lines)
 
 
+class ExperimentRun:
+    """Contain information that specifies the configuration for a particular
+    'run' of an Experiment.
+    """
+
+    def __init__(
+        self,
+        experiment_name: str,
+        experiment_run_no: int,
+        command_str: str,
+        experiment_output_directory: PathLike,
+        config_file_str: str,
+        setup_command_str=None,
+        clean_up_command_str=None,
+    ) -> None:
+        self.experiment_name = experiment_name
+        self.experiment_run_no = experiment_run_no
+        self.command_str = command_str
+        self.experiment_output_directory = experiment_output_directory
+        self.config_file_str = config_file_str
+        self.setup_command_str = setup_command_str
+        self.clean_up_command_str = clean_up_command_str
+        self.log_str = "Experiment {} run {} missing log str\n".format(
+            experiment_name, experiment_run_no
+        )
+
+    def get_config_file_str(self) -> str:
+        """Write this string to a file to generate a config file that specifies
+        the additional configs for this ExperimentRun.
+        """
+        return self.config_file_str
+
+    def get_execution_script_str(self) -> str:
+        """Write this string to a file to generate a script that executes this
+        ExperimentRun.
+
+        The returned string needs to be formatted with named argument
+        sniper_output_dir: where the experiment run output directory is
+        """
+        lines = []
+
+        # lines.append("cd {0}")
+
+        if self.setup_command_str:
+            lines.append(self.setup_command_str)
+
+        lines.append('echo "Running linux command:\n{}"'.format(self.command_str))
+        if "{sniper_output_dir}" not in self.command_str:
+            # command_str should have a {0} field to specify the Sniper output directory
+            raise ValueError(
+                "Experiment {} run {} missing '{{sniper_output_dir}}' in command_str to specify Sniper output directory. command_str given:\n{}".format(
+                    self.experiment_name, self.experiment_run_no, self.command_str
+                )
+            )
+        lines.append(self.command_str)
+        lines.append(
+            'if [ $? !=  0 ] ; then echo "{}" $?; fi'.format(
+                "Run-sniper-repeat command '{}' for experiment {} run {} got error ret val: ".format(
+                    self.command_str, self.experiment_name, self.experiment_run_no
+                )
+            )
+        )  # using single bracket [ ] testing for now, since might not be sure which shell is used
+
+        if self.clean_up_command_str:
+            lines.append(self.clean_up_command_str)
+
+        # Save a copy of the output for later reference
+        files_to_save = ["sim.cfg", "sim.out", "sim.stats.sqlite3"]
+        for filename in files_to_save:
+            lines.append(
+                'cp "{0}" "{1}"/"{2}_{0}"'.format(
+                    filename, self.experiment_output_directory, self.experiment_run_no
+                )
+            )
+
+        return "\n".join(lines)
+
+    def set_log_str(self, log_str) -> None:
+        """Set the log string of this ExperimentRun."""
+        self.log_str = log_str
+
+    def get_log_str(self) -> str:
+        """Return the log string of this ExperimentRun."""
+        return self.log_str
+
+
 class Experiment:
+    """Represents an experiment to run, specified with:
+    1) Parameters including a command string to run and configs for experiment runs
+    2) Commands to run after the experiment (eg graphing)
+    """
+
+    _experiment_runs: List[ExperimentRun]
+    _experiment_output_dir_abspath: Optional[PathLike]
+    _completed_experiment_runs: int
+
     def __init__(
         self,
         experiment_name: str,
         command_str: str,
         experiment_run_configs: Iterable[ExperimentRunConfig],
-        output_directory: PathLike,
+        output_root_directory: PathLike,
         setup_command_str=None,
         clean_up_command_str=None,
     ):
         self.experiment_name = experiment_name
         self.command_str = command_str
         self.experiment_run_configs = experiment_run_configs
-        self.output_directory = output_directory
+        self.output_root_directory = output_root_directory
         self.setup_command_str = setup_command_str
         self.clean_up_command_str = clean_up_command_str
+        self.start_time = None
+        self._experiment_runs = []
+        self._experiment_output_dir_abspath = None
+        self._completed_experiment_runs = 0
 
-    def run_and_graph(self):
-        experiment_output_directory = self.run_experiment(
-            self.experiment_name,
-            self.command_str,
-            self.experiment_run_configs,
-            self.output_directory,
-            self.setup_command_str,
-            self.clean_up_command_str,
+    def prepare_experiment(self) -> List[ExperimentRun]:
+        """Create directory that will eventually contain all finalized experiment
+        output, and generate a list of ExperimentRuns.
+        """
+        # Find a directory name that doesn't already exist
+        experiment_output_directory_name = self.experiment_name + "_output_files"
+        experiment_output_directory = os.path.join(
+            self.output_root_directory, experiment_output_directory_name
         )
+        num = 2
+        while os.path.exists(experiment_output_directory):
+            experiment_output_directory_name = (
+                self.experiment_name + "_output_files_" + str(num)
+            )
+            experiment_output_directory = os.path.join(
+                self.output_root_directory, experiment_output_directory_name
+            )
+            num += 1
+        os.makedirs(experiment_output_directory)
+        # Use absolute path from now on so no future results get messed up
+        self._experiment_output_dir_abspath = os.path.abspath(
+            experiment_output_directory
+        )
+
+        self.start_time = time.time()
+        for experiment_no, config_collection in enumerate(self.experiment_run_configs):
+            # Generate ExperimentRun objects
+            obj = ExperimentRun(
+                self.experiment_name,
+                experiment_no + 1,
+                self.command_str,
+                self._experiment_output_dir_abspath,
+                config_collection.generate_config_file_str(),
+            )
+            self._experiment_runs.append(obj)
+        return self._experiment_runs.copy()  # Shallow copy
+
+    def experiment_run_completed(self) -> None:
+        """Run this method when a run of this experiment (not necessarily in
+        order) is completed.
+        """
+        self._completed_experiment_runs += 1
+
+    def experiment_done(self) -> bool:
+        """Return True iff all runs of this experiment are completed."""
+        return self._completed_experiment_runs == len(self._experiment_runs)
+
+    def compile_experiment_log(self) -> PathLike:
+        """Create and return a log file from the log strings in this Experiment's
+        ExperimentRun objects.
+        """
+        # Create log file in the experiment output directory
+        log_file_path = os.path.join(
+            self._experiment_output_dir_abspath,
+            "Experiment_{}.log".format(self.experiment_name),
+        )
+        with open(log_file_path, "w") as log_file:
+            for experiment_run in self._experiment_runs:
+                log_file.write(experiment_run.get_log_str())
+                log_file.write("\n\n")
+        return log_file_path
+
+    def post_experiment_processing(self) -> None:
+        """Run this method after all runs of the experiment have finished."""
+        # Compile logs
+        log_file_path = self.compile_experiment_log()
+
+        with open(log_file_path, "a") as log_file:
+            log_file.write(
+                "Finished {} runs (potentially some in parallel) in {:.2f} seconds\n\n".format(
+                    self._completed_experiment_runs, time.time() - self.start_time
+                )
+            )
+
+            # Provide extra context to console output
+            print("Experiment {}:".format(self.experiment_name))
+            # Custom graph plotting function
+            plot_graph_pq.run_from_experiment(
+                self._experiment_output_dir_abspath, log_file
+            )
+
+    ### The following are older versions of methods used to run experiments
+    def run_and_graph(self):
+        """Older version, running experiment directly and graphing results
+        without parallelization."""
+        experiment_output_directory = self.run_experiment()
 
         # These experiments will use custom graph plotting functions
         # plot_graph.run_from_experiment(
@@ -112,36 +309,29 @@ class Experiment:
         #     self.config_param_values,
         # )
 
-    def run_experiment(
-        self,
-        experiment_name: str,
-        command_str: str,
-        experiment_run_configs: Iterable[ExperimentRunConfig],
-        output_root_directory: PathLike,
-        setup_command_str=None,
-        clean_up_command_str=None,
-    ) -> PathLike:
+    def run_experiment(self) -> PathLike:
+        """Older version, running experiment directly without parallelization."""
         # Find a directory name that doesn't already exist
-        experiment_output_directory_name = experiment_name + "_output_files"
+        experiment_output_directory_name = self.experiment_name + "_output_files"
         experiment_output_directory = os.path.join(
-            output_root_directory, experiment_output_directory_name
+            self.output_root_directory, experiment_output_directory_name
         )
         num = 2
         while os.path.exists(experiment_output_directory):
             experiment_output_directory_name = (
-                experiment_name + "_output_files_" + str(num)
+                self.experiment_name + "_output_files_" + str(num)
             )
             experiment_output_directory = os.path.join(
-                output_root_directory, experiment_output_directory_name
+                self.output_root_directory, experiment_output_directory_name
             )
             num += 1
         os.makedirs(experiment_output_directory)
 
         start_time = time.time()
-        for experiment_no, config_collection in enumerate(experiment_run_configs):
+        for experiment_no, config_collection in enumerate(self.experiment_run_configs):
             # Update config file
             with open(
-                os.path.join(this_file_containing_dir_abspath, "repeat_testing.cfg"),
+                os.path.join(experiment_output_directory, "repeat_testing.cfg"),
                 "w",
             ) as variating_config_file:
                 # variating_config_file.truncate(0)  # start writing from the beginning of the file;
@@ -152,14 +342,14 @@ class Experiment:
 
             # Run the program
             error_occurred = False
-            command_strs = [command_str]
-            if setup_command_str:
-                command_strs.insert(0, setup_command_str)
-            if clean_up_command_str:
-                command_strs.append(clean_up_command_str)
-            for command_str in command_strs:
-                print("Running linux command:\n{}".format(command_str))
-                wait_status = os.system(command_str)  # Behaviour on Linux
+            command_strs = [self.command_str]
+            if self.setup_command_str:
+                command_strs.insert(0, self.setup_command_str)
+            if self.clean_up_command_str:
+                command_strs.append(self.clean_up_command_str)
+            for cmd_str in command_strs:
+                print("Running linux command:\n{}".format(cmd_str))
+                wait_status = os.system(cmd_str)  # Behaviour on Linux
                 if os.WIFSIGNALED(wait_status) and os.WTERMSIG(wait_status) == 2:
                     # Keyboard Interrupt, stop execution of entire program
                     sys.exit(-1)
@@ -167,7 +357,7 @@ class Experiment:
                     error_occurred = True
                     print(
                         "Run-sniper-repeat command '{}' for experiment run {} got error ret val:\n[[{}]]".format(
-                            command_str,
+                            cmd_str,
                             experiment_no + 1,
                             os.WEXITSTATUS(wait_status),
                         )
@@ -186,48 +376,266 @@ class Experiment:
                 )
 
             print(
-                "Experiment {} run {} done.".format(experiment_name, experiment_no + 1)
+                "Experiment {} run {} done.".format(
+                    self.experiment_name, experiment_no + 1
+                )
             )
 
         end_time = time.time()
         print(
             "\nRan {} experiment runs in {:.2f} seconds.".format(
-                len(experiment_run_configs), end_time - start_time
+                len(self.experiment_run_configs), end_time - start_time
             )
         )
         print(
             "Average: {:.2f} seconds/experiment run.".format(
-                (end_time - start_time) / len(experiment_run_configs)
+                (end_time - start_time) / len(self.experiment_run_configs)
             )
         )
         return experiment_output_directory
 
 
-# def execute():
-#   global cmd, usage
+class ExperimentManager:
+    class ProcessInfo:
+        """Class only used by ExperimentManager, collecting information needed
+        by a process to run an ExperimentRun."""
 
-#   cmd = command_str.split()
+        process: Optional[subprocess.Popen]
+        start_time: Optional[float]
+        log_file: Optional[TextIO]
+        experiment_run: Optional[ExperimentRun]
+        containing_experiment: Optional[Experiment]
+        temp_dir: Optional[PathLike]
 
-#   sys.stdout.flush()
-#   sys.stderr.flush()
+        def __init__(self) -> None:
+            self.process = None
+            self.start_time = None
+            self.log_file = None
+            self.experiment_run = None
+            self.containing_experiment = None
+            self.temp_dir = None
 
-#   subproc = subprocess.Popen(cmd, env = env)
+    class ProcessQueueInfo:
+        """Class only used by ExperimentManager, to keep track of the
+        containing Experiment of an ExperimentRun."""
 
-#   try:
-#     try:
-#       pid, rc, usage = os.wait4(subproc.pid, 0)
-#     except AttributeError:
-#       pid, rc = os.waitpid(subproc.pid, 0)
-#   except KeyboardInterrupt:
-#     try:
-#       os.kill(subproc.pid, 9)
-#     except OSError:
-#       # Already dead, never mind
-#       pass
-#     return 9
+        def __init__(
+            self, containing_experiment: Experiment, experiment_run: ExperimentRun
+        ) -> None:
+            self.containing_experiment = containing_experiment
+            self.experiment_run = experiment_run
 
-#   rc >>= 8
-#   return rc
+    _pending_experiments: typing.Deque[Experiment]
+    _running_experiments: List[Experiment]
+    _process_queue: typing.Deque[ProcessQueueInfo]
+    _current_concurrent_processes: int
+
+    def __init__(
+        self,
+        output_root_directory: PathLike,
+        max_concurrent_processes: int,
+        log_file: TextIO,
+    ) -> None:
+        self.output_directory_abspath = os.path.abspath(output_root_directory)
+        self.max_concurrent_processes = max_concurrent_processes
+        self.log_file = log_file
+        self._pending_experiments = deque([])
+        self._running_experiments = []  # use list for easier extracting from the middle
+        self._process_queue = deque([])  # append, popleft
+        self._current_concurrent_processes = 0
+
+    # def set_max_concurrent_processes(self, max_concurrent_processes: int) -> None:
+    #     self.max_concurrent_processes = max_concurrent_processes
+
+    def add_experiment(self, experiment: Experiment) -> None:
+        self._pending_experiments.append(experiment)
+
+    def add_experiments(self, experiments: Iterable[Experiment]) -> None:
+        self._pending_experiments.extend(experiments)
+
+    def start(self) -> None:
+        """Start running Experiment's added to this ExperimentManager."""
+        os.chdir(self.output_directory_abspath)
+        process_info = [
+            ExperimentManager.ProcessInfo()
+            for _ in range(self.max_concurrent_processes)
+        ]
+
+        # Set up temp directories for the processes
+        for process_num in range(self.max_concurrent_processes):
+            process_temp_dir_name = "process_{}_temp".format(process_num)
+            process_temp_dir = os.path.join(
+                self.output_directory_abspath, process_temp_dir_name
+            )
+            if not os.path.isdir(process_temp_dir):
+                os.makedirs(process_temp_dir)
+            process_info[process_num].temp_dir = process_temp_dir
+
+        try:
+            while (
+                len(self._pending_experiments) > 0
+                or len(self._process_queue) > 0
+                or sum(pi.process is None for pi in process_info) != len(process_info)
+            ):
+                if len(self._process_queue) == 0 and len(self._pending_experiments) > 0:
+                    # Replenish _process_queue if there are more experiments yet to be started
+                    experiment = self._pending_experiments.popleft()
+                    self._running_experiments.append(experiment)
+                    experiment_runs = experiment.prepare_experiment()
+                    for experiment_run in experiment_runs:
+                        self._process_queue.append(
+                            ExperimentManager.ProcessQueueInfo(
+                                experiment, experiment_run
+                            )
+                        )
+
+                for index in range(len(process_info)):
+                    if (
+                        process_info[index].process is None
+                        and len(self._process_queue) > 0
+                    ):
+                        # Spawn process
+                        process_request = self._process_queue.popleft()
+                        process_info[
+                            index
+                        ].experiment_run = process_request.experiment_run
+                        process_info[
+                            index
+                        ].containing_experiment = process_request.containing_experiment
+
+                        # Change current working directory to that of the process to spawn
+                        os.chdir(process_info[index].temp_dir)
+                        # Create/Update config file
+                        with open(
+                            "repeat_testing.cfg",
+                            "w",
+                        ) as variating_config_file:
+                            variating_config_file.write(
+                                process_info[index].experiment_run.get_config_file_str()
+                            )
+
+                        # Create ExperimentRun execution script
+                        execution_script_path = "experiment_run_{}.sh".format(
+                            process_info[index].experiment_run.experiment_run_no
+                        )
+                        with open(
+                            execution_script_path,
+                            "w",
+                        ) as execution_script:
+                            # use current directory for Sniper output since we're already in the process' temp dir
+                            execution_script.write(
+                                process_info[index]
+                                .experiment_run.get_execution_script_str()
+                                .format(sniper_output_dir=".")
+                            )
+                        # os.system('chmod a+x "{}"'.format(execution_script_path))
+                        os.chmod(
+                            execution_script_path,
+                            os.stat(execution_script_path).st_mode
+                            | stat.S_IXUSR
+                            | stat.S_IXGRP
+                            | stat.S_IXOTH,
+                        )
+
+                        # Log file for this ExperimentRun for this process
+                        log_file = open("process_{}.log".format(index), "w+")
+                        process_info[index].log_file = log_file
+                        # Execute execution script
+                        process_info[index].process = subprocess.Popen(
+                            '"./{}"'.format(execution_script_path),
+                            shell=True,
+                            stdout=log_file,
+                            stderr=subprocess.STDOUT,
+                            text=True,
+                        )
+                        process_info[index].start_time = time.time()
+                        log_str = "Process {} for experiment {} run {} started at time {}".format(
+                            index,
+                            process_info[index].experiment_run.experiment_name,
+                            process_info[index].experiment_run.experiment_run_no,
+                            datetime.datetime.now().astimezone(),
+                        )
+                        print(log_str)
+                        print(log_str, file=self.log_file)
+
+                        # Restore current working directory after setting up the process
+                        os.chdir(self.output_directory_abspath)
+                    elif process_info[index].process is not None:
+                        ret = process_info[index].process.poll()
+                        if ret is not None:
+                            # Process is done
+                            if process_info[index].process.returncode != 0:
+                                log_str = "Experiment {} run {} execution script returned non-zero exit status of {}".format(
+                                    process_info[index].experiment_run.experiment_name,
+                                    process_info[
+                                        index
+                                    ].experiment_run.experiment_run_no,
+                                    process_info[index].process.returncode,
+                                )
+                                print(log_str)
+                                print(log_str, file=self.log_file)
+                            end_time = time.time()
+                            log_str = "Experiment {} run {} complete; took {:.2f} seconds (current time: {})".format(
+                                process_info[index].experiment_run.experiment_name,
+                                process_info[index].experiment_run.experiment_run_no,
+                                end_time - process_info[index].start_time,
+                                datetime.datetime.now().astimezone(),
+                            )
+
+                            print(log_str)
+                            print(log_str, file=self.log_file)
+                            process_info[
+                                index
+                            ].containing_experiment.experiment_run_completed()
+                            process_info[index].process = None
+                            # Write log file string to ExperimentRun object for later records
+                            process_info[index].log_file.seek(0)
+                            process_info[index].experiment_run.set_log_str(
+                                "Experiment run {}:\n".format(
+                                    process_info[index].experiment_run.experiment_run_no
+                                )
+                                + process_info[index].log_file.read()
+                            )
+                            process_info[index].log_file.close()
+                            process_info[index].log_file = None
+
+                # Process experiments that have all runs completed
+                i = 0
+                while i < len(self._running_experiments):
+                    if self._running_experiments[i].experiment_done():
+                        try:
+                            self._running_experiments[i].post_experiment_processing()
+                        except Exception as e:
+                            # Print exception details but don't let this post-processing crash the entire ExperimentManager
+                            traceback.print_exc()
+                            traceback.print_exc(file=self.log_file)
+                        log_str = "Experiment {} complete".format(
+                            self._running_experiments[i].experiment_name
+                        )
+                        print(log_str)
+                        print(log_str, file=self.log_file)
+                        self._running_experiments.pop(i)
+                    else:
+                        i += 1
+
+        except KeyboardInterrupt:
+            pass  # Cleanup is done in the finally block
+        except Exception as e:
+            # Print exception traceback to both stdout and log file
+            traceback.print_exc()
+            traceback.print_exc(file=self.log_file)
+        finally:
+            # Cleanup
+            for pi in process_info:
+                if pi.process is not None:
+                    pi.process.terminate()
+            time.sleep(0.5)  # Give processes some time to terminate
+            for pi in process_info:
+                if pi.log_file is not None:
+                    pi.log_file.close()
+            # Write experiment progress to files, even though experiments might not be done yet
+            for experiment in self._running_experiments:
+                experiment.compile_experiment_log()
 
 
 def generate_one_varying_param_experiment_run_configs(
@@ -245,23 +653,38 @@ def generate_one_varying_param_experiment_run_configs(
 
 
 if __name__ == "__main__":
-    # Assumes the program is compiled
-    command_str1a = "../run-sniper -n 1 -c ../disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg --roi -- ../test/a_disagg_test/mem_test"
-    command_str1b = "../run-sniper -n 1 -c ../disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg --roi -- ./test/a_disagg_test/mem_test_varied"
-    command_str2a = "../run-sniper -c ../disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg -- ../test/crono/apps/sssp/sssp ../test/crono/inputs/bcsstk05.mtx 1"
-    command_str2b = "../run-sniper -c ../disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg -- ../test/crono/apps/sssp/sssp ../test/crono/inputs/bcsstk25.mtx 1"
-
-    darknet_home = "../benchmarks/darknet"  # relative to disaggr_scripts directory
-    ligra_home = "../benchmarks/ligra"  # relative to disaggr_scripts directory
-
-    command_strs = {}
+    # Relative to directory where command_str will be executed, ie subfolder of this file's containing directory
+    subfolder_sniper_root_relpath = "../.."
+    # Relative to subfolder of disaggr_scripts directory
+    darknet_home = "{sniper_root}/benchmarks/darknet".format(
+        sniper_root=subfolder_sniper_root_relpath
+    )
+    ligra_home = "{sniper_root}/benchmarks/ligra".format(
+        sniper_root=subfolder_sniper_root_relpath
+    )
     ONE_MILLION = 1000000  # eg to specify how many instructions to run
     ONE_MB_TO_BYTES = 1024 * 1024  # eg to specify localdram_size
 
+    # Previous test strings; assumes the program is compiled
+    command_str1a = "{sniper_root}/run-sniper -d {{sniper_output_dir}} -n 1 -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg --roi -- {sniper_root}/test/a_disagg_test/mem_test".format(
+        sniper_root=subfolder_sniper_root_relpath
+    )
+    command_str1b = "{sniper_root}/run-sniper -d {{sniper_output_dir}} -n 1 -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg --roi -- {sniper_root}/test/a_disagg_test/mem_test_varied".format(
+        sniper_root=subfolder_sniper_root_relpath
+    )
+    command_str2a = "{sniper_root}/run-sniper -d {{sniper_output_dir}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg -- {sniper_root}/test/crono/apps/sssp/sssp {sniper_root}/test/crono/inputs/bcsstk05.mtx 1".format(
+        sniper_root=subfolder_sniper_root_relpath
+    )
+    command_str2b = "{sniper_root}/run-sniper -d {{sniper_output_dir}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg -- {sniper_root}/test/crono/apps/sssp/sssp {sniper_root}/test/crono/inputs/bcsstk25.mtx 1".format(
+        sniper_root=subfolder_sniper_root_relpath
+    )
+
+    command_strs = {}
+
     ###  Darknet command strings  ###
     # Note: using os.system(), the 'cd' of working directory doesn't persist to the next call to os.system()
-    darknet_base_str_options = "cd {1} && ../../run-sniper -d {2} -c ../../disaggr_config/local_memory_cache.cfg -c {2}/repeat_testing.cfg {{1}} -- {0}/darknet classifier predict {0}/cfg/imagenet1k.data {0}/cfg/{{0}}.cfg {0}/{{0}}.weights {0}/data/dog.jpg".format(
-        ".", darknet_home, this_file_containing_dir_abspath
+    darknet_base_str_options = "cd {1} && ../../run-sniper -d {{{{sniper_output_dir}}}} -c ../../disaggr_config/local_memory_cache.cfg -c {{{{sniper_output_dir}}}}/repeat_testing.cfg {{1}} -- {0}/darknet classifier predict {0}/cfg/imagenet1k.data {0}/cfg/{{0}}.cfg {0}/{{0}}.weights {0}/data/dog.jpg".format(
+        ".", darknet_home
     )
     command_strs["darknet_tiny"] = darknet_base_str_options.format("tiny", "")
     command_strs["darknet_darknet19"] = darknet_base_str_options.format("darknet19", "")
@@ -271,8 +694,8 @@ if __name__ == "__main__":
 
     ###  Ligra command strings  ###
     # Do only 1 timed round to save time during initial experiments
-    ligra_base_str_options = "../run-sniper -d {1} -c ../disaggr_config/local_memory_cache.cfg -c {1}/repeat_testing.cfg {{2}} -- {0}/apps/{{0}} -s -rounds 1 {0}/inputs/{{1}}".format(
-        ligra_home, this_file_containing_dir_abspath
+    ligra_base_str_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c {{{{sniper_output_dir}}}}/repeat_testing.cfg {{2}} -- {0}/apps/{{0}} -s -rounds 1 {0}/inputs/{{1}}".format(
+        ligra_home, sniper_root=subfolder_sniper_root_relpath
     )
     ligra_input_to_file = {
         "regular_input": "rMat_1000000",
@@ -313,8 +736,6 @@ if __name__ == "__main__":
         ligra_input_to_file["small_input"],
         "-g perf_model/dram/localdram_size={}".format(1 * ONE_MB_TO_BYTES),
     )
-
-    experiments = []
 
     partition_queue_series_experiment_run_configs = [
         # 1) Remote off
@@ -376,20 +797,26 @@ if __name__ == "__main__":
         ),
     ]
 
-    # Remote off, PQ=0 network lat=0, PQ=0, PQ=1
+    experiments = []
+
+    # Partition queue series, 6 runs per series
+    # BFS_small 1, 2, 4 MB, Partition queue series, now with net_lat = 120
+    bfs_small_pq_experiments = []
     ligra_input_selection = "regular_input"  # "regular_input" OR "small_input"
     ligra_input_file = ligra_input_to_file[ligra_input_selection]
-    for num_MB in [2, 4, 8]:
+    application_name = "BFS"
+    for num_MB in [1, 2, 4]:
         localdram_size_str = "{}MB".format(num_MB)
         command_str = ligra_base_str_options.format(
-            "BFS",
+            application_name,
             ligra_input_file,
             "-g perf_model/dram/localdram_size={}".format(num_MB * ONE_MB_TO_BYTES),
         )
 
-        experiments.append(
+        bfs_small_pq_experiments.append(
             Experiment(
-                experiment_name="ligra_bfs_{}localdram_{}_partition_queue_series".format(
+                experiment_name="ligra_{}_{}localdram_{}_netlat_120_partition_queue_series".format(
+                    application_name.lower(),
                     ""
                     if ligra_input_selection == "regular_input"
                     else ligra_input_selection + "_",
@@ -397,7 +824,100 @@ if __name__ == "__main__":
                 ),
                 command_str=command_str,
                 experiment_run_configs=partition_queue_series_experiment_run_configs,
-                output_directory=".",
+                output_root_directory=".",
+            )
+        )
+
+    # BFS_small, cacheline queue ratio series, net_lat = 120
+    bfs_small_cacheline_ratio_experiments = []
+    ligra_input_selection = "small_input"  # "regular_input" OR "small_input"
+    ligra_input_file = ligra_input_to_file[ligra_input_selection]
+    application_name = "BFS"
+    for num_MB in [1, 2, 4]:
+        localdram_size_str = "{}MB".format(num_MB)
+        command_str = ligra_base_str_options.format(
+            application_name,
+            ligra_input_file,
+            "-g perf_model/dram/localdram_size={}".format(num_MB * ONE_MB_TO_BYTES),
+        )
+
+        bfs_small_cacheline_ratio_experiments.append(
+            Experiment(
+                experiment_name="ligra_bfs_{}localdram_{}_netlat_120_cacheline_ratio_series".format(
+                    ""
+                    if ligra_input_selection == "regular_input"
+                    else ligra_input_selection + "_",
+                    localdram_size_str,
+                ),
+                command_str=command_str,
+                experiment_run_configs=generate_one_varying_param_experiment_run_configs(
+                    "perf_model/dram",
+                    "remote_cacheline_queue_fraction",
+                    ["0.4", "0.3", "0.2", "0.1"],
+                ),
+                output_root_directory=".",
+            )
+        )
+
+    # BFS 43, 22 MB, Partition queue series
+    bfs_pq_experiments = []
+    ligra_input_selection = "regular_input"  # "regular_input" OR "small_input"
+    ligra_input_file = ligra_input_to_file[ligra_input_selection]
+    application_name = "BFS"
+    for num_MB in [43, 22]:  # approx 50% and 25% of total memory usage in ROI
+        localdram_size_str = "{}MB".format(num_MB)
+        command_str = ligra_base_str_options.format(
+            application_name,
+            ligra_input_file,
+            "-g perf_model/dram/localdram_size={} -s stop-by-icount:{}".format(
+                num_MB * ONE_MB_TO_BYTES, 1000 * ONE_MILLION
+            ),
+        )
+        # BFS only has 220M instructions, so won't be limited by the 1 billion instructions cap
+
+        bfs_pq_experiments.append(
+            Experiment(
+                experiment_name="ligra_{}_{}localdram_{}_partition_queue_series".format(
+                    application_name.lower(),
+                    ""
+                    if ligra_input_selection == "regular_input"
+                    else ligra_input_selection + "_",
+                    localdram_size_str,
+                ),
+                command_str=command_str,
+                experiment_run_configs=partition_queue_series_experiment_run_configs,
+                output_root_directory=".",
+            )
+        )
+
+    # PageRank 36, 18 MB, Partition queue series
+    page_rank_pq_experiments = []
+    ligra_input_selection = "regular_input"  # "regular_input" OR "small_input"
+    ligra_input_file = ligra_input_to_file[ligra_input_selection]
+    application_name = "PageRank"
+    for num_MB in [36, 18]:  # approx 50% and 25% of total memory usage in ROI
+        localdram_size_str = "{}MB".format(num_MB)
+        command_str = ligra_base_str_options.format(
+            application_name,
+            ligra_input_file,
+            "-g perf_model/dram/localdram_size={} -s stop-by-icount:{}".format(
+                num_MB * ONE_MB_TO_BYTES, 1000 * ONE_MILLION
+            ),
+        )
+        # Cap Pagerank at 1 Billion instructions
+
+        page_rank_pq_experiments.append(
+            Experiment(
+                experiment_name="ligra_{}_{}localdram_{}_partition_queue_series".format(
+                    application_name.lower(),
+                    ""
+                    if ligra_input_selection == "regular_input"
+                    else ligra_input_selection + "_",
+                    localdram_size_str,
+                ),
+                command_str=command_str,
+                experiment_run_configs=partition_queue_series_experiment_run_configs,
+                output_root_directory=".",
             )
         )
 
@@ -420,9 +940,14 @@ if __name__ == "__main__":
         #                 16384,
         #             ],  # latency is in nanoseconds
         #         ),
-        #         output_directory=".",
+        #         output_root_directory=".",
         #     )
         # )
+
+    # experiments.extend(bfs_small_pq_experiments)
+    # experiments.extend(bfs_small_cacheline_ratio_experiments)
+    # experiments.extend(bfs_pq_experiments)
+    # experiments.extend(page_rank_pq_experiments)
 
     command_selection = "darknet_tiny"
     command_selection = "ligra_bfs_small_input"
@@ -446,7 +971,7 @@ if __name__ == "__main__":
     #                     10000,
     #                 ],  # latency is in nanoseconds
     #             ),
-    #             output_directory=".",
+    #             output_root_directory=".",
     #         ),
     #         Experiment(
     #             experiment_name=command_selection + "_remote_bw_scalefactor",
@@ -456,7 +981,7 @@ if __name__ == "__main__":
     #                 config_param_name="remote_mem_bw_scalefactor",
     #                 config_param_values=[1, 2, 4, 8, 16, 32, 64, 128],
     #             ),
-    #             output_directory=".",
+    #             output_root_directory=".",
     #         ),
     #         Experiment(
     #             experiment_name=command_selection + "_localdram_size",
@@ -466,7 +991,7 @@ if __name__ == "__main__":
     #                 config_param_name="localdram_size",
     #                 config_param_values=[4096, 16384, 65536, 262144, 524288, 1048576],
     #             ),
-    #             output_directory=".",
+    #             output_root_directory=".",
     #         ),
     #     ]
     # )
@@ -485,7 +1010,7 @@ if __name__ == "__main__":
     #             + list(range(1000, 10000, 1000))
     #             + [10000],  # latency is in nanoseconds
     #         ),
-    #         output_directory=".",
+    #         output_root_directory=".",
     #     ),
     #     Experiment(
     #         experiment_name="bcsstk05_remote_bw_scalefactor",
@@ -495,7 +1020,7 @@ if __name__ == "__main__":
     #             config_param_name="remote_mem_bw_scalefactor",
     #             config_param_values=[1, 2, 4, 8, 16, 32, 64, 128],
     #         ),
-    #         output_directory=".",
+    #         output_root_directory=".",
     #     ),
     #     Experiment(
     #         experiment_name="bcsstk05_localdram_size",
@@ -507,7 +1032,7 @@ if __name__ == "__main__":
     #             config_param_values=[4096, 16384, 65536, 262144, 524288, 1048576],
     #             # 950000 is approx the working set size for bcsstk05
     #         ),
-    #         output_directory=".",
+    #         output_root_directory=".",
     #     ),
     # ]
 
@@ -522,24 +1047,32 @@ if __name__ == "__main__":
         log_str = "Script start time: {}".format(datetime.datetime.now().astimezone())
         print(log_str)
         print(log_str, file=log_file)
-        for experiment in experiments:
-            try:
-                # Run experiment
-                log_str = "Starting experiment {} at {}".format(
-                    experiment.experiment_name, datetime.datetime.now().astimezone()
-                )
-                print(log_str)
-                print(log_str, file=log_file)
-                experiment.run_and_graph()
-            except Exception as e:
-                # Print exception traceback to both stdout and log file
-                err_str = "Error occurred while running experiment '{}':".format(
-                    experiment.experiment_name
-                )
-                print(err_str)
-                traceback.print_exc()
-                print(file=log_file)
-                traceback.print_exc(file=log_file)
+
+        # for experiment in experiments:
+        #     try:
+        #         # Run experiment
+        #         log_str = "Starting experiment {} at {}".format(
+        #             experiment.experiment_name, datetime.datetime.now().astimezone()
+        #         )
+        #         print(log_str)
+        #         print(log_str, file=log_file)
+        #         experiment.run_and_graph()
+        #     except Exception as e:
+        #         # Print exception traceback to both stdout and log file
+        #         err_str = "Error occurred while running experiment '{}':".format(
+        #             experiment.experiment_name
+        #         )
+        #         print(err_str)
+        #         traceback.print_exc()
+        #         print(err_str, file=log_file)
+        #         traceback.print_exc(file=log_file)
+
+        experiment_manager = ExperimentManager(
+            output_root_directory=".", max_concurrent_processes=4, log_file=log_file
+        )
+        experiment_manager.add_experiments(experiments)
+        experiment_manager.start()
+
         log_str = "Script end time: {}".format(datetime.datetime.now().astimezone())
         print(log_str)
         print(log_str, file=log_file)
