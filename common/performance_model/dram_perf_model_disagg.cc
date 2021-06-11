@@ -148,12 +148,13 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
                     m_intercommand_delay_long));
     }
 
-    // TODO: Compression
+    // Compression
     m_use_compression = Sim()->getCfg()->getBool("perf_model/dram/compression_model/use_compression");
     if (m_use_compression) {
         String compression_scheme = Sim()->getCfg()->getString("perf_model/dram/compression_model/compression_scheme");
         m_compression_model = CompressionModel::create("Link Compression Model", m_page_size, cache_block_size, compression_scheme);
         registerStatsMetric("compression", core_id, "bytes-saved", &bytes_saved);
+        registerStatsMetric("compression", core_id, "sum-compression-ratio", &m_sum_compression_ratio);
         registerStatsMetric("compression", core_id, "total-compression-latency", &m_total_compression_latency);
         registerStatsMetric("compression", core_id, "total-decompression-latency", &m_total_decompression_latency);
     }
@@ -169,7 +170,6 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     registerStatsMetric("ddr", core_id, "page-empty", &m_dram_page_empty);
     registerStatsMetric("ddr", core_id, "page-closing", &m_dram_page_closing);
     registerStatsMetric("ddr", core_id, "page-misses", &m_dram_page_misses);
-    registerStatsMetric("dram", core_id, "page-size", (UInt64*)&m_page_size); // For compression
     registerStatsMetric("dram", core_id, "total-access-latency", &m_total_access_latency); // cgiannoula
     registerStatsMetric("dram", core_id, "total-local-access-latency", &m_total_local_access_latency);
     registerStatsMetric("dram", core_id, "total-remote-access-latency", &m_total_remote_access_latency);
@@ -474,10 +474,12 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             UInt32 page_size = m_page_size;
             if (m_use_compression)
             {
-                SubsecondTime compression_latency = m_compression_model->compress(phys_page, m_page_size, m_core_id, &page_size);
+                UInt32 compressed_cache_lines;
+                SubsecondTime compression_latency = m_compression_model->compress(phys_page, m_page_size, m_core_id, &page_size, &compressed_cache_lines);
                 bytes_saved += m_page_size - page_size;
                 address_to_compressed_size[phys_page] = page_size;
-                address_to_num_cache_lines[phys_page] = 32; // TODO: fix
+                address_to_num_cache_lines[phys_page] = compressed_cache_lines;
+                m_sum_compression_ratio += float(m_page_size) / float(page_size);
                 m_total_compression_latency += compression_latency;
                 t_now += compression_latency;
             }
@@ -828,10 +830,12 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
             UInt32 page_size = m_page_size;
             if (m_use_compression)
             {
-                SubsecondTime compression_latency = m_compression_model->compress(phys_page, m_page_size, m_core_id, &page_size);
+                UInt32 compressed_cache_lines;
+                SubsecondTime compression_latency = m_compression_model->compress(phys_page, m_page_size, m_core_id, &page_size, &compressed_cache_lines);
                 bytes_saved += m_page_size - page_size;
                 address_to_compressed_size[phys_page] = page_size;
-                address_to_num_cache_lines[phys_page] = 32; // TODO: fix
+                address_to_num_cache_lines[phys_page] = compressed_cache_lines;
+                m_sum_compression_ratio += float(m_page_size) / float(page_size);
                 evict_compression_latency += compression_latency;
                 m_total_compression_latency += compression_latency;
             }
@@ -869,10 +873,12 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
             UInt32 page_size = m_page_size;
             if (m_use_compression)
             {
-                SubsecondTime compression_latency = m_compression_model->compress(phys_page, m_page_size, m_core_id, &page_size);
+                UInt32 compressed_cache_lines;
+                SubsecondTime compression_latency = m_compression_model->compress(phys_page, m_page_size, m_core_id, &page_size, &compressed_cache_lines);
                 bytes_saved += m_page_size - page_size;
                 address_to_compressed_size[phys_page] = page_size;
-                address_to_num_cache_lines[phys_page] = 32; // TODO: fix
+                address_to_num_cache_lines[phys_page] = compressed_cache_lines;
+                m_sum_compression_ratio += float(m_page_size) / float(page_size);
                 evict_compression_latency += compression_latency;
                 m_total_compression_latency += compression_latency;
             }

@@ -158,17 +158,19 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
   bytes_saved = results['compression.bytes-saved'][0]
   if bytes_saved != 0:
     data_moves = results['dram.data-moves'][0]
-    page_size = 4096 # TODO: Hardcoded for now
+    sum_compression_ratio = results['compression.sum-compression-ratio'][0]
     total_compression_latency = results['compression.total-compression-latency'][0]
     total_decompression_latency = results['compression.total-decompression-latency'][0]
 
-    results['compression.avg-compression-ratio'] = bytes_saved / (data_moves * page_size)
+    results['compression.avg-compression-ratio'] = sum_compression_ratio / data_moves
     results['compression.avg-compression-latency'] = total_compression_latency / data_moves
     results['compression.avg-decompression-latency'] = total_decompression_latency / data_moves
 
-    print(results['compression.avg-compression-ratio'])
-    print(results['compression.avg-compression-latency'])
-    print(results['compression.avg-decompression-latency'])
+    print("bytes_saved", bytes_saved)
+    print("data moves", data_moves)
+    print("avg compression ratio", results['compression.avg-compression-ratio'])
+    print("avg compression latency", results['compression.avg-compression-latency'])
+    print("avg decompression latency", results['compression.avg-decompression-latency'])
 
   template += [
     ('DRAM summary', '', ''),
@@ -201,8 +203,8 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     template += [
       ('  bytes saved', 'compression.bytes-saved', str),
       # ('  avg compression ratio', 'compression.avg-compression-ratio', str), # TODO: why this crash?
-      # ('  avg compression latency(ns)', 'compression.avg-compression-latency', str),
-      # ('  avg decompression latency(ns)', 'compression.avg-decompression-latency', str),
+      # ('  avg compression latency(ns)', 'compression.avg-compression-latency', format_ns(2)),
+      # ('  avg decompression latency(ns)', 'compression.avg-decompression-latency', format_ns(2)),
     ]
 
   if 'dram.total-read-queueing-delay' in results:

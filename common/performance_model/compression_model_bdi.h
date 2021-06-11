@@ -18,7 +18,7 @@ public:
    CompressionModelBDI(String name, UInt32 page_size, UInt32 cache_line_size);
    ~CompressionModelBDI();
 
-   SubsecondTime compress(IntPtr addr, size_t data_size, core_id_t core_id, UInt32 *compressed_page_size);
+   SubsecondTime compress(IntPtr addr, size_t data_size, core_id_t core_id, UInt32 *compressed_page_size, UInt32 *compressed_cache_lines);
    SubsecondTime decompress(IntPtr addr, UInt32 compressed_cache_lines, core_id_t core_id);
 
 private:
