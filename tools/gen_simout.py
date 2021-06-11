@@ -155,7 +155,7 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     results['dram.remotequeuemodel_datamovement2_avgdelay'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram-datamovement-queue-2.total-queue-delay'], results['dram-datamovement-queue-2.num-requests']))
 
   # Compression
-  bytes_saved = results['compression.bytes-saved'][0]
+  bytes_saved = results['compression.bytes-saved'][0] if 'compression.bytes-saved' in results else 0
   if bytes_saved != 0:
     data_moves = results['dram.data-moves'][0]
     sum_compression_ratio = results['compression.sum-compression-ratio'][0]
