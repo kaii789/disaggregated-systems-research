@@ -51,6 +51,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_refresh_length      (SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/ddr/refresh_length"))) // tRFC
     , m_r_added_latency       (SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/remote_mem_add_lat"))) // Network latency for remote DRAM access 
     , m_r_datamov_threshold       (Sim()->getCfg()->getInt("perf_model/dram/remote_datamov_threshold"))// Move data if greater than
+    , m_cache_line_size     (cache_block_size)
     , m_page_size        (Sim()->getCfg()->getInt("perf_model/dram/page_size"))  // Memory page size (bytes) in disagg.cc used for page movement (different from ddr page size)
     , m_localdram_size       (Sim()->getCfg()->getInt("perf_model/dram/localdram_size")) // Local DRAM size
     , m_enable_remote_mem       (Sim()->getCfg()->getBool("perf_model/dram/enable_remote_mem")) // Enable remote memory simulation
@@ -147,6 +148,16 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
                     m_intercommand_delay_long));
     }
 
+    // TODO: Compression
+    m_use_compression = Sim()->getCfg()->getBool("perf_model/dram/compression_model/use_compression");
+    if (m_use_compression) {
+        String compression_scheme = Sim()->getCfg()->getString("perf_model/dram/compression_model/compression_scheme");
+        m_compression_model = CompressionModel::create("Link Compression Model", m_page_size, cache_block_size, compression_scheme);
+        registerStatsMetric("compression", core_id, "bytes-saved", &bytes_saved);
+        registerStatsMetric("compression", core_id, "total-compression-latency", &m_total_compression_latency);
+        registerStatsMetric("compression", core_id, "total-decompression-latency", &m_total_decompression_latency);
+    }
+
     LOG_ASSERT_ERROR(cache_block_size == 64, "Hardcoded for 64-byte cache lines");
     LOG_ASSERT_ERROR(m_column_offset <= m_dram_page_size_log2, "Column offset exceeds bounds!");
     if(m_randomize_address)
@@ -158,6 +169,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     registerStatsMetric("ddr", core_id, "page-empty", &m_dram_page_empty);
     registerStatsMetric("ddr", core_id, "page-closing", &m_dram_page_closing);
     registerStatsMetric("ddr", core_id, "page-misses", &m_dram_page_misses);
+    registerStatsMetric("dram", core_id, "page-size", (UInt64*)&m_page_size); // For compression
     registerStatsMetric("dram", core_id, "total-access-latency", &m_total_access_latency); // cgiannoula
     registerStatsMetric("dram", core_id, "total-local-access-latency", &m_total_local_access_latency);
     registerStatsMetric("dram", core_id, "total-remote-access-latency", &m_total_remote_access_latency);
@@ -424,7 +436,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     // Track access to page
     UInt64 phys_page = address & ~((UInt64(1) << floorLog2(m_page_size)) - 1);
     if(m_r_cacheline_gran) 
-        phys_page =  address & ~((UInt64(1) << 6) - 1); // Assuming 64bit cache line 
+        phys_page =  address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1); // Was << 6
     bool move_page = false; 
     if(m_r_mode == 2) { //Only move pages when the page has been accessed remotely m_r_datamov_threshold times
         auto it = m_remote_access_tracker.find(phys_page);
@@ -457,12 +469,34 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             //if it is... wait.
             //to wait: t_now + window_size
             //try again
+
+            // Compress
+            UInt32 page_size = m_page_size;
+            if (m_use_compression)
+            {
+                SubsecondTime compression_latency = m_compression_model->compress(phys_page, m_page_size, m_core_id, &page_size);
+                bytes_saved += m_page_size - page_size;
+                address_to_compressed_size[phys_page] = page_size;
+                address_to_num_cache_lines[phys_page] = 32; // TODO: fix
+                m_total_compression_latency += compression_latency;
+                t_now += compression_latency;
+            }
+
+
             if(m_r_partition_queues) {
-                page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_part_bandwidth.getRoundedLatency(8*m_page_size), requester);
+                page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_part_bandwidth.getRoundedLatency(8*page_size), requester);
             } else {
-                page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*m_page_size), requester);
+                page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*page_size), requester);
                 t_now += page_datamovement_queue_delay;
                 t_now -= datamovement_queue_delay;  
+            }
+
+            // TODO: Currently model decompression by adding decompression latency to inflight page time
+            if (m_use_compression)
+            {
+                SubsecondTime decompression_latency = m_compression_model->decompress(phys_page, address_to_num_cache_lines[phys_page], m_core_id);
+                page_datamovement_queue_delay += decompression_latency;
+                m_total_decompression_latency += decompression_latency;
             }
         }
         else
@@ -501,8 +535,8 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
 {
     UInt64 phys_page = address & ~((UInt64(1) << floorLog2(m_page_size)) - 1);
     if(m_r_cacheline_gran) 
-        phys_page =  address & ~((UInt64(1) << 6) - 1); // Assuming 64bit cache line
-    UInt64 cacheline =  address & ~((UInt64(1) << 6) - 1); // Assuming 64bit cache line
+        phys_page =  address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1); // Was << 6
+    UInt64 cacheline =  address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1); // Was << 6
 
     // m_inflight_pages: tracks which pages are being moved and when the movement will complete
     // Check if the page movement is over and if so, remove from the list
@@ -695,11 +729,11 @@ DramPerfModelDisagg::isRemoteAccess(IntPtr address, core_id_t requester, DramCnt
 {
     UInt64 num_local_pages = m_localdram_size/m_page_size;
     if(m_r_cacheline_gran) // When we perform moves at cacheline granularity (should be disabled by default)
-        num_local_pages = m_localdram_size/64;  // Assuming 64bit cache line
+        num_local_pages = m_localdram_size/m_cache_line_size;  // Assuming 64bit cache line
 
     UInt64 phys_page =  address & ~((UInt64(1) << floorLog2(m_page_size)) - 1);
     if(m_r_cacheline_gran) 
-        phys_page =  address & ~((UInt64(1) << 6) - 1);  // Assuming 64bit cache line
+        phys_page =  address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1);
 
     if(m_r_mode == 0 || m_r_mode == 4) { // Static partitioning: no data movement and m_r_partitioning_ratio decides how many go where
         if (std::find(m_local_pages.begin(), m_local_pages.end(), phys_page) != m_local_pages.end())
@@ -755,11 +789,12 @@ DramPerfModelDisagg::isRemoteAccess(IntPtr address, core_id_t requester, DramCnt
 SubsecondTime 
 DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_id_t requester) 
 {
-    SubsecondTime sw_overhead = SubsecondTime::Zero(); 
+    SubsecondTime sw_overhead = SubsecondTime::Zero();
+    SubsecondTime evict_compression_latency = SubsecondTime::Zero();
     UInt64 evicted_page; 
     UInt64 num_local_pages = m_localdram_size/m_page_size;
     if(m_r_cacheline_gran)
-        num_local_pages = m_localdram_size/64;  // When we perform moves at cacheline granularity (should be disabled by default)
+        num_local_pages = m_localdram_size/m_cache_line_size;
     if(m_local_pages.size() > num_local_pages) {
         bool found = false;
         if(m_r_dontevictdirty) {
@@ -788,40 +823,83 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
             // The page to evict is dirty
             ++m_data_moves;
             ++m_writeback_pages;
+
+            // Compress
+            UInt32 page_size = m_page_size;
+            if (m_use_compression)
+            {
+                SubsecondTime compression_latency = m_compression_model->compress(phys_page, m_page_size, m_core_id, &page_size);
+                bytes_saved += m_page_size - page_size;
+                address_to_compressed_size[phys_page] = page_size;
+                address_to_num_cache_lines[phys_page] = 32; // TODO: fix
+                evict_compression_latency += compression_latency;
+                m_total_compression_latency += compression_latency;
+            }
+
             SubsecondTime page_datamovement_queue_delay = SubsecondTime::Zero();
             if(m_r_simulate_datamov_overhead) { 
                 if(m_r_partition_queues)
-                    page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_part_bandwidth.getRoundedLatency(8*m_page_size), requester);
+                    page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_part_bandwidth.getRoundedLatency(8*page_size), requester);
                 else if(m_r_cacheline_gran)
                     page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*64), requester);
                 else
-                    page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*m_page_size), requester);
-
+                    page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*page_size), requester);
             }
+
+            // TODO: Currently model decompression by adding decompression latency to inflight page time
+            if (m_use_compression)
+            {
+                SubsecondTime decompression_latency = m_compression_model->decompress(phys_page, address_to_num_cache_lines[phys_page], m_core_id);
+                page_datamovement_queue_delay += decompression_latency;
+                m_total_decompression_latency += decompression_latency;
+            }
+
             if (std::find(m_remote_pages.begin(), m_remote_pages.end(), evicted_page) == m_remote_pages.end()) {
                 // The page to evict is not in remote_pages
                 m_remote_pages.push_back(evicted_page);
-                m_inflightevicted_pages[evicted_page] = t_now + page_datamovement_queue_delay; 
-            } 
-        }	
+                m_inflightevicted_pages[evicted_page] = t_now + page_datamovement_queue_delay;
+            }
+        }
         else if (std::find(m_remote_pages.begin(), m_remote_pages.end(), evicted_page) == m_remote_pages.end()) {
             // The page to evict is not dirty and not in remote memory
             m_remote_pages.push_back(evicted_page);
             ++m_data_moves;
+
+            // Compress
+            UInt32 page_size = m_page_size;
+            if (m_use_compression)
+            {
+                SubsecondTime compression_latency = m_compression_model->compress(phys_page, m_page_size, m_core_id, &page_size);
+                bytes_saved += m_page_size - page_size;
+                address_to_compressed_size[phys_page] = page_size;
+                address_to_num_cache_lines[phys_page] = 32; // TODO: fix
+                evict_compression_latency += compression_latency;
+                m_total_compression_latency += compression_latency;
+            }
+
             SubsecondTime page_datamovement_queue_delay = SubsecondTime::Zero();
-            if(m_r_simulate_datamov_overhead) { 
+            if(m_r_simulate_datamov_overhead) {
                 if(m_r_partition_queues)
-                    page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_part_bandwidth.getRoundedLatency(8*m_page_size), requester);
+                    page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_part_bandwidth.getRoundedLatency(8*page_size), requester);
                 else if(m_r_cacheline_gran)
                     page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*64), requester);
                 else
-                    page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*m_page_size), requester);
+                    page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*page_size), requester);
             }
-            m_inflightevicted_pages[evicted_page] = t_now + page_datamovement_queue_delay; 
+
+            // TODO: Currently model decompression by adding decompression latency to inflight page time
+            if (m_use_compression)
+            {
+                SubsecondTime decompression_latency = m_compression_model->decompress(phys_page, address_to_num_cache_lines[phys_page], m_core_id);
+                page_datamovement_queue_delay += decompression_latency;
+                m_total_decompression_latency += decompression_latency;
+            }
+
+            m_inflightevicted_pages[evicted_page] = t_now + page_datamovement_queue_delay;
         }
         m_dirty_pages.remove(evicted_page);
     }
-    return sw_overhead; 
+    return sw_overhead + evict_compression_latency;
 }
 
 

@@ -3,6 +3,7 @@
 
 #include "dram_perf_model.h"
 #include "queue_model.h"
+#include "compression_model.h"
 #include "fixed_types.h"
 #include "subsecond_time.h"
 #include "dram_cntlr_interface.h"
@@ -58,6 +59,7 @@ class DramPerfModelDisagg : public DramPerfModel
         const SubsecondTime m_refresh_length;           // tRFC
         const SubsecondTime m_r_added_latency; // Additional remote latency
         const UInt32 m_r_datamov_threshold; // Move data if greater than yy
+        const UInt32 m_cache_line_size;
         const UInt32 m_page_size; // Memory page size (in bytes) in disagg.cc (different from ddr page size)
         const UInt32 m_localdram_size; // Local DRAM size
         const bool m_enable_remote_mem; // Enable remote memory with the same DDR type as local for now
@@ -110,6 +112,14 @@ class DramPerfModelDisagg : public DramPerfModel
         std::map<UInt64, UInt32> m_inflight_redundant; 
         std::map<UInt64, SubsecondTime> m_inflightevicted_pages; // Inflight pages that are being transferred from local memory to remote memory
 
+        // TODO: Compression
+        bool m_use_compression;
+        CompressionModel *m_compression_model;
+        UInt64 bytes_saved = 0;
+        SubsecondTime m_total_compression_latency = SubsecondTime::Zero();
+        SubsecondTime m_total_decompression_latency = SubsecondTime::Zero();
+        std::map<IntPtr, UInt32> address_to_compressed_size;
+        std::map<IntPtr, UInt32> address_to_num_cache_lines;
 
         // Variables to keep track of stats
         UInt64 m_dram_page_hits;

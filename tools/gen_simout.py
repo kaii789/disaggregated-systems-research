@@ -154,6 +154,21 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
   if 'dram-datamovement-queue-2.num-requests' in results and sum(results['dram-datamovement-queue-2.num-requests']) > 0:
     results['dram.remotequeuemodel_datamovement2_avgdelay'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram-datamovement-queue-2.total-queue-delay'], results['dram-datamovement-queue-2.num-requests']))
 
+  # Compression
+  bytes_saved = results['compression.bytes-saved'][0]
+  if bytes_saved != 0:
+    data_moves = results['dram.data-moves'][0]
+    page_size = 4096 # TODO: Hardcoded for now
+    total_compression_latency = results['compression.total-compression-latency'][0]
+    total_decompression_latency = results['compression.total-decompression-latency'][0]
+
+    results['compression.avg-compression-ratio'] = bytes_saved / (data_moves * page_size)
+    results['compression.avg-compression-latency'] = total_compression_latency / data_moves
+    results['compression.avg-decompression-latency'] = total_decompression_latency / data_moves
+
+    print(results['compression.avg-compression-ratio'])
+    print(results['compression.avg-compression-latency'])
+    print(results['compression.avg-decompression-latency'])
 
   template += [
     ('DRAM summary', '', ''),
@@ -180,6 +195,16 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     ('  num redundant moves', 'dram.redundant-moves', str),
     ('  max simultaneous # inflight pages (bufferspace)', 'dram.max-bufferspace', str),
   ]
+
+  # Compression
+  if bytes_saved != 0:
+    template += [
+      ('  bytes saved', 'compression.bytes-saved', str),
+      # ('  avg compression ratio', 'compression.avg-compression-ratio', str), # TODO: why this crash?
+      # ('  avg compression latency(ns)', 'compression.avg-compression-latency', str),
+      # ('  avg decompression latency(ns)', 'compression.avg-decompression-latency', str),
+    ]
+
   if 'dram.total-read-queueing-delay' in results:
     results['dram.avgqueueread'] = map(lambda (a,b): a/(b or 1), zip(results['dram.total-read-queueing-delay'], results['dram.reads']))
     results['dram.avgqueuewrite'] = map(lambda (a,b): a/(b or 1), zip(results['dram.total-write-queueing-delay'], results['dram.writes']))
