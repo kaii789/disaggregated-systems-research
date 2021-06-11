@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import pandas as pd
 import numpy as np
 import matplotlib as plt
@@ -92,13 +93,13 @@ def run_compression_queue_experiment(x_axis, x_axis_label, x_axis_config_param, 
     # yes_compression_yes_partition_queues = run_experiment(x_axis_label, bandwidth_scalefactor, None, "yes_compression_yes_partition_queues", x_axis_config_param, program_command)
 
     data = {
-        'X': bandwidth_scalefactor,
+        x_axis_label: bandwidth_scalefactor,
         'C: Off, P: Off': no_compression_no_partition_queues,
         'C: Off, P: On': no_compression_yes_partition_queues,
         'C: On, P: On': yes_compression_yes_partition_queues
     }
     df = pd.DataFrame(data)
-    graph = df.plot(x="X", y=["C: Off, P: Off", "C: Off, P: On", "C: On, P: On"], kind="bar")
+    graph = df.plot(x=x_axis_label, y=["C: Off, P: Off", "C: Off, P: On", "C: On, P: On"], kind="bar")
     fig = graph.get_figure()
     fig.savefig(result_name)
 
@@ -109,15 +110,17 @@ if __name__ == "__main__":
     bandwidth_scalefactor = [4, 8, 16, 32]
     x_axis_label = "Remote Bandwidth Scalefactor(gb/s)"
     x_axis_config_param = "perf_model/dram/remote_mem_bw_scalefactor"
-    program_command = "../../../test/compression/loop" # TODO: change me
+    # program_command = "../../../benchmarks/darknet/darknet classifier predict ../../../benchmarks/darknet/cfg/imagenet1k.data ../../../benchmarks/darknet/cfg/darknet19.cfg ../../../benchmarks/darknet/tiny.weights ../../../benchmarks/darknet/data/dog.jpg" # TODO: change me
+    program_command = " ../../../test/crono/apps/sssp/sssp ../../../test/crono/inputs/bcsstk05.mtx 1" # TODO: change me
     result_name = "ipc_vs_bandwidth_scalefactor_bar"
     t1 = threading.Thread(target=run_compression_queue_experiment, args=(bandwidth_scalefactor, x_axis_label, x_axis_config_param, program_command, result_name))
 
     # IPC vs Local DRAM Size
-    local_dram_size = [4194304, 8388608, 16777216, 33554432]
+    # local_dram_size = [4194304, 8388608, 16777216, 33554432]
+    local_dram_size = [4000, 8000, 16000, 32000]
     x_axis_label = "Local DRAM Size(bytes)"
     x_axis_config_param = "perf_model/dram/localdram_size"
-    program_command = "../../../test/compression/loop" # TODO: change me
+    program_command = " ../../../test/crono/apps/sssp/sssp ../../../test/crono/inputs/bcsstk05.mtx 1" # TODO: change me
     result_name = "ipc_vs_local_dram_size_bar"
     t2 = threading.Thread(target=run_compression_queue_experiment, args=(local_dram_size, x_axis_label, x_axis_config_param, program_command, result_name))
 
