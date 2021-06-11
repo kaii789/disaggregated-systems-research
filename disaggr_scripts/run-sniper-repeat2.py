@@ -477,8 +477,13 @@ class ExperimentManager:
                 or len(self._process_queue) > 0
                 or sum(pi.process is None for pi in process_info) != len(process_info)
             ):
-                if len(self._process_queue) == 0 and len(self._pending_experiments) > 0:
-                    # Replenish _process_queue if there are more experiments yet to be started
+                if (
+                    len(self._process_queue) < self.max_concurrent_processes
+                    and len(self._pending_experiments) > 0
+                    and sum(pi.process is None for pi in process_info) > 0
+                ):
+                    # Replenish self._process_queue if there are more experiments yet to be started,
+                    # and there is a free process slot
                     experiment = self._pending_experiments.popleft()
                     self._running_experiments.append(experiment)
                     experiment_runs = experiment.prepare_experiment()
@@ -617,6 +622,10 @@ class ExperimentManager:
                         self._running_experiments.pop(i)
                     else:
                         i += 1
+
+                if len(self._process_queue) > 0:
+                    # Can sleep for a while since don't need to check processes that often; reduce CPU usage
+                    time.sleep(60)  # sleep for 1 min
 
         except KeyboardInterrupt:
             pass  # Cleanup is done in the finally block
@@ -800,6 +809,29 @@ if __name__ == "__main__":
     experiments = []
 
     # Partition queue series, 6 runs per series
+    # Darknet tiny, partition queue series, net_lat = 120 (default)
+    # TODO: find out a good localdram_size to use
+    darknet_tiny_pq_experiments = []
+    model_type = "tiny"
+    for num_MB in []:  # approx 50% and 25% of total memory usage in ROI
+        localdram_size_str = "{}MB".format(num_MB)
+        command_str = darknet_base_str_options.format(model_type, "-g perf_model/dram/localdram_size={} -s stop-by-icount:{}".format(
+                num_MB * ONE_MB_TO_BYTES, 1000 * ONE_MILLION
+            ))
+        # 1 billion instructions cap
+
+        darknet_tiny_pq_experiments.append(
+            Experiment(
+                experiment_name="darknet_{}_localdram_{}_netlat_120_partition_queue_series".format(
+                    model_type.lower(),
+                    localdram_size_str,
+                ),
+                command_str=command_str,
+                experiment_run_configs=partition_queue_series_experiment_run_configs,
+                output_root_directory=".",
+            )
+        )
+
     # BFS_small 1, 2, 4 MB, Partition queue series, now with net_lat = 120
     bfs_small_pq_experiments = []
     ligra_input_selection = "regular_input"  # "regular_input" OR "small_input"
@@ -1068,7 +1100,7 @@ if __name__ == "__main__":
         #         traceback.print_exc(file=log_file)
 
         experiment_manager = ExperimentManager(
-            output_root_directory=".", max_concurrent_processes=4, log_file=log_file
+            output_root_directory=".", max_concurrent_processes=6, log_file=log_file
         )
         experiment_manager.add_experiments(experiments)
         experiment_manager.start()

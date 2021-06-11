@@ -10,13 +10,22 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from typing import Any, Callable, List, Optional, TextIO, TypeVar
+
+PathLike = TypeVar("PathLike", str, bytes, os.PathLike)  # Type for file/directory paths
+
 # Plots graph based on files in output_directory
 # sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 # print(sys.path)
 
 
 class StatSetting:
-    def __init__(self, line_beginning, format_func, name_for_legend=None):
+    def __init__(
+        self,
+        line_beginning: str,
+        format_func: Callable[[str], Any],
+        name_for_legend: str = None,
+    ):
         self.line_beginning = line_beginning
         self.format_func = format_func  # Function to format value read from text file
         if name_for_legend is None:
@@ -24,27 +33,84 @@ class StatSetting:
         self.name_for_legend = name_for_legend
 
 
-def run_from_experiment(output_directory_path, log_file=None):
+def run_from_experiment(
+    output_directory_path: PathLike, log_file: Optional[TextIO] = None
+):
     # in this case, the two functions are the same
     run_from_cmdline(output_directory_path, log_file)
 
-def run_from_cmdline(output_directory_path, log_file=None):
+
+def run_from_cmdline(
+    output_directory_path: PathLike, log_file: Optional[TextIO] = None
+):
     ipc_line_no = 3  # Indexing start from 0, not 1
     # StatSetting line_beginning's: case sensitive, not sensitive to leading whitespace
     stat_settings = [
         StatSetting("IPC", float),
         #  StatSetting("Idle time (%)", lambda s: float(s.strip("%"))),
-         StatSetting("remote dram avg access latency", float, name_for_legend="remote dram avg access latency (ns)"),
-         StatSetting("local dram avg access latency", float, name_for_legend="local dram avg access latency (ns)"),
-         StatSetting("average dram access latency", float, name_for_legend="avg dram access latency (ns)"),
-         StatSetting("num data moves", int, name_for_legend="num data moves"),
-         StatSetting("num inflight hits", int, name_for_legend="num inflight hits"),
-         # StatSetting("num redundant moves", int, name_for_legend="num redundant moves total"),
-         StatSetting("num redundant moves total", int, name_for_legend="num redundant moves total"),
-         StatSetting("num redundant moves temp1", int, name_for_legend="num redundant moves temp1"),
-         StatSetting("num temp1 cache slower than page", int, name_for_legend="num temp1 cache slower than page"),
-         StatSetting("num redundant moves temp2", int, name_for_legend="num redundant moves temp2"),
-         StatSetting("num local evictions", lambda s: int(s) / 1000, name_for_legend="local evictions (1000s)"),
+        StatSetting(
+            "remote dram avg access latency",
+            float,
+            name_for_legend="remote dram avg access latency (ns)",
+        ),
+        StatSetting(
+            "remote datamovement queue model avg access latency",
+            float,
+            name_for_legend="page queue avg access latency (ns)",
+        ),
+        StatSetting(
+            "remote datamovement2 queue model avg access latency",
+            float,
+            name_for_legend="cacheline queue avg access latency (ns)",
+        ),
+        StatSetting(
+            "local dram avg access latency",
+            float,
+            name_for_legend="local dram avg access latency (ns)",
+        ),
+        StatSetting(
+            "average dram access latency",
+            float,
+            name_for_legend="avg dram access latency (ns)",
+        ),
+        StatSetting("num data moves", int, name_for_legend="num page moves"),
+        StatSetting("num inflight hits", int, name_for_legend="num inflight hits"),
+        # StatSetting("num redundant moves", int, name_for_legend="num redundant moves total"),
+        StatSetting(
+            "num redundant moves total",
+            int,
+            name_for_legend="num redundant moves total",
+        ),
+        StatSetting(
+            "num redundant moves temp1",
+            int,
+            name_for_legend="num redundant moves temp1",
+        ),
+        StatSetting(
+            "num temp1 cache slower than page",
+            int,
+            name_for_legend="num temp1 cache slower than page",
+        ),
+        StatSetting(
+            "num redundant moves temp2",
+            int,
+            name_for_legend="num redundant moves temp2",
+        ),
+        StatSetting(
+            "PQ=1 temp1 time savings (ns)",
+            float,
+            name_for_legend="PQ=1 temp1 approx latency savings (ns)",
+        ),
+        StatSetting(
+            "PQ=1 temp2 time savings (ns)",
+            float,
+            name_for_legend="PQ=1 temp2 approx latency savings (ns)",
+        ),
+        StatSetting(
+            "num local evictions",
+            lambda s: int(s) / 1000,
+            name_for_legend="local evictions (1000s)",
+        ),
         #  StatSetting("DDR page hits", int),
         #  StatSetting("DDR page misses", int),
     ]
@@ -69,22 +135,34 @@ def run_from_cmdline(output_directory_path, log_file=None):
                         if line.strip().startswith(stat_setting.line_beginning):
                             y_value_line_nos[index] = line_no
                             y_values[index].append(
-                                stat_setting.format_func(line.split()[-1]) if line.split()[-1] != "|" else np.nan
+                                stat_setting.format_func(line.split()[-1])
+                                if line.split()[-1] != "|"
+                                else np.nan
                             )  # The last entry of the line
                 if not out_file_lines[ipc_line_no].strip().startswith("IPC"):
-                    print("Error: didn't find desired line starting with '{}' in .out file".format("IPC"))
+                    print(
+                        "Error: didn't find desired line starting with '{}' in .out file".format(
+                            "IPC"
+                        )
+                    )
                     sys.exit(-1)
                 elif None in y_value_line_nos:
                     for index, value in enumerate(y_value_line_nos):
                         if value is None:
-                            print("Error: didn't find desired line starting with '{}' in .out file".format(stat_settings[index].line_beginning))
+                            print(
+                                "Error: didn't find desired line starting with '{}' in .out file".format(
+                                    stat_settings[index].line_beginning
+                                )
+                            )
                     sys.exit(-1)
             else:
                 # Read the lines of pertinant information
                 for index in range(len(y_values)):
                     line = out_file_lines[y_value_line_nos[index]]
                     y_values[index].append(
-                        stat_settings[index].format_func(line.split()[-1]) if line.split()[-1] != "|" else np.nan
+                        stat_settings[index].format_func(line.split()[-1])
+                        if line.split()[-1] != "|"
+                        else np.nan
                     )  # The last entry of the line
 
         # Associated sim.cfg file
@@ -112,7 +190,12 @@ def run_from_cmdline(output_directory_path, log_file=None):
     save_graph_pq(output_directory_path, y_values, stat_settings, log_file)
 
 
-def save_graph_pq(output_directory_path, y_values, stat_settings, log_file=None):
+def save_graph_pq(
+    output_directory_path: PathLike,
+    y_values: List[List[Any]],
+    stat_settings: List[StatSetting],
+    log_file: Optional[TextIO] = None,
+):
     plt.clf()
 
     if len(y_values[0]) == 7:
@@ -148,7 +231,10 @@ def save_graph_pq(output_directory_path, y_values, stat_settings, log_file=None)
         print("X values:\n", [s.replace("\n", " ") for s in x_axis], file=log_file)
         print("Y values:", file=log_file)
         for i, y_value_list in enumerate(y_values):
-            print("{}: {}".format(stat_settings[i].name_for_legend, y_value_list), file=log_file)
+            print(
+                "{}: {}".format(stat_settings[i].name_for_legend, y_value_list),
+                file=log_file,
+            )
 
     # Plot as graph
     line_style_list = [".--r", ".--g", ".--b", ".--c", ".--m", ".--y"]
@@ -164,9 +250,13 @@ def save_graph_pq(output_directory_path, y_values, stat_settings, log_file=None)
     #         x_axis, y_value_list, line_style, label=stat_settings[i].name_for_legend
     #     )
     # Temporarily: only plot IPC in the graph
-    plt.plot(
-            x_axis, y_values[0], ".--r", label=stat_settings[0].name_for_legend
-        )
+    plt.plot(x_axis, y_values[0], ".--r", label=stat_settings[0].name_for_legend)
+    # Uniform scale among experiments for the same application and input
+    y_axis_top = 0.55
+    if max(y_values[0]) > y_axis_top:
+        y_axis_top = max(y_values[0])
+    plt.ylim(bottom=0, top=y_axis_top)
+    plt.yticks(np.arange(0, y_axis_top + 0.01, step=0.05))  # +0.01 to include y_axis_top
 
     title_str = "Effect of Partition Queues"
     plt.title(title_str)
