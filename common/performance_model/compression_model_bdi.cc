@@ -38,40 +38,7 @@ CompressionModelBDI::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
             total_compressed_cache_lines++;
     }
     assert(total_bytes <= m_page_size && "[BDI] Wrong compression!");
-   
-    /*
-     * Log for compressed data
-    // Log
-    FILE *fp;
-    fp = fopen("compression.log", "a");
-    // for (int i = 0; i < (int)data_size; i++) {
-    //     fprintf(fp, "%c ", buffer[i]);
-    // }
-    fprintf(fp, "##########################%s#############################\n", "PAGE START");
-    for (int i = 0; i < cacheline_count; i++)
-    {
-        // Orig
-        fprintf(fp, "Uncompressed: ");
-        for (int j = 0; j < m_cache_line_size; j++)
-        {
-            fprintf(fp, "%hhu ", (uint8_t)buffer[i * m_cache_line_size + j]);
-        }
-        // Compressed
-        fprintf(fp, "\nCompressed: ");
-        int size = compressed_size[i];
-        for (int j = 0; j < size; j++)
-        {
-            fprintf(fp, "%hhu ", (uint8_t)compressed_buffer[i * m_cache_line_size + j]);
-        }
-        fprintf(fp, "\n\n");
-    }
-    fprintf(fp, "##########################%s#############################\n", "PAGE END");
-
-    free(buffer);
-    free(compressed_buffer);
-    *
-    */
-
+  
     // Return compressed cache lines
     *compressed_cache_lines = total_compressed_cache_lines;
 
@@ -112,7 +79,7 @@ CompressionModelBDI::readWord(void *ptr, UInt32 idx, UInt32 word_size) // idx: w
             word = ((SInt8 *)ptr)[idx];
             break;
         default:
-            fprintf(stderr,"Unknown base size\n");
+            fprintf(stderr,"Unknown Base Size\n");
             exit(1);
     }
 
@@ -138,7 +105,7 @@ CompressionModelBDI::writeWord(void *ptr, UInt32 idx, SInt64 word, UInt32 word_s
             ((SInt8*)ptr)[idx] = (SInt8)word;
             break;
         default:
-            fprintf(stderr,"Unknown Delta size\n");
+            fprintf(stderr,"Unknown Base Size\n");
             exit(1);
     }      
 }
@@ -179,12 +146,10 @@ CompressionModelBDI::zeroValues(void* in, m_compress_info *res, void* out)
     if (i == m_cache_line_size) {
         res->is_compressible = true;
         res->compressed_size = 1;
-        //result=boost::make_tuple(1,1);
         writeWord(out, 0, base, sizeof(char));
     } else {
         res->is_compressible = false;
         res->compressed_size = m_cache_line_size;
-        //result=boost::make_tuple(0,m_cache_line_size);
     }
     return;
 }
@@ -193,6 +158,7 @@ void
 CompressionModelBDI::repeatedValues(void* in, m_compress_info *res, void* out)
 {
     //  Repeated value compression checks if a cache line has the same 1/2/4/8 byte value repeated. If so, it compresses the cache line to the corresponding value
+    /*
     //  FIXME cgiannoula - now it only works with 8-byte granularity
     SInt64 base;
     UInt32 i;
@@ -209,6 +175,69 @@ CompressionModelBDI::repeatedValues(void* in, m_compress_info *res, void* out)
         res->is_compressible = false;
         res->compressed_size = m_cache_line_size;
     }
+    */
+
+    SInt64 base;
+    bool repeated;
+    UInt32 i;
+    UInt32 k;
+    for(k = 1; k <= 8; k*=2) {
+        repeated = true;
+        switch(k)
+        {
+            case 8:   
+                base = ((SInt64*)in)[0];
+                for (i = 1; i < (m_cache_line_size / k); i++) 
+                    if ((base - ((SInt64*)in)[i]) != 0) {
+                        repeated = false;
+                        break;
+                    }
+                break;          
+            case 4:   
+                base = ((SInt32*)in)[0];
+                for (i = 1; i < (m_cache_line_size / k); i++) 
+                    if ((base - ((SInt32*)in)[i]) != 0) {
+                        repeated = false;
+                        break;
+                    }
+                break;
+            case 2:
+                base = ((SInt16*)in)[0];
+                for (i = 1; i < (m_cache_line_size / k); i++) 
+                    if ((base - ((SInt16*)in)[i]) != 0) {
+                        repeated = false;
+                        break;
+                    }
+                break;
+            case 1:
+                base = ((SInt8*)in)[0];
+                for (i = 1; i < (m_cache_line_size / k); i++) 
+                    if ((base - ((SInt8*)in)[i]) != 0) {
+                        repeated = false;
+                        break;
+                    }
+                break;
+            default:
+                fprintf(stderr,"Unknown Base Size\n");
+                exit(1);
+
+
+        }      
+
+        if (repeated == true) {
+            res->is_compressible = true;
+            res->compressed_size = k;
+            writeWord(out, 0, k, sizeof(char));
+            out = (void*)(((char*)out)+1); // Move out pointer by one byte
+            writeWord(out, 0, base, k * sizeof(char));
+            return;
+        } 
+    }
+
+    assert(repeated == false && "[BDI] repeated_values() failed!");
+    res->is_compressible = false;
+    res->compressed_size = m_cache_line_size;
+
     return;
 }
 
@@ -222,9 +251,7 @@ CompressionModelBDI::specializedCompress(void *in, m_compress_info *res, void *o
 
     base = readWord(in, 0, k);
     writeWord(out, 0, base, k);
-    //for(i = 0; i < ((m_cache_line_size / k) - 1); i++){
     for(i = 0; i < (m_cache_line_size / k); i++){
-       //word = readWord((void*)(((char*)in) + k * sizeof(char)), i, k);
        word = readWord((void*)((char*)in), i, k);
        delta = base - word;
 
@@ -241,7 +268,6 @@ CompressionModelBDI::specializedCompress(void *in, m_compress_info *res, void *o
     } else {
         res->is_compressible = within_limits; 
     }
-    //result = boost::make_tuple(within_limits, ((m_cache_line_size / k) - 1) * delta_size + k);
     return; 
 }
 
@@ -270,7 +296,6 @@ CompressionModelBDI::compressCacheLine(void* in, void* out)
     repeatedValues(in, &(m_options_compress_info[cur_option]), (void*) m_options_data_buffer[cur_option]);
     cur_option++;
 
-    //std::cout << "Start" << std::endl;
     for (b = 8; b >= 2; b /= 2) {
         for(d = 1; d <= (b/2); d *= 2){
             // Option 2: base_size = 8 bytes, delta_size = 1 byte
@@ -280,14 +305,12 @@ CompressionModelBDI::compressCacheLine(void* in, void* out)
             // Option 6: base_size = 4 bytes, delta_size = 2 bytes
             // Option 7: base_size = 2 bytes, delta_size = 1 byte
             specializedCompress(in, &(m_options_compress_info[cur_option]), (void*)m_options_data_buffer[cur_option], b, d);
-            //std::cout << " b " << b << " d " << d << " compressed " << m_options_compress_info[cur_option].is_compressible << " " << m_options_compress_info[cur_option].compressed_size << std::endl;
             cur_option++;
         }
     }
-    //std::cout << "End" << std::endl;
     
     UInt32 compressed_size = (UInt32) m_cache_line_size;
-    UInt32 chosen_option = 42; // If chosen_option == 42 (should be smaller than pow(2,8), cache line is not compressible (leave it uncompressed)
+    UInt8 chosen_option = 42; // If chosen_option == 42, cache line is not compressible (leave it uncompressed)
     for(i = 0; i < m_options; i++) {
         if(m_options_compress_info[i].is_compressible == true){
             if(m_options_compress_info[i].compressed_size < compressed_size){
@@ -334,9 +357,13 @@ CompressionModelBDI::decompressCacheLine(void *in, void *out)
             break;
         case 1:
             // Option 1: a single value repeated multiple times within the cache line (8-byte granularity) 
-            base = readWord(in, 0, 8);
-            for (i = 0; i < (m_cache_line_size / 8); i++)
-                ((long int*)out)[i] = base;
+            UInt32 k;
+            k = ((char*)in)[0];
+            in = (void*)(((char*)in)+1);
+            base = readWord(in, 0, k * sizeof(char));
+            for (i = 0; i < (m_cache_line_size / k); i++) {
+                writeWord(out, i, base, k * sizeof(char));   
+            }
             break;
        case 2:
             // Option 2: base_size = 8 bytes, delta_size = 1 byte
@@ -344,8 +371,7 @@ CompressionModelBDI::decompressCacheLine(void *in, void *out)
             writeWord(out, 0, base, sizeof(SInt64));
             in = (void*) (((char*)in) + sizeof(SInt64));
             out = (void*) (((char*)out) + sizeof(SInt64));
-            //for (i=0;i<(m_cache_line_size/sizeof(long int)-1);i++){
-            for (i = 1; i < (m_cache_line_size / sizeof(SInt64)); i++){
+            for (i = 1; i < (m_cache_line_size / sizeof(SInt64)); i++) {
                 delta = readWord(in, i, sizeof(SInt8));
                 word = base - delta;
                 writeWord(out, i, word, sizeof(SInt64));   
@@ -357,7 +383,6 @@ CompressionModelBDI::decompressCacheLine(void *in, void *out)
             writeWord(out, 0, base, sizeof(SInt64));
             in = (void*) (((char*)in) + sizeof(SInt64));
             out = (void*)(((char*)out) + sizeof(SInt64));
-            //for (i=0;i<(m_cache_line_size/sizeof(long int)-1);i++){
             for (i = 1; i < (m_cache_line_size / sizeof(SInt64)); i++){
                 delta = readWord(in, i, sizeof(SInt16));
                 word = base - delta;
@@ -370,7 +395,6 @@ CompressionModelBDI::decompressCacheLine(void *in, void *out)
             writeWord(out, 0, base, sizeof(SInt64));
             in = (void*) (((char*)in) + sizeof(SInt64));
             out = (void*) (((char*)out) + sizeof(SInt64));
-            //for (i=0;i<(m_cache_line_size/sizeof(long int)-1);i++){
             for (i=1; i< (m_cache_line_size / sizeof(SInt64)); i++){
                 delta = readWord(in, i, sizeof(SInt32));
                 word = base - delta;
@@ -383,7 +407,6 @@ CompressionModelBDI::decompressCacheLine(void *in, void *out)
             writeWord(out, 0, base, sizeof(SInt32));
             in = (void*)(((char*)in) + sizeof(SInt32));
             out = (void*)(((char*)out) + sizeof(SInt32));
-            //for (i=0;i<(m_cache_line_size/sizeof(int)-1);i++){
             for (i = 0; i < (m_cache_line_size / sizeof(SInt32)); i++){
                 delta = readWord(in, i, sizeof(SInt8));
                 word = base - delta;
@@ -396,7 +419,6 @@ CompressionModelBDI::decompressCacheLine(void *in, void *out)
             writeWord(out, 0, base, sizeof(SInt32));
             in = (void*) (((char*)in) + sizeof(SInt32));
             out = (void*) (((char*)out) + sizeof(SInt32));
-            //for(i = 0; i <(m_cache_line_size/sizeof(int)-1);i++){
             for(i = 0; i < (m_cache_line_size / sizeof(SInt32)); i++){
                 delta = readWord(in, i, sizeof(SInt16));
                 word = base - delta;
@@ -409,7 +431,6 @@ CompressionModelBDI::decompressCacheLine(void *in, void *out)
             writeWord(out, 0, base, sizeof(SInt16));
             in = (void*) (((char*)in) + sizeof(SInt16));
             out = (void*)(((char*)out) + sizeof(SInt16));
-            //for (i =0;i<(m_cache_line_size/sizeof(short int)-1);i++){
             for (i = 0; i < (m_cache_line_size / sizeof(SInt16)); i++){
                 delta = readWord(in, i, sizeof(SInt8));
                 word = base - delta;
