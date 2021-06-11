@@ -3,6 +3,7 @@
 
 #include "dram_perf_model.h"
 #include "queue_model.h"
+#include "compression_model.h"
 #include "fixed_types.h"
 #include "subsecond_time.h"
 #include "dram_cntlr_interface.h"

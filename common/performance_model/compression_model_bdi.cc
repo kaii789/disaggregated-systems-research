@@ -1,4 +1,5 @@
 #include "compression_model_bdi.h"
+#include "utils.h"
 
 CompressionModelBDI::CompressionModelBDI(String name, UInt32 page_size, UInt32 cache_line_size)
     : m_name(name)
@@ -22,8 +23,9 @@ SubsecondTime
 CompressionModelBDI::compress(IntPtr addr, size_t data_size, core_id_t core_id, UInt32 *compressed_page_size)
 {
     // Get Data
+    UInt64 page = addr & ~((UInt64(1) << floorLog2(m_page_size)) - 1);                                                   
     Core *core = Sim()->getCoreManager()->getCoreFromID(core_id);
-    core->getApplicationData(Core::NONE, Core::READ, addr, m_data_buffer, data_size, Core::MEM_MODELED_NONE);
+    core->getApplicationData(Core::NONE, Core::READ, page, m_data_buffer, data_size, Core::MEM_MODELED_NONE);
     
     // BDI
     UInt32 total_bytes = 0;
