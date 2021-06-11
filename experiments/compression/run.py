@@ -43,6 +43,31 @@ def get_ipc(res_directory):
     ]
     return results['performance_model.ipc'][0]
 
+def log_compression_stats(res_directory, result_filename, program_command, config_param, val):
+    res = sniper_lib.get_results(resultsdir=res_directory)
+    results = res['results']
+
+    # Compression
+    bytes_saved = results['compression.bytes-saved'][0] if 'compression.bytes-saved' in results else 0
+    if bytes_saved != 0:
+        data_moves = results['dram.data-moves'][0]
+        sum_compression_ratio = results['compression.sum-compression-ratio'][0]
+        total_compression_latency = results['compression.total-compression-latency'][0]
+        total_decompression_latency = results['compression.total-decompression-latency'][0]
+
+        avg_compression_ratio = sum_compression_ratio / data_moves
+        avg_compression_latency = total_compression_latency / data_moves
+        avg_decompression_latency = total_decompression_latency / data_moves
+
+        f = open("../{}".format(result_filename), "a")
+        f.write("Program Command: {}\n".format(program_command))
+        f.write("Config Param: {}, Val: {}\n".format(config_param, val))
+        f.write("Average Compression Ratio: {}\n".format(avg_compression_ratio))
+        f.write("Average Compression Latency(ns): {}\n".format(avg_compression_latency))
+        f.write("Average Decompression Latency(ns): {}\n\n".format(avg_decompression_latency))
+        f.close()
+
+
 def run_experiment(x_axis, x_axis_init, result_filename, config_name, config_param, program_command):
 
     data = {x_axis:x_axis_init,
@@ -57,6 +82,7 @@ def run_experiment(x_axis, x_axis_init, result_filename, config_name, config_par
         ipc = get_ipc(run_directory)
         print(ipc)
         data['IPC'].append(ipc)
+        log_compression_stats(run_directory, "{}.log".format(result_filename), program_command, config_param, val)
         subprocess.call("rm -r {}".format(tid), shell=True)
 
     # df = pd.DataFrame(data)
@@ -67,15 +93,15 @@ def run_experiment(x_axis, x_axis_init, result_filename, config_name, config_par
     return data['IPC']
 
 def thread_experiment(x_axis, x_axis_init, result_filename, config_name, config_param, program_command, res):
-    experiment_res = run_experiment(x_axis, x_axis_init, result_filename, config_name, config_param, program_command)
+    experiment_res = run_experiment(x_axis, x_axis_init, result_filename, config_name, config_param, program_command) # "{}-{}".format(result_filename, program_command)
     res.append(experiment_res)
 
 def run_compression_queue_experiment(x_axis, x_axis_label, x_axis_config_param, program_command, result_name):
     # Multithread
     res1, res2, res3 = [], [], []
-    t1 = threading.Thread(target=thread_experiment, args=(x_axis_label, x_axis, None, "../no_compression_no_partition_queues", x_axis_config_param, program_command, res1))
-    t2 = threading.Thread(target=thread_experiment, args=(x_axis_label, x_axis, None, "../no_compression_yes_partition_queues", x_axis_config_param, program_command, res2))
-    t3 = threading.Thread(target=thread_experiment, args=(x_axis_label, x_axis, None, "../yes_compression_yes_partition_queues", x_axis_config_param, program_command, res3))
+    t1 = threading.Thread(target=thread_experiment, args=(x_axis_label, x_axis, "c0p0", "../no_compression_no_partition_queues", x_axis_config_param, program_command, res1))
+    t2 = threading.Thread(target=thread_experiment, args=(x_axis_label, x_axis, "c0p1", "../no_compression_yes_partition_queues", x_axis_config_param, program_command, res2))
+    t3 = threading.Thread(target=thread_experiment, args=(x_axis_label, x_axis, "c1p1", "../yes_compression_yes_partition_queues", x_axis_config_param, program_command, res3))
 
     for t in [t1, t2, t3]:
         t.start()
@@ -93,7 +119,7 @@ def run_compression_queue_experiment(x_axis, x_axis_label, x_axis_config_param, 
     # yes_compression_yes_partition_queues = run_experiment(x_axis_label, bandwidth_scalefactor, None, "yes_compression_yes_partition_queues", x_axis_config_param, program_command)
 
     data = {
-        x_axis_label: bandwidth_scalefactor,
+        x_axis_label: x_axis,
         'C: Off, P: Off': no_compression_no_partition_queues,
         'C: Off, P: On': no_compression_yes_partition_queues,
         'C: On, P: On': yes_compression_yes_partition_queues
@@ -108,7 +134,7 @@ if __name__ == "__main__":
 
     # IPC vs Bandwidth
     bandwidth_scalefactor = [4, 8, 16, 32]
-    x_axis_label = "Remote Bandwidth Scalefactor(gb/s)"
+    x_axis_label = "Remote Bandwidth Scalefactor"
     x_axis_config_param = "perf_model/dram/remote_mem_bw_scalefactor"
     # program_command = "../../../benchmarks/darknet/darknet classifier predict ../../../benchmarks/darknet/cfg/imagenet1k.data ../../../benchmarks/darknet/cfg/darknet19.cfg ../../../benchmarks/darknet/tiny.weights ../../../benchmarks/darknet/data/dog.jpg" # TODO: change me
     program_command = " ../../../test/crono/apps/sssp/sssp ../../../test/crono/inputs/bcsstk05.mtx 1" # TODO: change me
@@ -116,8 +142,8 @@ if __name__ == "__main__":
     t1 = threading.Thread(target=run_compression_queue_experiment, args=(bandwidth_scalefactor, x_axis_label, x_axis_config_param, program_command, result_name))
 
     # IPC vs Local DRAM Size
-    # local_dram_size = [4194304, 8388608, 16777216, 33554432]
-    local_dram_size = [4000, 8000, 16000, 32000]
+    local_dram_size = [4194304, 8388608, 16777216, 33554432]
+    # local_dram_size = [4000, 8000, 16000, 32000]
     x_axis_label = "Local DRAM Size(bytes)"
     x_axis_config_param = "perf_model/dram/localdram_size"
     program_command = " ../../../test/crono/apps/sssp/sssp ../../../test/crono/inputs/bcsstk05.mtx 1" # TODO: change me
