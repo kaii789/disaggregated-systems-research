@@ -531,7 +531,7 @@ class ExperimentManager:
                             execution_script.write(
                                 process_info[index]
                                 .experiment_run.get_execution_script_str()
-                                .format(sniper_output_dir=".")
+                                .format(sniper_output_dir=os.path.abspath("."))
                             )
                         # os.system('chmod a+x "{}"'.format(execution_script_path))
                         os.chmod(
@@ -696,6 +696,7 @@ if __name__ == "__main__":
         ".", darknet_home
     )
     command_strs["darknet_tiny"] = darknet_base_str_options.format("tiny", "")
+    command_strs["darknet_darknet"] = darknet_base_str_options.format("darknet", "")
     command_strs["darknet_darknet19"] = darknet_base_str_options.format("darknet19", "")
     command_strs["darknet_vgg-16"] = darknet_base_str_options.format("vgg-16", "")
     command_strs["darknet_resnet50"] = darknet_base_str_options.format("resnet50", "")
