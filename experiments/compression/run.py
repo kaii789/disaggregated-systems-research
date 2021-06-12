@@ -59,7 +59,7 @@ def log_compression_stats(res_directory, result_filename, program_command, confi
         avg_compression_latency = total_compression_latency / data_moves
         avg_decompression_latency = total_decompression_latency / data_moves
 
-        f = open("../{}".format(result_filename), "a")
+        f = open(result_filename, "a")
         f.write("Program Command: {}\n".format(program_command))
         f.write("Config Param: {}, Val: {}\n".format(config_param, val))
         f.write("Average Compression Ratio: {}\n".format(avg_compression_ratio))
@@ -75,15 +75,14 @@ def run_experiment(x_axis, x_axis_init, result_filename, config_name, config_par
 
     for val in x_axis_init:
         command = "../../../run-sniper -v -n 1 -c {} -g --{}={} -- {}".format(config_name, config_param, val, program_command)
-        tid = threading.current_thread().ident
-        subprocess.call("mkdir {}".format(tid), shell=True)
-        run_directory = "./{}".format(tid)
+        run_directory = "./{}-{}-{}".format(result_filename, config_param.split("/")[-1], val)
+        subprocess.call("mkdir {}".format(run_directory), shell=True)
         subprocess.call(command, shell=True, cwd=run_directory)
         ipc = get_ipc(run_directory)
         print(ipc)
         data['IPC'].append(ipc)
         log_compression_stats(run_directory, "{}.log".format(result_filename), program_command, config_param, val)
-        subprocess.call("rm -r {}".format(tid), shell=True)
+        # subprocess.call("rm -r {}".format(run_directory), shell=True)
 
     # df = pd.DataFrame(data)
     # graph = df.plot(x=x_axis, y="IPC")
@@ -137,7 +136,8 @@ if __name__ == "__main__":
     x_axis_label = "Remote Bandwidth Scalefactor"
     x_axis_config_param = "perf_model/dram/remote_mem_bw_scalefactor"
     # program_command = "../../../benchmarks/darknet/darknet classifier predict ../../../benchmarks/darknet/cfg/imagenet1k.data ../../../benchmarks/darknet/cfg/darknet19.cfg ../../../benchmarks/darknet/tiny.weights ../../../benchmarks/darknet/data/dog.jpg" # TODO: change me
-    program_command = " ../../../test/crono/apps/sssp/sssp ../../../test/crono/inputs/bcsstk05.mtx 1" # TODO: change me
+    program_command = "../../../test/crono/apps/sssp/sssp ../../../test/crono/inputs/bcsstk05.mtx 1"
+    # program_command = "../../../benchmarks/ligra/apps/BFS -s -rounds 1 ../../../benchmarks/ligra/inputs/rMat_1000000" # TODO: change me
     result_name = "ipc_vs_bandwidth_scalefactor_bar"
     t1 = threading.Thread(target=run_compression_queue_experiment, args=(bandwidth_scalefactor, x_axis_label, x_axis_config_param, program_command, result_name))
 
@@ -146,10 +146,11 @@ if __name__ == "__main__":
     # local_dram_size = [4000, 8000, 16000, 32000]
     x_axis_label = "Local DRAM Size(bytes)"
     x_axis_config_param = "perf_model/dram/localdram_size"
-    program_command = " ../../../test/crono/apps/sssp/sssp ../../../test/crono/inputs/bcsstk05.mtx 1" # TODO: change me
+    program_command = "../../../test/crono/apps/sssp/sssp ../../../test/crono/inputs/bcsstk05.mtx 1"
+    # program_command = "../../../benchmarks/ligra/apps/BFS -s -rounds 1 ../../../benchmarks/ligra/inputs/rMat_1000000" # TODO: change me
     result_name = "ipc_vs_local_dram_size_bar"
-    t2 = threading.Thread(target=run_compression_queue_experiment, args=(local_dram_size, x_axis_label, x_axis_config_param, program_command, result_name))
+    # t2 = threading.Thread(target=run_compression_queue_experiment, args=(local_dram_size, x_axis_label, x_axis_config_param, program_command, result_name))
 
     t1.start()
-    t2.start()
+    # t2.start()
 
