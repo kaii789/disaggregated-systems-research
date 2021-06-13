@@ -781,7 +781,6 @@ DramPerfModelDisagg::isRemoteAccess(IntPtr address, core_id_t requester, DramCnt
                     return true;
 
                 }
-                //possiblyEvict
             }
         }  
     }
@@ -794,11 +793,14 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
     SubsecondTime sw_overhead = SubsecondTime::Zero();
     SubsecondTime evict_compression_latency = SubsecondTime::Zero();
     UInt64 evicted_page; 
+
     UInt64 num_local_pages = m_localdram_size/m_page_size;
     if(m_r_cacheline_gran)
         num_local_pages = m_localdram_size/m_cache_line_size;
-    if(m_local_pages.size() > num_local_pages) {
+
+    if(m_local_pages.size() >= num_local_pages) {
         bool found = false;
+
         if(m_r_dontevictdirty) {
             auto i = m_local_pages.begin();
             for(unsigned int k = 0; k < m_local_pages.size()/2; ++i, ++k) {
@@ -809,15 +811,19 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
                     break;
                 }
             }	
+            // If a non-dirty page is found, just remove this page to make space
             if (found) {
                 m_local_pages.remove(evicted_page); 
             }
         }
+
+        // If found==false, remove the first page
         if(!found) {
             evicted_page = m_local_pages.front(); // Evict the least recently used page
             m_local_pages.pop_front(); 
         }
         ++m_local_evictions; 
+
         if(m_r_simulate_sw_pagereclaim_overhead) 
             sw_overhead = SubsecondTime::NS() * 30000; 		
 
@@ -861,10 +867,10 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
             if (std::find(m_remote_pages.begin(), m_remote_pages.end(), evicted_page) == m_remote_pages.end()) {
                 // The page to evict is not in remote_pages
                 m_remote_pages.push_back(evicted_page);
-                m_inflightevicted_pages[evicted_page] = t_now + page_datamovement_queue_delay;
             }
-        }
-        else if (std::find(m_remote_pages.begin(), m_remote_pages.end(), evicted_page) == m_remote_pages.end()) {
+            m_inflightevicted_pages[evicted_page] = t_now + page_datamovement_queue_delay;
+
+        } else if (std::find(m_remote_pages.begin(), m_remote_pages.end(), evicted_page) == m_remote_pages.end()) {
             // The page to evict is not dirty and not in remote memory
             m_remote_pages.push_back(evicted_page);
             ++m_data_moves;
@@ -903,6 +909,7 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
 
             m_inflightevicted_pages[evicted_page] = t_now + page_datamovement_queue_delay;
         }
+
         m_dirty_pages.remove(evicted_page);
     }
     return sw_overhead + evict_compression_latency;
