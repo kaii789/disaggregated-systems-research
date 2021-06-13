@@ -200,6 +200,7 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
       ('Experiment stats', '', ''),
       ('  PQ=1 temp1 time savings (ns)', 'dram.redundant-moves-temp1-time-savings', format_ns(2)),
       ('  PQ=1 temp2 time savings (ns)', 'dram.redundant-moves-temp2-time-savings', format_ns(2)),
+      ('  num unique pages accessed', 'dram.unique-pages-accessed', str),
   ])
 
   if 'ddr.page-hits' in results:
