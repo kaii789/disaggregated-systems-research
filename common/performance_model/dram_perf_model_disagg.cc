@@ -821,7 +821,7 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
     if(m_r_cacheline_gran)
         num_local_pages = m_localdram_size/m_cache_line_size;
 
-    if(m_local_pages.size() >= num_local_pages) {
+    if(m_local_pages.size() > num_local_pages) {
         bool found = false;
 
         if(m_r_dontevictdirty) {
