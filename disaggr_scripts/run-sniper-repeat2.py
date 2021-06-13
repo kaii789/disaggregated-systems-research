@@ -164,6 +164,9 @@ class ExperimentRun:
         if self.clean_up_command_str:
             lines.append(self.clean_up_command_str)
 
+        # Wait a little bit of time in case something needs to wrap up
+        lines.append("sleep 30")  # sleep for 30 seconds 
+
         # Save a copy of the output for later reference
         files_to_save = ["sim.cfg", "sim.out", "sim.stats.sqlite3"]
         for filename in files_to_save:
@@ -623,7 +626,7 @@ class ExperimentManager:
                     else:
                         i += 1
 
-                if len(self._process_queue) > 0:
+                if len(self._process_queue) > 0 or len(self._pending_experiments) == 0:
                     # Can sleep for a while since don't need to check processes that often; reduce CPU usage
                     time.sleep(60)  # sleep for 1 min
 
@@ -814,7 +817,7 @@ if __name__ == "__main__":
     # TODO: find out a good localdram_size to use
     darknet_tiny_pq_experiments = []
     model_type = "tiny"
-    for num_MB in []:  # approx 50% and 25% of total memory usage in ROI
+    for num_MB in [32]:  # approx 50% and 25% of total memory usage in ROI
         localdram_size_str = "{}MB".format(num_MB)
         command_str = darknet_base_str_options.format(model_type, "-g perf_model/dram/localdram_size={} -s stop-by-icount:{}".format(
                 num_MB * ONE_MB_TO_BYTES, 1000 * ONE_MILLION

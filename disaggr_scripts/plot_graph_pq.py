@@ -140,21 +140,21 @@ def run_from_cmdline(
                                 else np.nan
                             )  # The last entry of the line
                 if not out_file_lines[ipc_line_no].strip().startswith("IPC"):
-                    print(
+                    raise ValueError(
                         "Error: didn't find desired line starting with '{}' in .out file".format(
                             "IPC"
                         )
                     )
-                    sys.exit(-1)
                 elif None in y_value_line_nos:
+                    error_strs = []
                     for index, value in enumerate(y_value_line_nos):
                         if value is None:
-                            print(
+                            error_strs.append(
                                 "Error: didn't find desired line starting with '{}' in .out file".format(
                                     stat_settings[index].line_beginning
                                 )
                             )
-                    sys.exit(-1)
+                    raise ValueError("\n".join(error_strs))
             else:
                 # Read the lines of pertinant information
                 for index in range(len(y_values)):
@@ -174,9 +174,8 @@ def run_from_cmdline(
         #                 # The entry after the equals sign
         #                 config_param_values.append(float(line.split()[2]))
         #         if x_value_line_no is None:
-        #             print("Error: didn't find desired line starting with '{}' in .cfg file".format(
+        #             raise ValueError("Error: didn't find desired line starting with '{}' in .cfg file".format(
         #                 config_line_beginning))
-        #             sys.exit(-1)
         #     else:
         #         line = config_file.readlines()[x_value_line_no]
         #         # The entry after the equals sign
@@ -220,7 +219,7 @@ def save_graph_pq(
     elif len(y_values[0]) == 4:  # Older experiment config setup
         x_axis = ["remote mem\ndisabled", "pq0\n0 network\nlatency", "pq0", "pq1"]
     else:
-        raise ValueError("number of experiment runs={}, inaccurate?", len(y_values[0]))
+        raise ValueError("number of experiment runs={}, inaccurate?".format(len(y_values[0])))
 
     print("X values:\n", [s.replace("\n", " ") for s in x_axis])
     print("Y values:")
@@ -256,7 +255,9 @@ def save_graph_pq(
     if max(y_values[0]) > y_axis_top:
         y_axis_top = max(y_values[0])
     plt.ylim(bottom=0, top=y_axis_top)
-    plt.yticks(np.arange(0, y_axis_top + 0.01, step=0.05))  # +0.01 to include y_axis_top
+    plt.yticks(
+        np.arange(0, y_axis_top + 0.01, step=0.05)
+    )  # +0.01 to include y_axis_top
 
     title_str = "Effect of Partition Queues"
     plt.title(title_str)

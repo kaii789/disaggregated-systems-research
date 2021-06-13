@@ -68,16 +68,26 @@ def run_from_experiment(
                             y_value_line_nos[index] = line_no
                             # The last entry of the line
                             y_values[index].append(
-                                stat_setting.format_func(line.split()[-1]) if line.split()[-1] != "|" else np.nan
+                                stat_setting.format_func(line.split()[-1])
+                                if line.split()[-1] != "|"
+                                else np.nan
                             )
                 if not out_file_lines[ipc_line_no].strip().startswith("IPC"):
-                    print("Error: didn't find desired line starting with '{}' in .out file".format("IPC"))
-                    sys.exit(-1)
+                    raise ValueError(
+                        "Error: didn't find desired line starting with '{}' in .out file".format(
+                            "IPC"
+                        )
+                    )
                 elif None in y_value_line_nos:
+                    error_strs = []
                     for index, value in enumerate(y_value_line_nos):
                         if value is None:
-                            print("Error: didn't find desired line starting with '{}' in .out file".format(stat_settings[index].line_beginning))
-                    sys.exit(-1)
+                            error_strs.append(
+                                "Error: didn't find desired line starting with '{}' in .out file".format(
+                                    stat_settings[index].line_beginning
+                                )
+                            )
+                    raise ValueError("\n".join(error_strs))
                 first_file = False
             else:
                 # Read the lines of pertinant information
@@ -85,7 +95,9 @@ def run_from_experiment(
                     line = out_file_lines[y_value_line_nos[index]]
                     # The last entry of the line
                     y_values[index].append(
-                        stat_settings[index].format_func(line.split()[-1]) if line.split()[-1] != "|" else np.nan
+                        stat_settings[index].format_func(line.split()[-1])
+                        if line.split()[-1] != "|"
+                        else np.nan
                     )
 
             # config_filename = "{}_sim.cfg".format(file_num)
@@ -146,22 +158,34 @@ def run_from_cmdline(
                         if line.strip().startswith(stat_setting.line_beginning):
                             y_value_line_nos[index] = line_no
                             y_values[index].append(
-                                stat_setting.format_func(line.split()[-1]) if line.split()[-1] != "|" else np.nan
+                                stat_setting.format_func(line.split()[-1])
+                                if line.split()[-1] != "|"
+                                else np.nan
                             )  # The last entry of the line
                 if not out_file_lines[ipc_line_no].strip().startswith("IPC"):
-                    print("Error: didn't find desired line starting with '{}' in .out file".format("IPC"))
-                    sys.exit(-1)
+                    raise ValueError(
+                        "Error: didn't find desired line starting with '{}' in .out file".format(
+                            "IPC"
+                        )
+                    )
                 elif None in y_value_line_nos:
+                    error_strs = []
                     for index, value in enumerate(y_value_line_nos):
                         if value is None:
-                            print("Error: didn't find desired line starting with '{}' in .out file".format(stat_settings[index].line_beginning))
-                    sys.exit(-1)
+                            error_strs.append(
+                                "Error: didn't find desired line starting with '{}' in .out file".format(
+                                    stat_settings[index].line_beginning
+                                )
+                            )
+                    raise ValueError("\n".join(error_strs))
             else:
                 # Read the lines of pertinant information
                 for index in range(len(y_values)):
                     line = out_file_lines[y_value_line_nos[index]]
                     y_values[index].append(
-                        stat_settings[index].format_func(line.split()[-1]) if line.split()[-1] != "|" else np.nan
+                        stat_settings[index].format_func(line.split()[-1])
+                        if line.split()[-1] != "|"
+                        else np.nan
                     )  # The last entry of the line
 
         # Associated sim.cfg file
@@ -175,12 +199,11 @@ def run_from_cmdline(
                         # The entry after the equals sign
                         config_param_values.append(float(line.split()[2]))
                 if x_value_line_no is None:
-                    print(
+                    raise ValueError(
                         "Error: didn't find desired line starting with '{}' in .cfg file".format(
                             config_line_beginning
                         )
                     )
-                    sys.exit(-1)
             else:
                 line = config_file.readlines()[x_value_line_no]
                 # The entry after the equals sign

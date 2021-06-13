@@ -82,21 +82,21 @@ def get_stats_from_files(
                                 else np.nan
                             )  # The last entry of the line
                 if not out_file_lines[ipc_line_no].strip().startswith("IPC"):
-                    print(
+                    raise ValueError(
                         "Error: didn't find desired line starting with '{}' in .out file".format(
                             "IPC"
                         )
                     )
-                    sys.exit(-1)
                 elif None in y_value_line_nos:
+                    error_strs = []
                     for index, value in enumerate(y_value_line_nos):
                         if value is None:
-                            print(
+                            error_strs.append(
                                 "Error: didn't find desired line starting with '{}' in .out file".format(
                                     stat_settings[index].line_beginning
                                 )
                             )
-                    sys.exit(-1)
+                    raise ValueError("\n".join(error_strs))
             else:
                 # Read the lines of pertinant information
                 for index in range(len(y_values)):
@@ -118,12 +118,11 @@ def get_stats_from_files(
                         # The entry after the equals sign
                         config_param_values.append(float(line.split()[2]))
                 if x_value_line_no is None:
-                    print(
+                    raise ValueError(
                         "Error: didn't find desired line starting with '{}' in .cfg file".format(
                             config_line_beginning
                         )
                     )
-                    sys.exit(-1)
             else:
                 line = config_file.readlines()[x_value_line_no]
                 # The entry after the equals sign
@@ -358,16 +357,15 @@ def check_config(
                         # The entry after the equals sign
                         config_param_values.append(float(line.split()[2]))
                 if x_value_line_no is None:
-                    print(
+                    raise ValueError(
                         "Error: didn't find desired line starting with '{}' in .cfg file".format(
                             config_line_beginning
                         )
                     )
-                    sys.exit(-1)
             else:
                 line = config_file.readlines()[x_value_line_no]
                 if not line.startswith(config_line_beginning):
-                    print(
+                    raise ValueError(
                         "Error: didn't find desired line starting with '{}' in .cfg file {}".format(
                             config_line_beginning, out_file_path
                         )
@@ -403,10 +401,9 @@ if __name__ == "__main__":
     elif type == "cacheline_ratio":
         run_from_cmdline_cacheline_queue_ratio(".")
     elif type == "print_only":
-        directory_path = "."  # current directory of the calling terminal 
+        directory_path = "."  # current directory of the calling terminal
         check_config(directory_path, "localdram_size")
         check_config(directory_path, "remote_mem_add_lat")
         check_config(directory_path, "remote_mem_bw_scalefactor")
         check_config(directory_path, "remote_partitioned_queues")
         check_config(directory_path, "remote_cacheline_queue_fraction")
-
