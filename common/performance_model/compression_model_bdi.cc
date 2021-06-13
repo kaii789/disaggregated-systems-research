@@ -23,10 +23,11 @@ SubsecondTime
 CompressionModelBDI::compress(IntPtr addr, size_t data_size, core_id_t core_id, UInt32 *compressed_page_size, UInt32 *compressed_cache_lines)
 {
     // Get Data
-    UInt64 page = addr & ~((UInt64(1) << floorLog2(m_page_size)) - 1);
     Core *core = Sim()->getCoreManager()->getCoreFromID(core_id);
-    core->getApplicationData(Core::NONE, Core::READ, page, m_data_buffer, data_size, Core::MEM_MODELED_NONE);
-    
+    // UInt64 page = addr & ~((UInt64(1) << floorLog2(m_page_size)) - 1);
+    // core->getApplicationData(Core::NONE, Core::READ, page, m_data_buffer, data_size, Core::MEM_MODELED_NONE);
+    core->getApplicationData(Core::NONE, Core::READ, addr, m_data_buffer, data_size, Core::MEM_MODELED_NONE); // Assume addr already points to page or cache line
+
     // BDI
     UInt32 total_bytes = 0;
     UInt32 total_compressed_cache_lines = 0;

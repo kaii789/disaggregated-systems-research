@@ -152,7 +152,8 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     m_use_compression = Sim()->getCfg()->getBool("perf_model/dram/compression_model/use_compression");
     if (m_use_compression) {
         String compression_scheme = Sim()->getCfg()->getString("perf_model/dram/compression_model/compression_scheme");
-        m_compression_model = CompressionModel::create("Link Compression Model", m_page_size, cache_block_size, compression_scheme);
+        UInt32 gran_size = m_r_cacheline_gran ? m_cache_line_size : m_page_size;
+        m_compression_model = CompressionModel::create("Link Compression Model", gran_size, m_cache_line_size, compression_scheme);
         registerStatsMetric("compression", core_id, "bytes-saved", &bytes_saved);
         registerStatsMetric("compression", core_id, "sum-compression-ratio", &m_sum_compression_ratio);
         registerStatsMetric("compression", core_id, "total-compression-latency", &m_total_compression_latency);
@@ -464,31 +465,31 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     if (move_page) {
         ++m_data_moves;
         SubsecondTime page_datamovement_queue_delay = SubsecondTime::Zero();
-        if(m_r_simulate_datamov_overhead && !m_r_cacheline_gran) { 
+        if(m_r_simulate_datamov_overhead) { 
             //check if queue is full
             //if it is... wait.
             //to wait: t_now + window_size
             //try again
 
             // Compress
-            UInt32 page_size = m_page_size;
+            UInt32 size = m_r_cacheline_gran ? m_cache_line_size : m_page_size;
             if (m_use_compression)
             {
+                UInt32 gran_size = size;
                 UInt32 compressed_cache_lines;
-                SubsecondTime compression_latency = m_compression_model->compress(phys_page, m_page_size, m_core_id, &page_size, &compressed_cache_lines);
-                bytes_saved += m_page_size - page_size;
-                address_to_compressed_size[phys_page] = page_size;
+                SubsecondTime compression_latency = m_compression_model->compress(phys_page, gran_size, m_core_id, &size, &compressed_cache_lines);
+                bytes_saved += gran_size - size;
+                address_to_compressed_size[phys_page] = size;
                 address_to_num_cache_lines[phys_page] = compressed_cache_lines;
-                m_sum_compression_ratio += float(m_page_size) / float(page_size);
+                m_sum_compression_ratio += float(gran_size) / float(size);
                 m_total_compression_latency += compression_latency;
                 t_now += compression_latency;
             }
 
-
             if(m_r_partition_queues) {
-                page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_part_bandwidth.getRoundedLatency(8*page_size), requester);
+                page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_part_bandwidth.getRoundedLatency(8*size), requester);
             } else {
-                page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*page_size), requester);
+                page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*size), requester);
                 t_now += page_datamovement_queue_delay;
                 t_now -= datamovement_queue_delay;  
             }
@@ -833,27 +834,28 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
             ++m_writeback_pages;
 
             // Compress
-            UInt32 page_size = m_page_size;
+            UInt32 size = m_r_cacheline_gran ? m_cache_line_size : m_page_size;
             if (m_use_compression)
             {
+                UInt32 gran_size = size;
                 UInt32 compressed_cache_lines;
-                SubsecondTime compression_latency = m_compression_model->compress(phys_page, m_page_size, m_core_id, &page_size, &compressed_cache_lines);
-                bytes_saved += m_page_size - page_size;
-                address_to_compressed_size[phys_page] = page_size;
+                SubsecondTime compression_latency = m_compression_model->compress(phys_page, gran_size, m_core_id, &size, &compressed_cache_lines);
+                bytes_saved += gran_size - size;
+                address_to_compressed_size[phys_page] = size;
                 address_to_num_cache_lines[phys_page] = compressed_cache_lines;
-                m_sum_compression_ratio += float(m_page_size) / float(page_size);
+                m_sum_compression_ratio += float(gran_size) / float(size);
                 evict_compression_latency += compression_latency;
                 m_total_compression_latency += compression_latency;
             }
 
             SubsecondTime page_datamovement_queue_delay = SubsecondTime::Zero();
-            if(m_r_simulate_datamov_overhead) { 
+            if(m_r_simulate_datamov_overhead) {
                 if(m_r_partition_queues)
-                    page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_part_bandwidth.getRoundedLatency(8*page_size), requester);
-                else if(m_r_cacheline_gran)
-                    page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*64), requester);
+                    page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_part_bandwidth.getRoundedLatency(8*size), requester);
+                // else if(m_r_cacheline_gran)
+                //     page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*m_cache_line_size), requester);
                 else
-                    page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*page_size), requester);
+                    page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*size), requester);
             }
 
             // TODO: Currently model decompression by adding decompression latency to inflight page time
@@ -876,15 +878,16 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
             ++m_data_moves;
 
             // Compress
-            UInt32 page_size = m_page_size;
+            UInt32 size = m_r_cacheline_gran ? m_cache_line_size : m_page_size;
             if (m_use_compression)
             {
+                UInt32 gran_size = size;
                 UInt32 compressed_cache_lines;
-                SubsecondTime compression_latency = m_compression_model->compress(phys_page, m_page_size, m_core_id, &page_size, &compressed_cache_lines);
-                bytes_saved += m_page_size - page_size;
-                address_to_compressed_size[phys_page] = page_size;
+                SubsecondTime compression_latency = m_compression_model->compress(phys_page, gran_size, m_core_id, &size, &compressed_cache_lines);
+                bytes_saved += gran_size - size;
+                address_to_compressed_size[phys_page] = size;
                 address_to_num_cache_lines[phys_page] = compressed_cache_lines;
-                m_sum_compression_ratio += float(m_page_size) / float(page_size);
+                m_sum_compression_ratio += float(gran_size) / float(size);
                 evict_compression_latency += compression_latency;
                 m_total_compression_latency += compression_latency;
             }
@@ -892,11 +895,11 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
             SubsecondTime page_datamovement_queue_delay = SubsecondTime::Zero();
             if(m_r_simulate_datamov_overhead) {
                 if(m_r_partition_queues)
-                    page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_part_bandwidth.getRoundedLatency(8*page_size), requester);
-                else if(m_r_cacheline_gran)
-                    page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*64), requester);
+                    page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_part_bandwidth.getRoundedLatency(8*size), requester);
+                // else if(m_r_cacheline_gran)
+                //     page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*64), requester);
                 else
-                    page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*page_size), requester);
+                    page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*size), requester);
             }
 
             // TODO: Currently model decompression by adding decompression latency to inflight page time
