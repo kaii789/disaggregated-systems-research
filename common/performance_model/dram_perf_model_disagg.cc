@@ -80,7 +80,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_dram_page_misses         (0)
     , m_remote_reads        (0)
     , m_remote_writes       (0)
-    , m_data_moves          (0)
+    , m_page_moves          (0)
     , m_page_prefetches     (0)
     , m_inflight_hits       (0)
     , m_writeback_pages     (0)
@@ -88,8 +88,8 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_extra_pages         (0)
     , m_redundant_moves     (0)
     , m_max_bufferspace     (0)
+    , m_unique_pages_accessed      (0)
     , m_total_queueing_delay(SubsecondTime::Zero())
-    , m_total_access_latency(SubsecondTime::Zero())
     , m_total_local_access_latency(SubsecondTime::Zero())
     , m_total_remote_access_latency(SubsecondTime::Zero())
 {
@@ -163,7 +163,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     registerStatsMetric("dram", core_id, "total-remote-access-latency", &m_total_remote_access_latency);
     registerStatsMetric("dram", core_id, "remote-reads", &m_remote_reads);
     registerStatsMetric("dram", core_id, "remote-writes", &m_remote_writes);
-    registerStatsMetric("dram", core_id, "data-moves", &m_data_moves);
+    registerStatsMetric("dram", core_id, "data-moves", &m_page_moves);
     registerStatsMetric("dram", core_id, "page-prefetches", &m_page_prefetches);
     registerStatsMetric("dram", core_id, "inflight-hits", &m_inflight_hits);
     registerStatsMetric("dram", core_id, "writeback-pages", &m_writeback_pages);
@@ -171,6 +171,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     registerStatsMetric("dram", core_id, "extra-traffic", &m_extra_pages);
     registerStatsMetric("dram", core_id, "redundant-moves", &m_redundant_moves);
     registerStatsMetric("dram", core_id, "max-bufferspace", &m_max_bufferspace);
+    registerStatsMetric("dram", core_id, "unique-pages-accessed", &m_unique_pages_accessed);
 }
 
 DramPerfModelDisagg::~DramPerfModelDisagg()
@@ -450,7 +451,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
 
     // Adding data movement cost of the entire page for now (this just adds contention in the queue)
     if (move_page) {
-        ++m_data_moves;
+        ++m_page_moves;
         SubsecondTime page_datamovement_queue_delay = SubsecondTime::Zero();
         if(m_r_simulate_datamov_overhead && !m_r_cacheline_gran) { 
             //check if queue is full
@@ -503,6 +504,13 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
     if(m_r_cacheline_gran) 
         phys_page =  address & ~((UInt64(1) << 6) - 1); // Assuming 64bit cache line
     UInt64 cacheline =  address & ~((UInt64(1) << 6) - 1); // Assuming 64bit cache line
+
+    if (m_page_usage_map.count(phys_page) == 0) {
+        ++m_unique_pages_accessed;
+        m_page_usage_map[phys_page] = 0;
+    } else {
+        m_page_usage_map[phys_page] += 1;
+    }
 
     // m_inflight_pages: tracks which pages are being moved and when the movement will complete
     // Check if the page movement is over and if so, remove from the list
@@ -786,7 +794,7 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
 
         if (std::find(m_dirty_pages.begin(), m_dirty_pages.end(), evicted_page) != m_dirty_pages.end()) {
             // The page to evict is dirty
-            ++m_data_moves;
+            ++m_page_moves;
             ++m_writeback_pages;
             SubsecondTime page_datamovement_queue_delay = SubsecondTime::Zero();
             if(m_r_simulate_datamov_overhead) { 
@@ -807,7 +815,7 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
         else if (std::find(m_remote_pages.begin(), m_remote_pages.end(), evicted_page) == m_remote_pages.end()) {
             // The page to evict is not dirty and not in remote memory
             m_remote_pages.push_back(evicted_page);
-            ++m_data_moves;
+            ++m_page_moves;
             SubsecondTime page_datamovement_queue_delay = SubsecondTime::Zero();
             if(m_r_simulate_datamov_overhead) { 
                 if(m_r_partition_queues)
@@ -835,7 +843,7 @@ DramPerfModelDisagg::possiblyPrefetch(UInt64 phys_page, SubsecondTime t_now, cor
     if (std::find(m_local_pages.begin(), m_local_pages.end(), pref_page) == m_local_pages.end() && std::find(m_remote_pages.begin(), m_remote_pages.end(), pref_page) != m_remote_pages.end()) {
         // pref_page is not in local_pages but in remote_pages
         ++m_page_prefetches;
-        ++m_data_moves;
+        ++m_page_moves;
         SubsecondTime page_datamovement_queue_delay = SubsecondTime::Zero();
         if(m_r_simulate_datamov_overhead) { 
             page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*m_page_size), requester);

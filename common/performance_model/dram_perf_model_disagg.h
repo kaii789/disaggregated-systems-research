@@ -110,7 +110,6 @@ class DramPerfModelDisagg : public DramPerfModel
         std::map<UInt64, UInt32> m_inflight_redundant; 
         std::map<UInt64, SubsecondTime> m_inflightevicted_pages; // Inflight pages that are being transferred from local memory to remote memory
 
-
         // Variables to keep track of stats
         UInt64 m_dram_page_hits;
         UInt64 m_dram_page_empty;
@@ -118,7 +117,7 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_dram_page_misses;
         UInt64 m_remote_reads;
         UInt64 m_remote_writes;
-        UInt64 m_data_moves;
+        UInt64 m_page_moves;
         UInt64 m_page_prefetches;
         UInt64 m_inflight_hits;
         UInt64 m_writeback_pages;
@@ -126,6 +125,8 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_extra_pages;
         UInt64 m_redundant_moves;
         UInt64 m_max_bufferspace;
+        std::map<UInt64, UInt32> m_page_usage_map;  // track number of times each phys page is accessed
+        UInt64 m_unique_pages_accessed;             // track number of unique pages accessed
 
         SubsecondTime m_total_queueing_delay;
         SubsecondTime m_total_access_latency;
