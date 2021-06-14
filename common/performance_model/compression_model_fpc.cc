@@ -22,6 +22,7 @@ CompressionModelFPC::CompressionModelFPC(String name, UInt32 page_size, UInt32 c
 
     predsizem1 = (1L << predsizem1) - 1;
 	c_fcm = (long long *)calloc(predsizem1 + 1, 8);
+<<<<<<< HEAD
 	assert(NULL != c_fcm);
 	c_dfcm = (long long *)calloc(predsizem1 + 1, 8);
 	assert(NULL != c_dfcm);
@@ -29,6 +30,15 @@ CompressionModelFPC::CompressionModelFPC(String name, UInt32 page_size, UInt32 c
 	assert(NULL != d_fcm);
 	d_dfcm = (long long *)calloc(predsizem1 + 1, 8);
 	assert(NULL != d_dfcm);
+=======
+	// assert(NULL != c_fcm);
+	c_dfcm = (long long *)calloc(predsizem1 + 1, 8);
+	// assert(NULL != c_dfcm);
+	d_fcm = (long long *)calloc(predsizem1 + 1, 8);
+	// assert(NULL != d_fcm);
+	d_dfcm = (long long *)calloc(predsizem1 + 1, 8);
+	// assert(NULL != d_dfcm);
+>>>>>>> 20a3c12d51907966971637e2cc1d112678166ea2
 }
 
 SubsecondTime
@@ -56,6 +66,11 @@ CompressionModelFPC::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
     // Return compressed pages size in Bytes
     *compressed_page_size = total_bytes;
 
+<<<<<<< HEAD
+=======
+    printf("[FPC Compression] Compressed Page Size: %ud bytes", total_bytes);
+
+>>>>>>> 20a3c12d51907966971637e2cc1d112678166ea2
     // Return compression latency
     ComponentLatency compress_latency(ComponentLatency(core->getDvfsDomain(), total_compressed_cache_lines * m_compression_latency));
     return compress_latency.getLatency();
