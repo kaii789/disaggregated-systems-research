@@ -14,6 +14,18 @@ CompressionModelFPC::CompressionModelFPC(String name, UInt32 page_size, UInt32 c
     : m_name(name)
     , m_page_size(page_size)
     , m_cache_line_size(cache_line_size)
+    , insize((int)cache_line_size/sizeof(double))
+    , predsizem1(8) // TODO: fix
+    , c_hash(0)
+    , d_hash(0)
+    , c_dhash(0)
+    , d_dhash(0)
+    , c_pred1(0)
+    , c_pred2(0)
+    , d_pred1(0)
+    , d_pred2(0)
+    , c_lastval(0)
+    , d_lastval(0)
 {
     m_cacheline_count = m_page_size / m_cache_line_size;
     m_data_buffer = new char[m_page_size];
@@ -22,15 +34,6 @@ CompressionModelFPC::CompressionModelFPC(String name, UInt32 page_size, UInt32 c
 
     predsizem1 = (1L << predsizem1) - 1;
 	c_fcm = (long long *)calloc(predsizem1 + 1, 8);
-<<<<<<< HEAD
-	assert(NULL != c_fcm);
-	c_dfcm = (long long *)calloc(predsizem1 + 1, 8);
-	assert(NULL != c_dfcm);
-	d_fcm = (long long *)calloc(predsizem1 + 1, 8);
-	assert(NULL != d_fcm);
-	d_dfcm = (long long *)calloc(predsizem1 + 1, 8);
-	assert(NULL != d_dfcm);
-=======
 	// assert(NULL != c_fcm);
 	c_dfcm = (long long *)calloc(predsizem1 + 1, 8);
 	// assert(NULL != c_dfcm);
@@ -38,7 +41,6 @@ CompressionModelFPC::CompressionModelFPC(String name, UInt32 page_size, UInt32 c
 	// assert(NULL != d_fcm);
 	d_dfcm = (long long *)calloc(predsizem1 + 1, 8);
 	// assert(NULL != d_dfcm);
->>>>>>> 20a3c12d51907966971637e2cc1d112678166ea2
 }
 
 SubsecondTime
@@ -66,11 +68,8 @@ CompressionModelFPC::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
     // Return compressed pages size in Bytes
     *compressed_page_size = total_bytes;
 
-<<<<<<< HEAD
-=======
-    printf("[FPC Compression] Compressed Page Size: %ud bytes", total_bytes);
+    printf("[FPC Compression] Compressed Page Size: %u bytes", total_bytes);
 
->>>>>>> 20a3c12d51907966971637e2cc1d112678166ea2
     // Return compression latency
     ComponentLatency compress_latency(ComponentLatency(core->getDvfsDomain(), total_compressed_cache_lines * m_compression_latency));
     return compress_latency.getLatency();
@@ -124,7 +123,7 @@ UInt32 CompressionModelFPC::compressCacheLine(void* _inbuf, void* _outbuf)
         		xor1 = xor2;
  	  	}
 
-		
+
 		bcode = 7;                // 8 bytes
    	if (0 == (xor1 >> 56))
      		bcode = 6;              // 7 bytes
