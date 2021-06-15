@@ -154,6 +154,23 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
   if 'dram-datamovement-queue-2.num-requests' in results and sum(results['dram-datamovement-queue-2.num-requests']) > 0:
     results['dram.remotequeuemodel_datamovement2_avgdelay'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram-datamovement-queue-2.total-queue-delay'], results['dram-datamovement-queue-2.num-requests']))
 
+  # Compression
+  bytes_saved = results['compression.bytes-saved'][0] if 'compression.bytes-saved' in results else 0
+  if bytes_saved != 0:
+    data_moves = results['dram.data-moves'][0]
+    sum_compression_ratio = results['compression.sum-compression-ratio'][0]
+    total_compression_latency = results['compression.total-compression-latency'][0]
+    total_decompression_latency = results['compression.total-decompression-latency'][0]
+
+    results['compression.avg-compression-ratio'] = sum_compression_ratio / data_moves
+    results['compression.avg-compression-latency'] = total_compression_latency / data_moves
+    results['compression.avg-decompression-latency'] = total_decompression_latency / data_moves
+
+    print("bytes_saved", bytes_saved)
+    print("data moves", data_moves)
+    print("avg compression ratio", results['compression.avg-compression-ratio'])
+    print("avg compression latency", results['compression.avg-compression-latency'])
+    print("avg decompression latency", results['compression.avg-decompression-latency'])
 
   template += [
     ('DRAM summary', '', ''),
@@ -180,6 +197,16 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     ('  num redundant moves', 'dram.redundant-moves', str),
     ('  max simultaneous # inflight pages (bufferspace)', 'dram.max-bufferspace', str),
   ]
+
+  # Compression
+  if bytes_saved != 0:
+    template += [
+      ('  bytes saved', 'compression.bytes-saved', str),
+      # ('  avg compression ratio', 'compression.avg-compression-ratio', str), # TODO: why this crash?
+      # ('  avg compression latency(ns)', 'compression.avg-compression-latency', format_ns(2)),
+      # ('  avg decompression latency(ns)', 'compression.avg-decompression-latency', format_ns(2)),
+    ]
+
   if 'dram.total-read-queueing-delay' in results:
     results['dram.avgqueueread'] = map(lambda (a,b): a/(b or 1), zip(results['dram.total-read-queueing-delay'], results['dram.reads']))
     results['dram.avgqueuewrite'] = map(lambda (a,b): a/(b or 1), zip(results['dram.total-write-queueing-delay'], results['dram.writes']))
