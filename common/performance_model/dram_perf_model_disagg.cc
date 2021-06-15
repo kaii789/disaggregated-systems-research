@@ -883,7 +883,7 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
         } else if (std::find(m_remote_pages.begin(), m_remote_pages.end(), evicted_page) == m_remote_pages.end()) {
             // The page to evict is not dirty and not in remote memory
             m_remote_pages.push_back(evicted_page);
-            ++m_data_moves;
+            ++m_page_moves;
 
             // Compress
             UInt32 size = m_r_cacheline_gran ? m_cache_line_size : m_page_size;
