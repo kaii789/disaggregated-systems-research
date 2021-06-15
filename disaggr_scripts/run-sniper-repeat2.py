@@ -6,6 +6,7 @@ import time
 import traceback
 import datetime
 import getopt
+import shutil
 import subprocess
 from collections import deque
 
@@ -165,7 +166,7 @@ class ExperimentRun:
             lines.append(self.clean_up_command_str)
 
         # Wait a little bit of time in case something needs to wrap up
-        lines.append("sleep 30")  # sleep for 30 seconds 
+        lines.append("sleep 30")  # sleep for 30 seconds
 
         # Save a copy of the output for later reference
         files_to_save = ["sim.cfg", "sim.out", "sim.stats.sqlite3"]
@@ -607,6 +608,18 @@ class ExperimentManager:
                             process_info[index].log_file.close()
                             process_info[index].log_file = None
 
+                            # Create backup of temp folder; we should have cwd of self.output_directory_abspath
+                            time.sleep(5)  # give a bit of time for things to settle in
+                            shutil.copytree(
+                                process_info[index].temp_dir,
+                                os.path.join(
+                                    process_info[
+                                        index
+                                    ].experiment_run.experiment_output_directory,
+                                    "process_{}_temp_copy".format(index),
+                                ),
+                            )
+
                 # Process experiments that have all runs completed
                 i = 0
                 while i < len(self._running_experiments):
@@ -812,16 +825,29 @@ if __name__ == "__main__":
 
     experiments = []
 
+    experiments.append(
+            Experiment(
+                experiment_name="test".format(
+                ),
+                command_str=command_str2a,
+                experiment_run_configs=partition_queue_series_experiment_run_configs,
+                output_root_directory=".",
+            )
+        )
+
     # Partition queue series, 6 runs per series
     # Darknet tiny, partition queue series, net_lat = 120 (default)
     # TODO: find out a good localdram_size to use
     darknet_tiny_pq_experiments = []
     model_type = "tiny"
-    for num_MB in [32]:  # approx 50% and 25% of total memory usage in ROI
+    for num_MB in [16]:  # approx 50% of total memory usage in ROI
         localdram_size_str = "{}MB".format(num_MB)
-        command_str = darknet_base_str_options.format(model_type, "-g perf_model/dram/localdram_size={} -s stop-by-icount:{}".format(
+        command_str = darknet_base_str_options.format(
+            model_type,
+            "-g perf_model/dram/localdram_size={} -s stop-by-icount:{}".format(
                 num_MB * ONE_MB_TO_BYTES, 1000 * ONE_MILLION
-            ))
+            ),
+        )
         # 1 billion instructions cap
 
         darknet_tiny_pq_experiments.append(
