@@ -74,7 +74,7 @@ UInt32 CompressionModelFPC::compressCacheLine(void* _inbuf, void* _outbuf)
 		for (int i = 0; i < 6; i++)
 		{
 			// TODO: How to handle words consisting of repeated bytes?
-			if (word | mask[i] == mask[i])
+			if ((word | mask[i]) == mask[i])
 			{
 				compressed_size_bits += mask_to_bits[i];
 				break;
