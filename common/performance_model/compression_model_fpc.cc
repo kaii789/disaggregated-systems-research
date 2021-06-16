@@ -1,13 +1,13 @@
 #include "compression_model_fpc.h"
 
-// Assume 64 bit word
-const long long unsigned CompressionModelFPC::mask[6]=
-       {0x0000000000000000LL, // Zero run
-        0x00000000000000ffLL, // 4 Bit
-        0x000000000000ffffLL, // One byte
-        0x00000000ffffffffLL, // Halfword
-        0xffffffff00000000LL, // Halfword padded with a zero halfword
-        0x0000ffff0000ffffLL}; // Two halfwords, each a byte
+// Assume 32 bit word
+const UInt32 CompressionModelFPC::mask[6]=
+       {0x00000000LL, // Zero run
+        0x0000000fLL, // 4 Bit
+        0x000000ffLL, // One byte
+        0x0000ffffLL, // Halfword
+        0xffff0000LL, // Halfword padded with a zero halfword
+        0x00ff00ffLL}; // Two halfwords, each a byte
 
 CompressionModelFPC::CompressionModelFPC(String name, UInt32 page_size, UInt32 cache_line_size)
     : m_name(name)
@@ -60,30 +60,49 @@ CompressionModelFPC::~CompressionModelFPC()
 }
 
 UInt32 CompressionModelFPC::compressCacheLine(void* _inbuf, void* _outbuf)
-
 {
-	UInt64 *cache_line = (UInt64*)_inbuf;
+	UInt32 *cache_line = (UInt32*)_inbuf;
 	UInt32 compressed_size_bits = 0;
-	UInt32 mask_to_bits[6] = {3, 4, 8, 32, 32, 16};
+	UInt32 mask_to_bits[6] = {3, 4, 8, 16, 16, 16};
 	const UInt8 prefix_len = 3;
 
-	for (int i = 0; i < m_cache_line_size / 64; i++)
+	for (int i = 0; i < m_cache_line_size / 32; i++)
 	{
-		UInt64 word = cache_line[i];
+		UInt32 word = cache_line[i];
 		compressed_size_bits += prefix_len;
-		for (int i = 0; i < 6; i++)
+
+        bool is_pattern_matched = false;
+		for (int j = 0; j < 6; j++)
 		{
-			// TODO: How to handle words consisting of repeated bytes?
-			if ((word | mask[i]) == mask[i])
+            // Pattern match and handle
+			if ((word | mask[j]) == mask[j])
 			{
-				compressed_size_bits += mask_to_bits[i];
+				compressed_size_bits += mask_to_bits[j];
+                is_pattern_matched = true;
 				break;
 			}
 		}
-		compressed_size_bits += 64; // Uncompressed word
+
+        if (!is_pattern_matched)
+        {
+            // Handle words consisting of repeated bytes
+            bool repeated = true;
+            SInt8 base = ((SInt8*)word)[0];
+            for (int j = 1; j < 4; j++)
+                if ((base - ((SInt8*)word)[j]) != 0) {
+                    repeated = false;
+                    break;
+                }
+            compressed_size_bits += 8;
+            is_pattern_matched = true;
+        }
+
+        // None of the patterns match, so can't compress
+        if (!is_pattern_matched)
+            compressed_size_bits += 32;
 	}
 
-	return (UInt32)compressed_size_bits / 8; // Return compressed size in bytes
+	return (UInt32)((compressed_size_bits + 7) / 8); // Return compressed size in bytes
 };
 
 SubsecondTime

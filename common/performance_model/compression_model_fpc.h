@@ -30,7 +30,7 @@ private:
     UInt32 m_decompression_latency = 5;
 
     // FPC
-    static const long long unsigned mask[6];
+    static const UInt32 mask[6];
 
     UInt32 compressCacheLine(void *in, void *out);
     UInt32 decompressCacheLine(void *in, void *out);
