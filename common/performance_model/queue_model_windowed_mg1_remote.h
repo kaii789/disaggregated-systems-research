@@ -20,6 +20,7 @@ private:
    const SubsecondTime m_window_size;
 
    UInt64 m_total_requests;
+   UInt64 m_total_requests_queue_full;
    SubsecondTime m_total_utilized_time;
    SubsecondTime m_total_queue_delay;
 

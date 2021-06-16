@@ -12,6 +12,7 @@
 QueueModelWindowedMG1Remote::QueueModelWindowedMG1Remote(String name, UInt32 id)
    : m_window_size(SubsecondTime::NS(Sim()->getCfg()->getInt("queue_model/windowed_mg1/window_size")))
    , m_total_requests(0)
+   , m_total_requests_queue_full(0)
    , m_total_utilized_time(SubsecondTime::Zero())
    , m_total_queue_delay(SubsecondTime::Zero())
    , m_num_arrivals(0)
@@ -23,6 +24,7 @@ QueueModelWindowedMG1Remote::QueueModelWindowedMG1Remote(String name, UInt32 id)
    registerStatsMetric(name, id, "num-requests", &m_total_requests);
    registerStatsMetric(name, id, "total-time-used", &m_total_utilized_time);
    registerStatsMetric(name, id, "total-queue-delay", &m_total_queue_delay);
+   registerStatsMetric(name, id, "num-requests-queue-full", &m_total_requests_queue_full);
 }
 
 QueueModelWindowedMG1Remote::~QueueModelWindowedMG1Remote()
@@ -54,6 +56,7 @@ QueueModelWindowedMG1Remote::computeQueueDelay(SubsecondTime pkt_time, Subsecond
 
       // If requesters do not throttle based on returned latency, it's their problem, not ours
       if (utilization > .9999) { // number here changed from .99 to .9999; still needed?
+         ++m_total_requests_queue_full;
          utilization = .9999;
       }
 
