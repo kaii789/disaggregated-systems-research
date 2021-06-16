@@ -124,15 +124,15 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_local_evictions;
         UInt64 m_extra_pages;
         UInt64 m_redundant_moves;
-        UInt64 m_redundant_moves_temp1;
-        UInt64 m_redundant_moves_temp1_cache_slower_than_page;
-        UInt64 m_redundant_moves_temp2;
+        UInt64 m_redundant_moves_type1;
+        UInt64 m_redundant_moves_type1_cache_slower_than_page;
+        UInt64 m_redundant_moves_type2;
         UInt64 m_max_bufferspace;
         std::map<UInt64, UInt32> m_page_usage_map;  // track number of times each phys page is accessed
         UInt64 m_unique_pages_accessed;             // track number of unique pages accessed
 
-        SubsecondTime m_redundant_moves_temp1_time_savings;
-        SubsecondTime m_redundant_moves_temp2_time_savings;
+        SubsecondTime m_redundant_moves_type1_time_savings;
+        SubsecondTime m_redundant_moves_type2_time_savings;
 
         SubsecondTime m_total_queueing_delay;
         SubsecondTime m_total_access_latency;

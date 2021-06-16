@@ -178,9 +178,9 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     ('  num local evictions', 'dram.local-evictions', str),
     ('  num pages disturbed by extra traffic', 'dram.extra-traffic', str),
     ('  num redundant moves total', 'dram.redundant-moves', str),
-    ('    num redundant moves temp1', 'dram.redundant-moves-temp1', str),
-    ('      num temp1 cache slower than page', 'dram.redundant-moves-temp1-cache-slower-than-page', str),
-    ('    num redundant moves temp2', 'dram.redundant-moves-temp2', str),
+    ('    num redundant moves type1', 'dram.redundant-moves-type1', str),
+    ('      num type1 cache slower than page', 'dram.redundant-moves-type1-cache-slower-than-page', str),
+    ('    num redundant moves type2', 'dram.redundant-moves-type2', str),
     ('  max simultaneous # inflight pages (bufferspace)', 'dram.max-bufferspace', str),
   ]
   if 'dram.total-read-queueing-delay' in results:
@@ -195,11 +195,11 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     results['dram.bandwidth'] = map(lambda a: 100*a/time0 if time0 else float('inf'), results['dram-queue.total-time-used'])
     template.append(('  average dram bandwidth utilization', 'dram.bandwidth', lambda v: '%.2f%%' % v))
 
-  # if 'dram.redundant-moves-temp1-time-savings' in results:
+  # if 'dram.redundant-moves-type1-time-savings' in results:
   template.extend([
       ('Experiment stats', '', ''),
-      ('  PQ=1 temp1 time savings (ns)', 'dram.redundant-moves-temp1-time-savings', format_ns(2)),
-      ('  PQ=1 temp2 time savings (ns)', 'dram.redundant-moves-temp2-time-savings', format_ns(2)),
+      ('  PQ=1 type1 time savings (ns)', 'dram.redundant-moves-type1-time-savings', format_ns(2)),
+      ('  PQ=1 type2 time savings (ns)', 'dram.redundant-moves-type2-time-savings', format_ns(2)),
       ('  num unique pages accessed', 'dram.unique-pages-accessed', str),
   ])
 
