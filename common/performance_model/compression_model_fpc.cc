@@ -83,7 +83,7 @@ UInt32 CompressionModelFPC::compressCacheLine(void* _inbuf, void* _outbuf)
 		for (int j = 0; j < 6; j++)
 		{
             // Pattern match and handle
-			if ((word | mask[j]) == mask[j] || word > neg_check[j])
+			if (((word | mask[j]) == mask[j]) || ((int)word < 0 && word >= neg_check[j]))
 			{
 				compressed_size_bits += mask_to_bits[j];
                 is_pattern_matched = true;
