@@ -31,6 +31,7 @@ private:
 
     // FPC
     static const UInt32 mask[6];
+    static const UInt32 neg_check[6];
 
     UInt32 compressCacheLine(void *in, void *out);
     UInt32 decompressCacheLine(void *in, void *out);

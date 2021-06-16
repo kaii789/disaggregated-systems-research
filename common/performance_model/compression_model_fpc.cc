@@ -9,6 +9,14 @@ const UInt32 CompressionModelFPC::mask[6]=
         0xffff0000LL, // Halfword padded with a zero halfword
         0x00ff00ffLL}; // Two halfwords, each a byte
 
+const UInt32 CompressionModelFPC::neg_check[6]=
+       {0x00000000LL, // N/A
+        0xfffffff0LL, // 4 Bit
+        0xffffff00LL, // One byte
+        0xffff0000LL, // Halfword
+        0x00000000LL, // N/A
+        0xff00ff00LL}; // Two halfwords, each a byte
+
 CompressionModelFPC::CompressionModelFPC(String name, UInt32 page_size, UInt32 cache_line_size)
     : m_name(name)
     , m_page_size(page_size)
@@ -75,7 +83,7 @@ UInt32 CompressionModelFPC::compressCacheLine(void* _inbuf, void* _outbuf)
 		for (int j = 0; j < 6; j++)
 		{
             // Pattern match and handle
-			if ((word | mask[j]) == mask[j])
+			if ((word | mask[j]) == mask[j] || word < neg_check[j])
 			{
 				compressed_size_bits += mask_to_bits[j];
                 is_pattern_matched = true;
