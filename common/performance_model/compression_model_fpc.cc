@@ -94,15 +94,19 @@ UInt32 CompressionModelFPC::compressCacheLine(void* _inbuf, void* _outbuf)
         if (!is_pattern_matched)
         {
             // Handle words consisting of repeated bytes
+            UInt32 repeated_mask = 0x000000ff;
             bool repeated = true;
-            SInt8 base = ((SInt8*)word)[0];
+            SInt8 base = word & repeated_mask;
             for (int j = 1; j < 4; j++)
-                if ((base - ((SInt8*)word)[j]) != 0) {
+                if ((word & (repeated_mask << (j * 8))) >> (j * 8) != base) {
                     repeated = false;
                     break;
                 }
-            compressed_size_bits += 8;
-            is_pattern_matched = true;
+            if (repeated)
+            {
+                compressed_size_bits += 8;
+                is_pattern_matched = true;
+            }
         }
 
         // None of the patterns match, so can't compress
