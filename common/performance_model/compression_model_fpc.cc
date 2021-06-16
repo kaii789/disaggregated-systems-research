@@ -3,19 +3,19 @@
 // Assume 32 bit word
 const UInt32 CompressionModelFPC::mask[6]=
        {0x00000000LL, // Zero run
-        0x0000000fLL, // 4 Bit
-        0x000000ffLL, // One byte
-        0x0000ffffLL, // Halfword
-        0xffff0000LL, // Halfword padded with a zero halfword
-        0x00ff00ffLL}; // Two halfwords, each a byte
+        0x00000007LL, // 4 Bit
+        0x0000007fLL, // One byte
+        0x00007fffLL, // Halfword
+        0x7fff0000LL, // Halfword padded with a zero halfword
+        0x007f007fLL}; // Two halfwords, each a byte
 
 const UInt32 CompressionModelFPC::neg_check[6]=
        {0xffffffffLL, // N/A
-        0xfffffff0LL, // 4 Bit
-        0xffffff00LL, // One byte
-        0xffff0000LL, // Halfword
+        0xfffffff8LL, // 4 Bit
+        0xffffff80LL, // One byte
+        0xffff8000LL, // Halfword
         0xffffffffLL, // N/A
-        0xff00ff00LL}; // Two halfwords, each a byte
+        0xff80ff80LL}; // Two halfwords, each a byte
 
 CompressionModelFPC::CompressionModelFPC(String name, UInt32 page_size, UInt32 cache_line_size)
     : m_name(name)
