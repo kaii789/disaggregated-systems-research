@@ -276,7 +276,7 @@ def run_from_cmdline_cacheline_queue_ratio(output_directory_path: PathLike):
             float,
             name_for_legend="avg dram access latency (ns)",
         ),
-        StatSetting("num data moves", int, name_for_legend="num page moves"),
+        StatSetting("num page moves", int, name_for_legend="num page moves"),
         StatSetting("num inflight hits", int, name_for_legend="num inflight hits"),
         # StatSetting("num redundant moves", int, name_for_legend="num redundant moves total"),
         StatSetting(
