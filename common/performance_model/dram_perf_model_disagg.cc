@@ -117,12 +117,18 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     if(m_r_partition_queues == 1) {
         m_data_movement = QueueModel::create(
                 name + "-datamovement-queue", core_id, data_movement_queue_model_type,
-                m_r_bus_bandwidth.getRoundedLatency(8)); // bytes to bits
+                m_r_part_bandwidth.getRoundedLatency(8)); // bytes to bits
+        m_data_movement_2 = QueueModel::create(
+                name + "-datamovement-queue-2", core_id, data_movement_queue_model_type,
+                m_r_part2_bandwidth.getRoundedLatency(8)); // bytes to bits
     } else {
         m_data_movement = QueueModel::create(
                 name + "-datamovement-queue", core_id, data_movement_queue_model_type,
                 m_r_bus_bandwidth.getRoundedLatency(8)); // bytes to bits
         // Note: currently m_data_movement_2 is not used anywhere when m_r_partition_queues != 1
+        m_data_movement_2 = QueueModel::create(
+                name + "-datamovement-queue-2", core_id, data_movement_queue_model_type,
+                m_r_bus_bandwidth.getRoundedLatency(8)); // bytes to bits	
     }
 
     for(UInt32 rank = 0; rank < m_total_ranks; ++rank) {
@@ -405,7 +411,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
 
     SubsecondTime datamovement_queue_delay;
     if (m_r_partition_queues == 1) { 
-        datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*pkt_size), requester);
+        datamovement_queue_delay = m_data_movement_2->computeQueueDelay(t_now, m_r_part2_bandwidth.getRoundedLatency(8*pkt_size), requester);
         m_redundant_moves++; 
     } else
         datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*pkt_size), requester);
@@ -483,7 +489,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
 
             if(m_r_partition_queues) {
                 if(m_test_bandwidth == false) { // cgiannoula - Test Bandwidth
-                    page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*size), requester);
+                    page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_part_bandwidth.getRoundedLatency(8*size), requester);
                 } else {
                     /*
                      * cgiannoula - Test Bandwidth
@@ -592,7 +598,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
             SubsecondTime delay(SubsecondTime::NS() * 1000);
             //std::cout << "In the right place" << std::endl;
             if(m_r_partition_queues)  
-                SubsecondTime page_datamovement_queue_delay = m_data_movement->computeQueueDelay(pkt_time + delay, m_r_bus_bandwidth.getRoundedLatency(8*m_page_size), requester);
+                SubsecondTime page_datamovement_queue_delay = m_data_movement->computeQueueDelay(pkt_time + delay, m_r_part_bandwidth.getRoundedLatency(8*m_page_size), requester);
             else	
                 SubsecondTime page_datamovement_queue_delay = m_data_movement->computeQueueDelay(pkt_time + delay, m_r_bus_bandwidth.getRoundedLatency(8*m_page_size), requester);
             m_extra_pages++;	
@@ -727,17 +733,17 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
 
             if(m_r_partition_queues == 1 && m_inflight_redundant[phys_page] < m_r_limit_redundant_moves) {
                 // Compare the arrival time of the inflight page vs requesting the cache line using the cacheline queue
-                if(m_r_throttle_redundant_moves) {
-                    SubsecondTime datamov_queue_delay = m_data_movement->computeQueueDelayNoEffect(t_now, m_r_bus_bandwidth.getRoundedLatency(8*pkt_size), requester);
+               if(m_r_throttle_redundant_moves) {
+                    SubsecondTime datamov_queue_delay = m_data_movement_2->computeQueueDelayNoEffect(t_now, m_r_part2_bandwidth.getRoundedLatency(8*pkt_size), requester);
                     if ((datamov_queue_delay + t_now - pkt_time) < access_latency) {
-                        datamov_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*pkt_size), requester);
+                        datamov_queue_delay = m_data_movement_2->computeQueueDelay(t_now, m_r_part2_bandwidth.getRoundedLatency(8*pkt_size), requester);
                         access_latency = datamov_queue_delay + t_now - pkt_time;
                         ++m_redundant_moves;
                     } 
                 } else {
-                    SubsecondTime datamov_queue_delay = m_data_movement->computeQueueDelayNoEffect(t_now, m_r_bus_bandwidth.getRoundedLatency(8*pkt_size), requester);
+                    SubsecondTime datamov_queue_delay = m_data_movement_2->computeQueueDelayNoEffect(t_now, m_r_part2_bandwidth.getRoundedLatency(8*pkt_size), requester);
                     if ((datamov_queue_delay + t_now - pkt_time) < access_latency) {
-                        datamov_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*pkt_size), requester);
+                        datamov_queue_delay = m_data_movement_2->computeQueueDelay(t_now, m_r_part2_bandwidth.getRoundedLatency(8*pkt_size), requester);
                         access_latency = datamov_queue_delay + t_now - pkt_time;
                         ++m_redundant_moves;
                         m_inflight_redundant[phys_page] = m_inflight_redundant[phys_page] + 1; 
@@ -876,7 +882,7 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
             if(m_r_simulate_datamov_overhead) { 
                 if(m_r_partition_queues) {
                     if(m_test_bandwidth == false) { // cgiannoula - Test Bandwidth
-                        page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*size), requester);
+                        page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_part_bandwidth.getRoundedLatency(8*size), requester);
                     } else {
                         /*
                          * cgiannoula - Test Bandwidth
@@ -942,7 +948,7 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
             if(m_r_simulate_datamov_overhead) {
                 if(m_r_partition_queues) {
                     if(m_test_bandwidth == false) { // cgiannoula - Test Bandwidth
-                        page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*size), requester);
+                        page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_part_bandwidth.getRoundedLatency(8*size), requester);
                     } else {
                         /*
                          * cgiannoula - Test Bandwidth
