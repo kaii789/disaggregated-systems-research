@@ -171,7 +171,7 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     ('    remote dram avg access latency (ns)', 'dram.remoteavglatency', format_ns(2)),
     ('      remote datamovement queue model avg access latency (ns)', 'dram.remotequeuemodel_datamovement_avgdelay', format_ns(2)),
     ('      remote datamovement2 queue model avg access latency (ns)', 'dram.remotequeuemodel_datamovement2_avgdelay', format_ns(2)),
-    ('  num data moves', 'dram.data-moves', str),
+    ('  num page moves', 'dram.page-moves', str),
     ('  num page prefetches', 'dram.page-prefetches', str),
     ('  num inflight hits', 'dram.inflight-hits', str),
     ('  num writeback pages', 'dram.writeback-pages', str),
