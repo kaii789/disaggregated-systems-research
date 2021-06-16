@@ -75,10 +75,10 @@ String TraceManager::getFifoName(app_id_t app_id, UInt64 thread_num, bool respon
       mkfifo(filename.c_str(), 0600);
 
       if(response == true) {
-        String request_filename = "data_request_pipe.app" + itostr(app_id) + ".th" + itostr(thread_num);
+        String request_filename = m_trace_prefix + "_data_request_pipe.app" + itostr(app_id) + ".th" + itostr(thread_num);
         mkfifo(request_filename.c_str(), 0600);
       } else {
-        String response_filename = "data_response_pipe.app" + itostr(app_id) + ".th" + itostr(thread_num);
+        String response_filename = m_trace_prefix + "_data_response_pipe.app" + itostr(app_id) + ".th" + itostr(thread_num);
         mkfifo(response_filename.c_str(), 0600);
       }
 
@@ -132,8 +132,8 @@ thread_id_t TraceManager::newThread(app_id_t app_id, bool first, bool init_fifo,
    }
 
    // Get Application Data
-   String data_request_filename = "data_request_pipe.app" + itostr(app_id) + ".th" + itostr(thread_num);
-   String data_response_filename = "data_response_pipe.app" + itostr(app_id) + ".th" + itostr(thread_num);
+   String data_request_filename = m_trace_prefix + "_data_request_pipe.app" + itostr(app_id) + ".th" + itostr(thread_num);
+   String data_response_filename = m_trace_prefix +  "_data_response_pipe.app" + itostr(app_id) + ".th" + itostr(thread_num);
 
    m_num_threads_running++;
    Thread *thread = Sim()->getThreadManager()->createThread(app_id, creator_thread_id);

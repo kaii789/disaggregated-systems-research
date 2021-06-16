@@ -23,10 +23,16 @@ SubsecondTime
 CompressionModelBDI::compress(IntPtr addr, size_t data_size, core_id_t core_id, UInt32 *compressed_page_size, UInt32 *compressed_cache_lines)
 {
     // Get Data
-    UInt64 page = addr & ~((UInt64(1) << floorLog2(m_page_size)) - 1);
     Core *core = Sim()->getCoreManager()->getCoreFromID(core_id);
-    core->getApplicationData(Core::NONE, Core::READ, page, m_data_buffer, data_size, Core::MEM_MODELED_NONE);
-    
+    // UInt64 page = addr & ~((UInt64(1) << floorLog2(m_page_size)) - 1);
+    // core->getApplicationData(Core::NONE, Core::READ, page, m_data_buffer, data_size, Core::MEM_MODELED_NONE);
+    if (data_size == m_cache_line_size)  { // If we compress in cache_line granularity
+        core->getApplicationData(Core::NONE, Core::READ, addr, m_data_buffer, data_size, Core::MEM_MODELED_NONE); // Assume addr already points to page or cache line
+    } else { // If we compress in page_size granularity, we shift to move to the start_addr of the corresponding page
+        UInt64 page = addr & ~((UInt64(1) << floorLog2(m_page_size)) - 1);
+        core->getApplicationData(Core::NONE, Core::READ, page, m_data_buffer, data_size, Core::MEM_MODELED_NONE);
+    }
+
     // BDI
     UInt32 total_bytes = 0;
     UInt32 total_compressed_cache_lines = 0;
