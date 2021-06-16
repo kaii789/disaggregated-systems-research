@@ -10,11 +10,11 @@ const UInt32 CompressionModelFPC::mask[6]=
         0x00ff00ffLL}; // Two halfwords, each a byte
 
 const UInt32 CompressionModelFPC::neg_check[6]=
-       {0x00000000LL, // N/A
+       {0xffffffffLL, // N/A
         0xfffffff0LL, // 4 Bit
         0xffffff00LL, // One byte
         0xffff0000LL, // Halfword
-        0x00000000LL, // N/A
+        0xffffffffLL, // N/A
         0xff00ff00LL}; // Two halfwords, each a byte
 
 CompressionModelFPC::CompressionModelFPC(String name, UInt32 page_size, UInt32 cache_line_size)
