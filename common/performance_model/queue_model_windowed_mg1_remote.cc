@@ -54,7 +54,7 @@ QueueModelWindowedMG1Remote::computeQueueDelay(SubsecondTime pkt_time, Subsecond
    //    LOG_PRINT("m_num_arrivals=%ld initially; removeItems argument was max of %ld ns and %ld ns", m_num_arrivals,
    //              main.getNS(), backup.getNS());
    // }
-   removeItems(std::max(main, backup));
+   removeItems(SubsecondTime::max(main, backup));
 
    if (m_name == "dram-datamovement-queue")
       LOG_PRINT("m_num_arrivals=%ld before if statement", m_num_arrivals);
@@ -104,7 +104,7 @@ QueueModelWindowedMG1Remote::computeQueueDelayNoEffect(SubsecondTime pkt_time, S
    // Use a backup value of 10 window sizes before the current request to avoid excessive memory usage in case something fishy is going on.
    SubsecondTime backup = pkt_time > 10*m_window_size ? pkt_time - 10*m_window_size : SubsecondTime::Zero();
    SubsecondTime main = Sim()->getClockSkewMinimizationServer()->getGlobalTime() > m_window_size ? Sim()->getClockSkewMinimizationServer()->getGlobalTime() - m_window_size : SubsecondTime::Zero();
-   removeItems(std::max(main, backup));
+   removeItems(SubsecondTime::max(main, backup));
 
    if (m_num_arrivals > 1)
    {
@@ -148,7 +148,7 @@ QueueModelWindowedMG1Remote::computeQueueDelayTest(SubsecondTime pkt_time, Subse
    //    LOG_PRINT("m_num_arrivals=%ld initially; removeItems argument was max of %ld ns and %ld ns", m_num_arrivals,
    //              main.getNS(), backup.getNS());
    // }
-   SubsecondTime time_point = std::max(main, backup);
+   SubsecondTime time_point = SubsecondTime::max(main, backup);
    removeItems(time_point);
    removeItemsUpdateBytes(time_point, pkt_time);
 

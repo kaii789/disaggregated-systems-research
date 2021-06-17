@@ -3,7 +3,6 @@ import pandas as pd
 import numpy as np
 import matplotlib as plt
 plt.use('Agg')
-import os
 import subprocess
 import threading
 
@@ -69,19 +68,16 @@ def log_compression_stats(res_directory, result_filename, program_command, confi
         f.close()
 
 
-def run_experiment(x_axis, x_axis_init, result_filename, config_name, config_param, program_command, cwd):
+def run_experiment(x_axis, x_axis_init, result_filename, config_name, config_param, program_command):
 
     data = {x_axis:x_axis_init,
             'IPC':[]}
 
     for val in x_axis_init:
+        command = "../../../run-sniper -v -n 1 -c {} -g --{}={} -- {}".format(config_name, config_param, val, program_command)
         run_directory = "./{}-{}-{}".format(result_filename, config_param.split("/")[-1], val)
-        sniper_path = os.path.abspath("../../run-sniper")
-        output_directory = os.path.abspath("./{}".format(run_directory))
-        if not cwd: cwd = run_directory
-        command = "{} -v -n 1 -c {} -g --{}={} -d {} -- {}".format(sniper_path, config_name, config_param, val, output_directory, program_command)
         subprocess.call("mkdir {}".format(run_directory), shell=True)
-        subprocess.call(command, shell=True, cwd=cwd)
+        subprocess.call(command, shell=True, cwd=run_directory)
         ipc = get_ipc(run_directory)
         print(ipc)
         data['IPC'].append(ipc)
@@ -95,28 +91,28 @@ def run_experiment(x_axis, x_axis_init, result_filename, config_name, config_par
 
     return data['IPC']
 
-def thread_experiment(x_axis, x_axis_init, result_filename, config_name, config_param, program_command, res, cwd
-):
-    experiment_res = run_experiment(x_axis, x_axis_init, result_filename, config_name, config_param, program_command, cwd) # "{}-{}".format(result_filename, program_command)
+def thread_experiment(x_axis, x_axis_init, result_filename, config_name, config_param, program_command, res):
+    experiment_res = run_experiment(x_axis, x_axis_init, result_filename, config_name, config_param, program_command) # "{}-{}".format(result_filename, program_command)
     res.append(experiment_res)
 
-def run_compression_queue_experiment(x_axis, x_axis_label, x_axis_config_param, program_command, result_name, cwd=None
-):
+def run_compression_queue_experiment(x_axis, x_axis_label, x_axis_config_param, program_command, result_name):
     # Multithread
-    res1, res2, res3 = [], [], []
-    t1 = threading.Thread(target=thread_experiment, args=(x_axis_label, x_axis, "c0p0", os.path.abspath("./no_compression_no_partition_queues"), x_axis_config_param, program_command, res1, cwd))
-    t2 = threading.Thread(target=thread_experiment, args=(x_axis_label, x_axis, "c0p1", os.path.abspath("./no_compression_yes_partition_queues"), x_axis_config_param, program_command, res2, cwd))
-    t3 = threading.Thread(target=thread_experiment, args=(x_axis_label, x_axis, "c1p1", os.path.abspath("./yes_compression_yes_partition_queues"), x_axis_config_param, program_command, res3, cwd))
+    res1, res2, res3, res4 = [], [], [], []
+    t1 = threading.Thread(target=thread_experiment, args=(x_axis_label, x_axis, "c0p0", "../no_compression_no_partition_queues", x_axis_config_param, program_command, res1))
+    t2 = threading.Thread(target=thread_experiment, args=(x_axis_label, x_axis, "c0p1", "../no_compression_yes_partition_queues", x_axis_config_param, program_command, res2))
+    t3 = threading.Thread(target=thread_experiment, args=(x_axis_label, x_axis, "c1p0", "../yes_compression_no_partition_queues", x_axis_config_param, program_command, res3))
+    t4 = threading.Thread(target=thread_experiment, args=(x_axis_label, x_axis, "c1p1", "../yes_compression_yes_partition_queues", x_axis_config_param, program_command, res4))
 
-    for t in [t1, t2, t3]:
+    for t in [t1, t2, t3, t4]:
         t.start()
 
-    for t in [t1, t2, t3]:
+    for t in [t1, t2, t3, t4]:
         t.join()
 
     no_compression_no_partition_queues = res1[0]
     no_compression_yes_partition_queues = res2[0]
-    yes_compression_yes_partition_queues = res3[0]
+    yes_compression_no_partition_queues = res3[0]
+    yes_compression_yes_partition_queues = res4[0]
 
     # Single Thread
     # no_compression_no_partition_queues = run_experiment(x_axis_label, bandwidth_scalefactor, None, "no_compression_no_partition_queues", x_axis_config_param, program_command)
@@ -127,10 +123,11 @@ def run_compression_queue_experiment(x_axis, x_axis_label, x_axis_config_param, 
         x_axis_label: x_axis,
         'C: Off, P: Off': no_compression_no_partition_queues,
         'C: Off, P: On': no_compression_yes_partition_queues,
+        'C: On, P: Off': yes_compression_no_partition_queues,
         'C: On, P: On': yes_compression_yes_partition_queues
     }
     df = pd.DataFrame(data)
-    graph = df.plot(x=x_axis_label, y=["C: Off, P: Off", "C: Off, P: On", "C: On, P: On"], kind="bar")
+    graph = df.plot(x=x_axis_label, y=["C: Off, P: Off", "C: Off, P: On", "C: On, P: Off", "C: On, P: On"], kind="bar")
     fig = graph.get_figure()
     fig.savefig(result_name)
 
@@ -138,29 +135,29 @@ if __name__ == "__main__":
     # Note: sniper is run in test/compression/{thread id}
 
     # IPC vs Bandwidth
+    ##bandwidth_scalefactor = [4, 8, 16, 32]
     bandwidth_scalefactor = [4, 8, 16, 32]
     x_axis_label = "Remote Bandwidth Scalefactor"
     x_axis_config_param = "perf_model/dram/remote_mem_bw_scalefactor"
-    # program_command = "../../../test/crono/apps/sssp/sssp ../../../test/crono/inputs/bcsstk05.mtx 1"
+    # program_command = "../../../benchmarks/darknet/darknet classifier predict ../../../benchmarks/darknet/cfg/imagenet1k.data ../../../benchmarks/darknet/cfg/darknet19.cfg ../../../benchmarks/darknet/tiny.weights ../../../benchmarks/darknet/data/dog.jpg" # TODO: change me
     # program_command = "../../../benchmarks/ligra/apps/BFS -s -rounds 1 ../../../benchmarks/ligra/inputs/rMat_1000000" # TODO: change me
+    #program_command = "../../../test/crono/apps/sssp/sssp ../../../test/crono/inputs/bcsstk05.mtx 1"
+    program_command = "../../../test/crono/apps/sssp/sssp ~/graph_generator/real_graphs/roadNet-PA.mtx 1"
     result_name = "ipc_vs_bandwidth_scalefactor_bar"
-    # t1 = threading.Thread(target=run_compression_queue_experiment, args=(bandwidth_scalefactor, x_axis_label, x_axis_config_param, program_command, result_name))
-
-    # Darknet
-    program_command = "./darknet classifier predict cfg/imagenet1k.data cfg/darknet19.cfg tiny.weights data/dog.jpg" # TODO: change me
-    cwd = "../../benchmarks/darknet"
-    t1 = threading.Thread(target=run_compression_queue_experiment, args=(bandwidth_scalefactor, x_axis_label, x_axis_config_param, program_command, result_name, cwd))
+    t1 = threading.Thread(target=run_compression_queue_experiment, args=(bandwidth_scalefactor, x_axis_label, x_axis_config_param, program_command, result_name))
 
     # IPC vs Local DRAM Size
     local_dram_size = [4194304, 8388608, 16777216, 33554432]
+    #local_dram_size = [4194304, 8388608]
     # local_dram_size = [4000, 8000, 16000, 32000]
     x_axis_label = "Local DRAM Size(bytes)"
     x_axis_config_param = "perf_model/dram/localdram_size"
-    program_command = "../../../test/crono/apps/sssp/sssp ../../../test/crono/inputs/bcsstk05.mtx 1"
     # program_command = "../../../benchmarks/ligra/apps/BFS -s -rounds 1 ../../../benchmarks/ligra/inputs/rMat_1000000" # TODO: change me
+    #program_command = "../../../test/crono/apps/sssp/sssp ../../../test/crono/inputs/bcsstk05.mtx 1"
+    program_command = "../../../test/crono/apps/sssp/sssp ~/graph_generator/real_graphs/roadNet-PA.mtx 1"
     result_name = "ipc_vs_local_dram_size_bar"
-    # t2 = threading.Thread(target=run_compression_queue_experiment, args=(local_dram_size, x_axis_label, x_axis_config_param, program_command, result_name))
+    t2 = threading.Thread(target=run_compression_queue_experiment, args=(local_dram_size, x_axis_label, x_axis_config_param, program_command, result_name))
 
     t1.start()
-    # t2.start()
+    t2.start()
 

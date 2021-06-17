@@ -73,7 +73,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_r_limit_redundant_moves      (Sim()->getCfg()->getInt("perf_model/dram/remote_limit_redundant_moves"))
     , m_r_throttle_redundant_moves      (Sim()->getCfg()->getBool("perf_model/dram/remote_throttle_redundant_moves"))
     , m_r_use_separate_queue_model      (Sim()->getCfg()->getBool("perf_model/dram/queue_model/use_separate_remote_queue_model")) // Whether to use the separate remote queue model
-    , m_test_bandwidth       (Sim()->getCfg()->getBool("perf_model/dram/test_bandwidth")) // cgiannoula - Test Bandwidth
+    , m_test_bandwidth       (Sim()->getCfg()->getInt("perf_model/dram/test_bandwidth")) // cgiannoula - Test Bandwidth
     , m_banks               (m_total_banks)
     , m_r_banks               (m_total_banks)
     , m_dram_page_hits           (0)
@@ -509,22 +509,32 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             }
 
             if(m_r_partition_queues) {
-                if(m_test_bandwidth == false) { // cgiannoula - Test Bandwidth
+                if(m_test_bandwidth == 0) { // cgiannoula - Test Bandwidth
                     page_datamovement_queue_delay = m_data_movement->computeQueueDelayTest(t_now, m_r_part_bandwidth.getRoundedLatency(8*page_size), page_size, requester);
-                } else {
+                } else if (m_test_bandwidth == 1) {
                     /*
                      * cgiannoula - Test Bandwidth
                      */
                     UInt32 cacheline_count = page_size / m_cache_line_size;
                     for (UInt32 c = 0; c < cacheline_count; c++) {
-                        page_datamovement_queue_delay += m_data_movement->computeQueueDelayTest(t_now, m_r_bus_bandwidth.getRoundedLatency(8*m_cache_line_size), m_cache_line_size, requester);
+                        page_datamovement_queue_delay += m_data_movement->computeQueueDelayTest(t_now, m_r_part_bandwidth.getRoundedLatency(8*m_cache_line_size), m_cache_line_size, requester);
                     }
+                } else {
+                    /*
+                     * cgiannoula - Test Bandwidth
+                     */
+                    SubsecondTime max_packet_arrival = m_data_movement->computeQueueDelayTest(t_now, m_r_part_bandwidth.getRoundedLatency(8*m_cache_line_size), m_cache_line_size, requester);
+                    UInt32 cacheline_count = page_size / m_cache_line_size;
+                    for (UInt32 c = 1; c < cacheline_count; c++) {
+                        page_datamovement_queue_delay = SubsecondTime::max(max_packet_arrival, m_data_movement->computeQueueDelayTest(t_now, m_r_part_bandwidth.getRoundedLatency(8*m_cache_line_size), m_cache_line_size, requester));
+                    }
+ 
                 }
 
             } else {
-                if(m_test_bandwidth == false) { // cgiannoula - Test Bandwidth
+                if(m_test_bandwidth == 0) { // cgiannoula - Test Bandwidth
                     page_datamovement_queue_delay = m_data_movement->computeQueueDelayTest(t_now, m_r_bus_bandwidth.getRoundedLatency(8*page_size), page_size, requester);
-                } else {
+                } else if (m_test_bandwidth == 1) {
                     /*
                      * cgiannoula - Test Bandwidth
                      */
@@ -532,6 +542,16 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
                     for (UInt32 c = 0; c < cacheline_count; c++) {
                         page_datamovement_queue_delay += m_data_movement->computeQueueDelayTest(t_now, m_r_bus_bandwidth.getRoundedLatency(8*m_cache_line_size), m_cache_line_size, requester);
                     }
+                } else {
+                    /*
+                     * cgiannoula - Test Bandwidth
+                     */
+                    SubsecondTime max_packet_arrival = m_data_movement->computeQueueDelayTest(t_now, m_r_bus_bandwidth.getRoundedLatency(8*m_cache_line_size), m_cache_line_size, requester);
+                    UInt32 cacheline_count = page_size / m_cache_line_size;
+                    for (UInt32 c = 1; c < cacheline_count; c++) {
+                        page_datamovement_queue_delay = SubsecondTime::max(max_packet_arrival, m_data_movement->computeQueueDelayTest(t_now, m_r_bus_bandwidth.getRoundedLatency(8*m_cache_line_size), m_cache_line_size, requester));
+                    }
+ 
                 }
                 
                 t_now += page_datamovement_queue_delay;
@@ -902,23 +922,35 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
             SubsecondTime page_datamovement_queue_delay = SubsecondTime::Zero();
             if(m_r_simulate_datamov_overhead) { 
                 if(m_r_partition_queues) {
-                    if(m_test_bandwidth == false) { // cgiannoula - Test Bandwidth
+                    if(m_test_bandwidth == 0) { // cgiannoula - Test Bandwidth
                         page_datamovement_queue_delay = m_data_movement->computeQueueDelayTest(t_now, m_r_part_bandwidth.getRoundedLatency(8*size), size, requester);
-                    } else {
+                    } else if (m_test_bandwidth == 1) {
                         /*
                          * cgiannoula - Test Bandwidth
                          */
                         UInt32 cacheline_count = size / m_cache_line_size;
                         for (UInt32 c = 0; c < cacheline_count; c++) {
-                            page_datamovement_queue_delay += m_data_movement->computeQueueDelayTest(t_now, m_r_bus_bandwidth.getRoundedLatency(8*m_cache_line_size), m_cache_line_size, requester);
+                            page_datamovement_queue_delay += m_data_movement->computeQueueDelayTest(t_now, m_r_part_bandwidth.getRoundedLatency(8*m_cache_line_size), m_cache_line_size, requester);
                         } 
+                    } else {
+                        /*
+                         * cgiannoula - Test Bandwidth
+                         */
+                        SubsecondTime max_packet_arrival = m_data_movement->computeQueueDelayTest(t_now, m_r_part_bandwidth.getRoundedLatency(8*m_cache_line_size), m_cache_line_size, requester);
+                        UInt32 cacheline_count = size / m_cache_line_size;
+                        for (UInt32 c = 1; c < cacheline_count; c++) {
+                            page_datamovement_queue_delay = SubsecondTime::max(max_packet_arrival, m_data_movement->computeQueueDelayTest(t_now, m_r_part_bandwidth.getRoundedLatency(8*m_cache_line_size), m_cache_line_size, requester));
+                        }
+     
                     }
+
+
                 } else if(m_r_cacheline_gran) {
                     page_datamovement_queue_delay = m_data_movement->computeQueueDelayTest(t_now, m_r_bus_bandwidth.getRoundedLatency(8*64), 64, requester);
                 } else {
-                    if(m_test_bandwidth == false) { // cgiannoula - Test Bandwidth
+                    if(m_test_bandwidth == 0) { // cgiannoula - Test Bandwidth
                         page_datamovement_queue_delay = m_data_movement->computeQueueDelayTest(t_now, m_r_bus_bandwidth.getRoundedLatency(8*size), size, requester);
-                    } else {
+                    } else if (m_test_bandwidth == 1) {
                         /*
                          * cgiannoula - Test Bandwidth
                          */
@@ -926,7 +958,19 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
                         for (UInt32 c = 0; c < cacheline_count; c++) {
                             page_datamovement_queue_delay += m_data_movement->computeQueueDelayTest(t_now, m_r_bus_bandwidth.getRoundedLatency(8*m_cache_line_size), m_cache_line_size, requester);
                         } 
+            
+                    } else {
+                        /*
+                         * cgiannoula - Test Bandwidth
+                         */
+                        SubsecondTime max_packet_arrival = m_data_movement->computeQueueDelayTest(t_now, m_r_bus_bandwidth.getRoundedLatency(8*m_cache_line_size), m_cache_line_size, requester);
+                        UInt32 cacheline_count = size / m_cache_line_size;
+                        for (UInt32 c = 1; c < cacheline_count; c++) {
+                            page_datamovement_queue_delay = SubsecondTime::max(max_packet_arrival, m_data_movement->computeQueueDelayTest(t_now, m_r_bus_bandwidth.getRoundedLatency(8*m_cache_line_size), m_cache_line_size, requester));
+                        }
+     
                     }
+
 
                 }
             }
@@ -968,24 +1012,35 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
             SubsecondTime page_datamovement_queue_delay = SubsecondTime::Zero();
             if(m_r_simulate_datamov_overhead) {
                 if(m_r_partition_queues) {
-                    if(m_test_bandwidth == false) { // cgiannoula - Test Bandwidth
+                    if(m_test_bandwidth == 0) { // cgiannoula - Test Bandwidth
                         page_datamovement_queue_delay = m_data_movement->computeQueueDelayTest(t_now, m_r_part_bandwidth.getRoundedLatency(8*size), size, requester);
-                    } else {
+                    } else if (m_test_bandwidth == 1) {
                         /*
                          * cgiannoula - Test Bandwidth
                          */
                         UInt32 cacheline_count = size / m_cache_line_size;
                         for (UInt32 c = 0; c < cacheline_count; c++) {
-                            page_datamovement_queue_delay += m_data_movement->computeQueueDelayTest(t_now, m_r_bus_bandwidth.getRoundedLatency(8*m_cache_line_size), m_cache_line_size, requester);
+                            page_datamovement_queue_delay += m_data_movement->computeQueueDelayTest(t_now, m_r_part_bandwidth.getRoundedLatency(8*m_cache_line_size), m_cache_line_size, requester);
                         } 
+                    } else {
+                        /*
+                         * cgiannoula - Test Bandwidth
+                         */
+                        SubsecondTime max_packet_arrival = m_data_movement->computeQueueDelayTest(t_now, m_r_part_bandwidth.getRoundedLatency(8*m_cache_line_size), m_cache_line_size, requester);
+                        UInt32 cacheline_count = size / m_cache_line_size;
+                        for (UInt32 c = 1; c < cacheline_count; c++) {
+                            page_datamovement_queue_delay = SubsecondTime::max(max_packet_arrival, m_data_movement->computeQueueDelayTest(t_now, m_r_part_bandwidth.getRoundedLatency(8*m_cache_line_size), m_cache_line_size, requester));
+                        }
+     
                     }
+
  
                 } else if(m_r_cacheline_gran) {
                     page_datamovement_queue_delay = m_data_movement->computeQueueDelayTest(t_now, m_r_bus_bandwidth.getRoundedLatency(8*64), 64, requester);
                 } else {
-                    if(m_test_bandwidth == false) { // cgiannoula - Test Bandwidth
+                    if(m_test_bandwidth == 0) { // cgiannoula - Test Bandwidth
                         page_datamovement_queue_delay = m_data_movement->computeQueueDelayTest(t_now, m_r_bus_bandwidth.getRoundedLatency(8*size), size, requester);
-                    } else {
+                    } else if (m_test_bandwidth == 1) {
                         /*
                          * cgiannoula - Test Bandwidth
                          */
@@ -993,7 +1048,20 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
                         for (UInt32 c = 0; c < cacheline_count; c++) {
                             page_datamovement_queue_delay += m_data_movement->computeQueueDelayTest(t_now, m_r_bus_bandwidth.getRoundedLatency(8*m_cache_line_size), m_cache_line_size, requester);
                         } 
+            
+                    } else {
+                        /*
+                         * cgiannoula - Test Bandwidth
+                         */
+                        SubsecondTime max_packet_arrival = m_data_movement->computeQueueDelayTest(t_now, m_r_bus_bandwidth.getRoundedLatency(8*m_cache_line_size), m_cache_line_size, requester);
+                        UInt32 cacheline_count = size / m_cache_line_size;
+                        for (UInt32 c = 1; c < cacheline_count; c++) {
+                            page_datamovement_queue_delay = SubsecondTime::max(max_packet_arrival, m_data_movement->computeQueueDelayTest(t_now, m_r_bus_bandwidth.getRoundedLatency(8*m_cache_line_size), m_cache_line_size, requester));
+                        }
+     
                     }
+
+
  
                 }
             }
