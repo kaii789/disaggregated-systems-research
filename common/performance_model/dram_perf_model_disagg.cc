@@ -425,10 +425,10 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
 
     SubsecondTime datamovement_queue_delay;
     if (m_r_partition_queues == 1) {
-        datamovement_queue_delay = m_data_movement_2->computeQueueDelay(t_now, m_r_part2_bandwidth.getRoundedLatency(8*size), requester);
+        datamovement_queue_delay = m_data_movement_2->computeQueueDelayTest(t_now, m_r_part2_bandwidth.getRoundedLatency(8*size), size, requester);
         m_redundant_moves++;
     } else
-        datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*size), requester);
+        datamovement_queue_delay = m_data_movement->computeQueueDelayTest(t_now, m_r_bus_bandwidth.getRoundedLatency(8*size), size, requester);
 
     // TODO: Currently model decompression by adding decompression latency to inflight page time
     if (m_use_compression && m_r_cacheline_gran)
@@ -510,27 +510,27 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
 
             if(m_r_partition_queues) {
                 if(m_test_bandwidth == false) { // cgiannoula - Test Bandwidth
-                    page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_part_bandwidth.getRoundedLatency(8*page_size), requester);
+                    page_datamovement_queue_delay = m_data_movement->computeQueueDelayTest(t_now, m_r_part_bandwidth.getRoundedLatency(8*page_size), page_size, requester);
                 } else {
                     /*
                      * cgiannoula - Test Bandwidth
                      */
                     UInt32 cacheline_count = page_size / m_cache_line_size;
                     for (UInt32 c = 0; c < cacheline_count; c++) {
-                        page_datamovement_queue_delay += m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*m_cache_line_size), requester);
+                        page_datamovement_queue_delay += m_data_movement->computeQueueDelayTest(t_now, m_r_bus_bandwidth.getRoundedLatency(8*m_cache_line_size), m_cache_line_size, requester);
                     }
                 }
 
             } else {
                 if(m_test_bandwidth == false) { // cgiannoula - Test Bandwidth
-                    page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*page_size), requester);
+                    page_datamovement_queue_delay = m_data_movement->computeQueueDelayTest(t_now, m_r_bus_bandwidth.getRoundedLatency(8*page_size), page_size, requester);
                 } else {
                     /*
                      * cgiannoula - Test Bandwidth
                      */
                     UInt32 cacheline_count = page_size / m_cache_line_size;
                     for (UInt32 c = 0; c < cacheline_count; c++) {
-                        page_datamovement_queue_delay += m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*m_cache_line_size), requester);
+                        page_datamovement_queue_delay += m_data_movement->computeQueueDelayTest(t_now, m_r_bus_bandwidth.getRoundedLatency(8*m_cache_line_size), m_cache_line_size, requester);
                     }
                 }
                 
@@ -619,9 +619,9 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
             SubsecondTime delay(SubsecondTime::NS() * 1000);
             //std::cout << "In the right place" << std::endl;
             if(m_r_partition_queues)  
-                SubsecondTime page_datamovement_queue_delay = m_data_movement->computeQueueDelay(pkt_time + delay, m_r_part_bandwidth.getRoundedLatency(8*m_page_size), requester);
+                SubsecondTime page_datamovement_queue_delay = m_data_movement->computeQueueDelayTest(pkt_time + delay, m_r_part_bandwidth.getRoundedLatency(8*m_page_size), m_page_size, requester);
             else	
-                SubsecondTime page_datamovement_queue_delay = m_data_movement->computeQueueDelay(pkt_time + delay, m_r_bus_bandwidth.getRoundedLatency(8*m_page_size), requester);
+                SubsecondTime page_datamovement_queue_delay = m_data_movement->computeQueueDelayTest(pkt_time + delay, m_r_bus_bandwidth.getRoundedLatency(8*m_page_size), m_page_size, requester);
             m_extra_pages++;	
         } 
     } 
@@ -757,14 +757,14 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                if(m_r_throttle_redundant_moves) {
                     SubsecondTime datamov_queue_delay = m_data_movement_2->computeQueueDelayNoEffect(t_now, m_r_part2_bandwidth.getRoundedLatency(8*pkt_size), requester);
                     if ((datamov_queue_delay + t_now - pkt_time) < access_latency) {
-                        datamov_queue_delay = m_data_movement_2->computeQueueDelay(t_now, m_r_part2_bandwidth.getRoundedLatency(8*pkt_size), requester);
+                        datamov_queue_delay = m_data_movement_2->computeQueueDelayTest(t_now, m_r_part2_bandwidth.getRoundedLatency(8*pkt_size), pkt_size, requester);
                         access_latency = datamov_queue_delay + t_now - pkt_time;
                         ++m_redundant_moves;
                     } 
                 } else {
                     SubsecondTime datamov_queue_delay = m_data_movement_2->computeQueueDelayNoEffect(t_now, m_r_part2_bandwidth.getRoundedLatency(8*pkt_size), requester);
                     if ((datamov_queue_delay + t_now - pkt_time) < access_latency) {
-                        datamov_queue_delay = m_data_movement_2->computeQueueDelay(t_now, m_r_part2_bandwidth.getRoundedLatency(8*pkt_size), requester);
+                        datamov_queue_delay = m_data_movement_2->computeQueueDelayTest(t_now, m_r_part2_bandwidth.getRoundedLatency(8*pkt_size), pkt_size, requester);
                         access_latency = datamov_queue_delay + t_now - pkt_time;
                         ++m_redundant_moves;
                         m_inflight_redundant[phys_page] = m_inflight_redundant[phys_page] + 1; 
@@ -903,28 +903,28 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
             if(m_r_simulate_datamov_overhead) { 
                 if(m_r_partition_queues) {
                     if(m_test_bandwidth == false) { // cgiannoula - Test Bandwidth
-                        page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_part_bandwidth.getRoundedLatency(8*size), requester);
+                        page_datamovement_queue_delay = m_data_movement->computeQueueDelayTest(t_now, m_r_part_bandwidth.getRoundedLatency(8*size), size, requester);
                     } else {
                         /*
                          * cgiannoula - Test Bandwidth
                          */
                         UInt32 cacheline_count = size / m_cache_line_size;
                         for (UInt32 c = 0; c < cacheline_count; c++) {
-                            page_datamovement_queue_delay += m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*m_cache_line_size), requester);
+                            page_datamovement_queue_delay += m_data_movement->computeQueueDelayTest(t_now, m_r_bus_bandwidth.getRoundedLatency(8*m_cache_line_size), m_cache_line_size, requester);
                         } 
                     }
                 } else if(m_r_cacheline_gran) {
-                    page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*64), requester);
+                    page_datamovement_queue_delay = m_data_movement->computeQueueDelayTest(t_now, m_r_bus_bandwidth.getRoundedLatency(8*64), 64, requester);
                 } else {
                     if(m_test_bandwidth == false) { // cgiannoula - Test Bandwidth
-                        page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*size), requester);
+                        page_datamovement_queue_delay = m_data_movement->computeQueueDelayTest(t_now, m_r_bus_bandwidth.getRoundedLatency(8*size), size, requester);
                     } else {
                         /*
                          * cgiannoula - Test Bandwidth
                          */
                         UInt32 cacheline_count = size / m_cache_line_size;
                         for (UInt32 c = 0; c < cacheline_count; c++) {
-                            page_datamovement_queue_delay += m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*m_cache_line_size), requester);
+                            page_datamovement_queue_delay += m_data_movement->computeQueueDelayTest(t_now, m_r_bus_bandwidth.getRoundedLatency(8*m_cache_line_size), m_cache_line_size, requester);
                         } 
                     }
 
@@ -969,29 +969,29 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
             if(m_r_simulate_datamov_overhead) {
                 if(m_r_partition_queues) {
                     if(m_test_bandwidth == false) { // cgiannoula - Test Bandwidth
-                        page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_part_bandwidth.getRoundedLatency(8*size), requester);
+                        page_datamovement_queue_delay = m_data_movement->computeQueueDelayTest(t_now, m_r_part_bandwidth.getRoundedLatency(8*size), size, requester);
                     } else {
                         /*
                          * cgiannoula - Test Bandwidth
                          */
                         UInt32 cacheline_count = size / m_cache_line_size;
                         for (UInt32 c = 0; c < cacheline_count; c++) {
-                            page_datamovement_queue_delay += m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*m_cache_line_size), requester);
+                            page_datamovement_queue_delay += m_data_movement->computeQueueDelayTest(t_now, m_r_bus_bandwidth.getRoundedLatency(8*m_cache_line_size), m_cache_line_size, requester);
                         } 
                     }
  
                 } else if(m_r_cacheline_gran) {
-                    page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*64), requester);
+                    page_datamovement_queue_delay = m_data_movement->computeQueueDelayTest(t_now, m_r_bus_bandwidth.getRoundedLatency(8*64), 64, requester);
                 } else {
                     if(m_test_bandwidth == false) { // cgiannoula - Test Bandwidth
-                        page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*size), requester);
+                        page_datamovement_queue_delay = m_data_movement->computeQueueDelayTest(t_now, m_r_bus_bandwidth.getRoundedLatency(8*size), size, requester);
                     } else {
                         /*
                          * cgiannoula - Test Bandwidth
                          */
                         UInt32 cacheline_count = size / m_cache_line_size;
                         for (UInt32 c = 0; c < cacheline_count; c++) {
-                            page_datamovement_queue_delay += m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*m_cache_line_size), requester);
+                            page_datamovement_queue_delay += m_data_movement->computeQueueDelayTest(t_now, m_r_bus_bandwidth.getRoundedLatency(8*m_cache_line_size), m_cache_line_size, requester);
                         } 
                     }
  
@@ -1028,7 +1028,7 @@ DramPerfModelDisagg::possiblyPrefetch(UInt64 phys_page, SubsecondTime t_now, cor
         ++m_page_moves;
         SubsecondTime page_datamovement_queue_delay = SubsecondTime::Zero();
         if(m_r_simulate_datamov_overhead) { 
-            page_datamovement_queue_delay = m_data_movement->computeQueueDelay(t_now, m_r_bus_bandwidth.getRoundedLatency(8*m_page_size), requester);
+            page_datamovement_queue_delay = m_data_movement->computeQueueDelayTest(t_now, m_r_bus_bandwidth.getRoundedLatency(8*m_page_size), m_page_size, requester);
         } 
 
         assert(std::find(m_local_pages.begin(), m_local_pages.end(), pref_page) == m_local_pages.end()); 
