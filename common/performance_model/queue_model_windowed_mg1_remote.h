@@ -16,11 +16,15 @@ public:
    SubsecondTime computeQueueDelay(SubsecondTime pkt_time, SubsecondTime processing_time, core_id_t requester = INVALID_CORE_ID);
    SubsecondTime computeQueueDelayNoEffect(SubsecondTime pkt_time, SubsecondTime processing_time, core_id_t requester = INVALID_CORE_ID);
 
+   SubsecondTime computeQueueDelayTest(SubsecondTime pkt_time, SubsecondTime processing_time, UInt64 num_bytes, core_id_t requester = INVALID_CORE_ID);
+
+
 private:
    const SubsecondTime m_window_size;
 
    UInt64 m_total_requests;
    UInt64 m_total_requests_queue_full;
+   UInt64 m_total_requests_capped_by_window_size;
    SubsecondTime m_total_utilized_time;
    SubsecondTime m_total_queue_delay;
 
@@ -33,8 +37,20 @@ private:
 
    String m_name;  // temporary, for debugging
 
+   UInt64 m_bytes_in_window;                                // track the total number of bytes being transferred in the current window
+   double m_max_effective_bandwidth;                        // in bytes / ps
+   // The following two variables are to register stats
+   UInt64 m_max_effective_bandwidth_bytes;
+   UInt64 m_max_effective_bandwidth_ps;
+   std::multimap<SubsecondTime, UInt64> m_packet_bytes;     // track the number of bytes of each packet being transferred in the current window
+   std::multimap<UInt64, UInt64> m_bytes_in_window_freq;    // (try to) track the number of times each "bandwidth" happens
+
+
    void addItem(SubsecondTime pkt_time, SubsecondTime service_time);
    void removeItems(SubsecondTime earliest_time);
+
+   void addItemUpdateBytes(SubsecondTime pkt_time, UInt64 num_bytes, SubsecondTime pkt_queue_delay);
+   void removeItemsUpdateBytes(SubsecondTime earliest_time, SubsecondTime pkt_time);
 };
 
 #endif /* __QUEUE_MODEL_WINDOWED_MG1_REMOTE_H__ */
