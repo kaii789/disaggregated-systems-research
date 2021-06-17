@@ -53,7 +53,7 @@ CompressionModelFPC::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
     // Return compressed pages size in Bytes
     *compressed_page_size = total_bytes;
 
-    printf("[FPC Compression] Compressed Page Size: %u bytes", total_bytes);
+    // printf("[FPC Compression] Compressed Page Size: %u bytes", total_bytes);
 
     // Return compression latency
     ComponentLatency compress_latency(ComponentLatency(core->getDvfsDomain(), total_compressed_cache_lines * m_compression_latency));
