@@ -21,7 +21,7 @@ QueueModelWindowedMG1Remote::QueueModelWindowedMG1Remote(String name, UInt32 id)
    , m_service_time_sum2(0)
    , m_r_added_latency(SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/remote_mem_add_lat"))) // Network latency for remote DRAM access 
    , m_name(name)
-   , m_bytes_in_window(0)
+   , m_bytes_tracking(0)
    , m_max_effective_bandwidth(0.0)
    , m_max_effective_bandwidth_bytes(0)
    , m_max_effective_bandwidth_ps(1)  // dummy value; can't be 0
@@ -39,7 +39,13 @@ QueueModelWindowedMG1Remote::QueueModelWindowedMG1Remote(String name, UInt32 id)
 }
 
 QueueModelWindowedMG1Remote::~QueueModelWindowedMG1Remote()
-{}
+{
+   // Print one time debug output in the destructor method, to be printed once when the program finishes
+   std::cout << "Queue " << m_name << ":" << std::endl; 
+   std::cout << "m_max_effective_bandwidth value: " << m_max_effective_bandwidth << std::endl;
+
+   // Compute rough percentiles of m_effective_bandwidth_tracker
+}
 
 SubsecondTime
 QueueModelWindowedMG1Remote::computeQueueDelay(SubsecondTime pkt_time, SubsecondTime processing_time, core_id_t requester)
@@ -194,30 +200,38 @@ QueueModelWindowedMG1Remote::computeQueueDelayTest(SubsecondTime pkt_time, Subse
 void
 QueueModelWindowedMG1Remote::addItemUpdateBytes(SubsecondTime pkt_time, UInt64 num_bytes, SubsecondTime pkt_queue_delay)
 {
-   // Add num_bytes to map tracking the current window & update m_bytes_in_window
+   // Add num_bytes to map tracking the current window & update m_bytes_tracking
    m_packet_bytes.insert(std::pair<SubsecondTime, UInt64>(pkt_time + pkt_queue_delay, num_bytes));
-   m_bytes_in_window += num_bytes;
+   m_bytes_tracking += num_bytes;
 }
 
 void
 QueueModelWindowedMG1Remote::removeItemsUpdateBytes(SubsecondTime earliest_time, SubsecondTime pkt_time)
 {
-   // Can remove packets that fall outside the current window
+   // Can remove packets that arrived earlier than the current window
    while(!m_packet_bytes.empty() && m_packet_bytes.begin()->first < earliest_time)
    {
       std::multimap<SubsecondTime, UInt64>::iterator bytes_entry = m_packet_bytes.begin();
-      m_bytes_in_window -= bytes_entry->second;
+      m_bytes_tracking -= bytes_entry->second;
       m_packet_bytes.erase(bytes_entry);
    }
 
+   UInt64 bytes_in_window = m_bytes_tracking;
+   // Update bytes_in_window by removing packets in m_bytes_tracking that arrive later than pkt_time
+   for (std::multimap<SubsecondTime, UInt64>::iterator bytes_entry = m_packet_bytes.upper_bound(pkt_time); bytes_entry != m_packet_bytes.end(); ++bytes_entry) {
+      bytes_in_window -= bytes_entry->second;
+   }
+   
    // Compute the effective current window length, and calculate the current effective bandwidth
+   // Note: bytes_in_window is used instead of m_bytes_tracking
    UInt64 effective_window_length_ps = (pkt_time - earliest_time).getPS();
-   double cur_effective_bandwidth = (double)m_bytes_in_window / effective_window_length_ps;
+   double cur_effective_bandwidth = (double)bytes_in_window / effective_window_length_ps;
    if (cur_effective_bandwidth > m_max_effective_bandwidth) {
       m_max_effective_bandwidth = cur_effective_bandwidth;
-      m_max_effective_bandwidth_bytes = m_bytes_in_window;
+      m_max_effective_bandwidth_bytes = bytes_in_window;
       m_max_effective_bandwidth_ps = effective_window_length_ps;
    }
+   m_effective_bandwidth_tracker.insert(std::pair<double, char>(cur_effective_bandwidth, 1));
 }
 
 

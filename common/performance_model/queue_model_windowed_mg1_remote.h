@@ -37,13 +37,13 @@ private:
 
    String m_name;  // temporary, for debugging
 
-   UInt64 m_bytes_in_window;                                // track the total number of bytes being transferred in the current window
+   UInt64 m_bytes_tracking;                                // track the total number of bytes being transferred in the current window
    double m_max_effective_bandwidth;                        // in bytes / ps
    // The following two variables are to register stats
    UInt64 m_max_effective_bandwidth_bytes;
    UInt64 m_max_effective_bandwidth_ps;
    std::multimap<SubsecondTime, UInt64> m_packet_bytes;     // track the number of bytes of each packet being transferred in the current window
-   std::multimap<UInt64, UInt64> m_bytes_in_window_freq;    // (try to) track the number of times each "bandwidth" happens
+   std::multimap<double, char> m_effective_bandwidth_tracker;    // (try to) track the distribution of effective bandwidth
 
 
    void addItem(SubsecondTime pkt_time, SubsecondTime service_time);

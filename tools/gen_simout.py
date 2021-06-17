@@ -219,10 +219,17 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     results['dram.bandwidth'] = map(lambda a: 100*a/time0 if time0 else float('inf'), results['dram-queue.total-time-used'])
     template.append(('  average dram bandwidth utilization', 'dram.bandwidth', lambda v: '%.2f%%' % v))
 
+  if 'dram-datamovement-queue.max-effective-bandwidth-ps' in results and sum(results['dram-datamovement-queue.max-effective-bandwidth-ps']) > 0:
+    results['dram.remotequeuemodel_datamovement_max_effective_bandwidth'] = map(lambda (a,b): 1000*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue.max-effective-bandwidth-bytes'], results['dram-datamovement-queue.max-effective-bandwidth-ps']))
+  if 'dram-datamovement-queue-2.max-effective-bandwidth-ps' in results and sum(results['dram-datamovement-queue-2.max-effective-bandwidth-ps']) > 0:
+    results['dram.remotequeuemodel_datamovement2_max_effective_bandwidth'] = map(lambda (a,b): 1000*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue-2.max-effective-bandwidth-bytes'], results['dram-datamovement-queue-2.max-effective-bandwidth-ps']))
+
   # if 'dram.redundant-moves-temp1-time-savings' in results:
   template.extend([
       ('Experiment stats', '', ''),
       ('  num unique pages accessed', 'dram.unique-pages-accessed', str),
+      ('  remote datamovement max effective bandwidth (GB/s)', 'dram.remotequeuemodel_datamovement_max_effective_bandwidth', format_float(4)),
+      ('  remote datamovement2 max effective bandwidth (GB/s)', 'dram.remotequeuemodel_datamovement2_max_effective_bandwidth', format_float(4)),
   ])
 
   if 'ddr.page-hits' in results:
