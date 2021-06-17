@@ -24,20 +24,18 @@ private:
     UInt32 *m_compressed_cache_line_sizes;
     UInt32 m_cacheline_count;
 
-    // Compression latency per cache line TODO: fix
-    UInt32 m_compression_latency = 3;
-    // Decompression latency per cache line TODO: fix
-    UInt32 m_decompression_latency = 3;
+    // Compression latency per cache line TODO: correct?
+    UInt32 m_compression_latency = 1;
+    // Decompression latency per cache line TODO: correct?
+    UInt32 m_decompression_latency = 5;
+
+    // FPC
+    static const UInt32 mask[6];
+    static const UInt32 neg_check[6];
 
     UInt32 compressCacheLine(void *in, void *out);
     UInt32 decompressCacheLine(void *in, void *out);
 
-    // FPC
-    int insize;
-    long predsizem1,c_hash,d_hash,c_dhash,d_dhash;
-    long long c_pred1,c_pred2,d_pred1,d_pred2,c_lastval,d_lastval;
-    long long *c_fcm,*d_fcm,*c_dfcm,*d_dfcm;
-    static const long long unsigned mask[8];
 };
 
 #endif /* __COMPRESSION_MODEL_FPC_H__ */
