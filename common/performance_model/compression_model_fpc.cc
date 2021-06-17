@@ -74,10 +74,9 @@ UInt32 CompressionModelFPC::compressCacheLine(void* _inbuf, void* _outbuf)
 	UInt32 mask_to_bits[6] = {3, 4, 8, 16, 16, 16};
 	const UInt8 prefix_len = 3;
 
-	for (int i = 0; i < m_cache_line_size / 32; i++)
+	for (int i = 0; i < (m_cache_line_size * 8) / 32; i++)
 	{
 		UInt32 word = cache_line[i];
-		compressed_size_bits += prefix_len;
 
         bool is_pattern_matched = false;
 		for (int j = 0; j < 6; j++)
@@ -85,8 +84,10 @@ UInt32 CompressionModelFPC::compressCacheLine(void* _inbuf, void* _outbuf)
             // Pattern match and handle
 			if (((word | mask[j]) == mask[j]) || ((int)word < 0 && word >= neg_check[j]))
 			{
+                compressed_size_bits += prefix_len;
 				compressed_size_bits += mask_to_bits[j];
                 is_pattern_matched = true;
+                // printf("[FPC] %d %x\n", j, word);
 				break;
 			}
 		}
@@ -104,14 +105,19 @@ UInt32 CompressionModelFPC::compressCacheLine(void* _inbuf, void* _outbuf)
                 }
             if (repeated)
             {
+                compressed_size_bits += prefix_len;
                 compressed_size_bits += 8;
                 is_pattern_matched = true;
+                // printf("[FPC] pattern match %x\n", word);
             }
         }
 
         // None of the patterns match, so can't compress
         if (!is_pattern_matched)
+        {
             compressed_size_bits += 32;
+            // printf("[FPC] uncompressed %x\n", word);
+        }
 	}
 
 	return (UInt32)((compressed_size_bits + 7) / 8); // Return compressed size in bytes
