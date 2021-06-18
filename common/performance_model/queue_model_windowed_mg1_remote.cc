@@ -58,6 +58,9 @@ QueueModelWindowedMG1Remote::~QueueModelWindowedMG1Remote()
 
    // Compute approximate percentiles of m_effective_bandwidth_tracker
    std::sort(m_effective_bandwidth_tracker.begin(), m_effective_bandwidth_tracker.end());
+   if (m_effective_bandwidth_tracker.size() < 1) {
+      return;
+   }
 
    // Compute percentiles for stats
    UInt64 index;
