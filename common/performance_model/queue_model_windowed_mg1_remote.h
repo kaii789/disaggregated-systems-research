@@ -38,12 +38,18 @@ private:
    String m_name;  // temporary, for debugging
 
    UInt64 m_bytes_tracking;                                // track the total number of bytes being transferred in the current window
-   double m_max_effective_bandwidth;                        // in bytes / ps
+   double m_max_effective_bandwidth;                       // in bytes / ps
    // The following two variables are to register stats
    UInt64 m_max_effective_bandwidth_bytes;
    UInt64 m_max_effective_bandwidth_ps;
-   std::multimap<SubsecondTime, UInt64> m_packet_bytes;     // track the number of bytes of each packet being transferred in the current window
-   std::multimap<double, char> m_effective_bandwidth_tracker;    // (try to) track the distribution of effective bandwidth
+   std::multimap<SubsecondTime, UInt64> m_packet_bytes;    // track the number of bytes of each packet being transferred in the current window
+   std::vector<double> m_effective_bandwidth_tracker;      // (try to) track the distribution of effective bandwidth
+   
+   // Testing: divide these to get GB/s (NOT bytes/ps)
+   // UInt64 m_975_percentile_effective_bandwidth_numerator;   // can use 97.5% percentile instead of max
+   // UInt64 m_975_percentile_effective_bandwidth_denominator;
+   // UInt64 m_95_percentile_effective_bandwidth_numerator;
+   // UInt64 m_95_percentile_effective_bandwidth_denominator;
 
 
    void addItem(SubsecondTime pkt_time, SubsecondTime service_time);

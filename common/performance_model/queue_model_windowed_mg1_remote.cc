@@ -9,6 +9,8 @@
 #include "log.h"
 #include "stats.h"
 
+#include <algorithm>
+
 QueueModelWindowedMG1Remote::QueueModelWindowedMG1Remote(String name, UInt32 id)
    : m_window_size(SubsecondTime::NS(Sim()->getCfg()->getInt("queue_model/windowed_mg1/window_size")))
    , m_total_requests(0)
@@ -25,6 +27,10 @@ QueueModelWindowedMG1Remote::QueueModelWindowedMG1Remote(String name, UInt32 id)
    , m_max_effective_bandwidth(0.0)
    , m_max_effective_bandwidth_bytes(0)
    , m_max_effective_bandwidth_ps(1)  // dummy value; can't be 0
+   // , m_95_percentile_effective_bandwidth_numerator(0)
+   // , m_95_percentile_effective_bandwidth_denominator(1)  // dummy value; can't be 0
+   // , m_975_percentile_effective_bandwidth_numerator(0)
+   // , m_975_percentile_effective_bandwidth_denominator(1) // dummy value; can't be 0
 {  
    registerStatsMetric(name, id, "num-requests", &m_total_requests);
    registerStatsMetric(name, id, "total-time-used", &m_total_utilized_time);
@@ -36,15 +42,62 @@ QueueModelWindowedMG1Remote::QueueModelWindowedMG1Remote(String name, UInt32 id)
    // Divide the first following stat by the second one to get bytes / ps (can't register a double type as a stat)
    registerStatsMetric(name, id, "max-effective-bandwidth-bytes", &m_max_effective_bandwidth_bytes);
    registerStatsMetric(name, id, "max-effective-bandwidth-ps", &m_max_effective_bandwidth_ps);
+
+   // Testing: Divide the numerator stat by the denominator to get GB/s with around 12 decimal digits precision (NOT bytes/ps)
+   // registerStatsMetric(name, id, "p975-effective-bandwidth-numerator", &m_975_percentile_effective_bandwidth_numerator);
+   // registerStatsMetric(name, id, "p975-effective-bandwidth-denominator", &m_975_percentile_effective_bandwidth_denominator);
+   // registerStatsMetric(name, id, "p95-effective-bandwidth-numerator", &m_95_percentile_effective_bandwidth_numerator);
+   // registerStatsMetric(name, id, "p95-effective-bandwidth-denominator", &m_95_percentile_effective_bandwidth_denominator);
 }
 
 QueueModelWindowedMG1Remote::~QueueModelWindowedMG1Remote()
 {
    // Print one time debug output in the destructor method, to be printed once when the program finishes
    std::cout << "Queue " << m_name << ":" << std::endl; 
-   std::cout << "m_max_effective_bandwidth value: " << m_max_effective_bandwidth << std::endl;
+   std::cout << "m_max_effective_bandwidth gave: " << 1000 * m_max_effective_bandwidth << " GB/s" << std::endl;
 
-   // Compute rough percentiles of m_effective_bandwidth_tracker
+   // Compute approximate percentiles of m_effective_bandwidth_tracker
+   std::sort(m_effective_bandwidth_tracker.begin(), m_effective_bandwidth_tracker.end());
+
+   // Compute percentiles for stats
+   UInt64 index;
+   double percentile;
+
+   // Updating stats in destructor doesn't seem to work
+   // UInt64 denominator = 1000000000000000;  // 10^15
+   // index = (UInt64)(0.975 * (m_effective_bandwidth_tracker.size() - 1));  // -1 so array indices don't go out of bounds
+   // percentile = 1000 * m_effective_bandwidth_tracker[index];  // in GB/s
+   // m_975_percentile_effective_bandwidth_numerator = (UInt64)(percentile * denominator);
+   // m_975_percentile_effective_bandwidth_denominator = denominator;
+   // index = (UInt64)(0.95 * (m_effective_bandwidth_tracker.size() - 1));  // -1 so array indices don't go out of bounds
+   // percentile = 1000 * m_effective_bandwidth_tracker[index];  // in GB/s
+   // m_95_percentile_effective_bandwidth_numerator = (UInt64)(percentile * denominator);
+   // m_95_percentile_effective_bandwidth_denominator = denominator;
+   
+   // Compute more percentiles for output
+   UInt32 num_bins = 40;  // the total number of points is 1 more than num_bins, since it includes the endpoints
+   std::map<double, double> effective_bandwidth_percentiles;
+   for (UInt32 bin = 0; bin < num_bins; ++bin) {
+      double percentage = (double)bin / num_bins;
+      index = (UInt64)(percentage * (m_effective_bandwidth_tracker.size() - 1));  // -1 so array indices don't go out of bounds
+      percentile = m_effective_bandwidth_tracker[index];  // in bytes/ps
+      std::cout << "percentage: " << percentage << ", vector index: " << index << ", percentile: " << 1000 * percentile << " GB/s" << std::endl;
+      effective_bandwidth_percentiles.insert(std::pair<double, double>(percentage, percentile));
+   }
+   // Print output in format that can easily be graphed in Python
+   std::ostringstream percentages_buffer;
+   std::ostringstream cdf_buffer;
+   percentages_buffer << "[";
+   cdf_buffer << "[";
+   for (std::map<double, double>::iterator it = effective_bandwidth_percentiles.begin(); it != effective_bandwidth_percentiles.end(); ++it) {
+      percentages_buffer << it->first << ", ";
+      cdf_buffer << 1000 * it->second << ", ";  // Convert to GB/s
+   }
+   percentages_buffer << "]";
+   cdf_buffer << "]";
+
+   std::cout << "CDF X values (bandwidth), in GB/s:\n" << cdf_buffer.str() << std::endl;
+   std::cout << "CDF Y values (probability):\n" << percentages_buffer.str() << std::endl;
 }
 
 SubsecondTime
@@ -231,7 +284,7 @@ QueueModelWindowedMG1Remote::removeItemsUpdateBytes(SubsecondTime earliest_time,
       m_max_effective_bandwidth_bytes = bytes_in_window;
       m_max_effective_bandwidth_ps = effective_window_length_ps;
    }
-   m_effective_bandwidth_tracker.insert(std::pair<double, char>(cur_effective_bandwidth, 1));
+   m_effective_bandwidth_tracker.push_back(cur_effective_bandwidth);
 }
 
 
