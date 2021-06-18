@@ -225,6 +225,11 @@ DramPerfModelDisagg::~DramPerfModelDisagg()
         for(UInt32 group = 0; group < m_total_bank_groups; ++group)
             delete m_r_bank_group_avail[group];
     }
+
+    // putting this near the end so hopefully print output from the two queue model destructors won't interfere
+    if(m_r_partition_queues == 1) {
+        delete m_data_movement_2;
+    }
 }
 
 UInt64
