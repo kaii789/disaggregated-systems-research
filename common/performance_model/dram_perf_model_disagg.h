@@ -138,6 +138,7 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_extra_pages;
         UInt64 m_redundant_moves;
         UInt64 m_max_bufferspace;
+        UInt64 m_bufferspace_full_move_page_cancelled;
         std::map<UInt64, UInt32> m_page_usage_map;  // track number of times each phys page is accessed
         UInt64 m_unique_pages_accessed;             // track number of unique pages accessed
 
