@@ -417,7 +417,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         bytes_saved += m_cache_line_size - size;
         address_to_compressed_size[phys_page] = size;
         address_to_num_cache_lines[phys_page] = compressed_cache_lines;
-        m_sum_compression_ratio += float(m_cache_line_size) / float(size);
+        m_sum_compression_ratio += (float(m_cache_line_size) / float(size)) * 1000;
         m_total_compression_latency += compression_latency;
         t_now += compression_latency;
     }
@@ -502,7 +502,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
                 bytes_saved += m_page_size - page_size;
                 address_to_compressed_size[phys_page] = page_size;
                 address_to_num_cache_lines[phys_page] = compressed_cache_lines;
-                m_sum_compression_ratio += float(m_page_size) / float(page_size);
+                m_sum_compression_ratio += (float(m_page_size) / float(page_size)) * 1000;
                 m_total_compression_latency += compression_latency;
                 t_now += compression_latency;
             }
@@ -864,7 +864,7 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
                 bytes_saved += gran_size - size;
                 address_to_compressed_size[phys_page] = size;
                 address_to_num_cache_lines[phys_page] = compressed_cache_lines;
-                m_sum_compression_ratio += float(gran_size) / float(size);
+                m_sum_compression_ratio += (float(gran_size) / float(size)) * 1000;
                 evict_compression_latency += compression_latency;
                 m_total_compression_latency += compression_latency;
             }
@@ -908,7 +908,7 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
                 bytes_saved += gran_size - size;
                 address_to_compressed_size[phys_page] = size;
                 address_to_num_cache_lines[phys_page] = compressed_cache_lines;
-                m_sum_compression_ratio += float(gran_size) / float(size);
+                m_sum_compression_ratio += (float(gran_size) / float(size)) * 1000;
                 evict_compression_latency += compression_latency;
                 m_total_compression_latency += compression_latency;
             }

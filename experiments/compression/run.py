@@ -52,17 +52,19 @@ def log_compression_stats(res_directory, result_filename, program_command, confi
     bytes_saved = results['compression.bytes-saved'][0] if 'compression.bytes-saved' in results else 0
     if bytes_saved != 0:
         data_moves = results['dram.data-moves'][0]
-        sum_compression_ratio = results['compression.sum-compression-ratio'][0]
+        sum_compression_ratio = results['compression.sum-compression-ratio'][0] / 1000
         total_compression_latency = results['compression.total-compression-latency'][0]
         total_decompression_latency = results['compression.total-decompression-latency'][0]
 
-        avg_compression_ratio = sum_compression_ratio / data_moves
+        avg_compression_ratio = float(sum_compression_ratio) / float(data_moves)
         avg_compression_latency = total_compression_latency / data_moves
         avg_decompression_latency = total_decompression_latency / data_moves
 
         f = open(result_filename, "a")
         f.write("Program Command: {}\n".format(program_command))
         f.write("Config Param: {}, Val: {}\n".format(config_param, val))
+        f.write("Data Moves: {}\n".format(data_moves))
+        f.write("Bytes Saved: {}\n".format(bytes_saved))
         f.write("Average Compression Ratio: {}\n".format(avg_compression_ratio))
         f.write("Average Compression Latency(ns): {}\n".format(avg_compression_latency))
         f.write("Average Decompression Latency(ns): {}\n\n".format(avg_decompression_latency))

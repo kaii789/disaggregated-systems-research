@@ -116,7 +116,7 @@ class DramPerfModelDisagg : public DramPerfModel
         bool m_use_compression;
         CompressionModel *m_compression_model;
         UInt64 bytes_saved = 0;
-        UInt64 m_sum_compression_ratio = 0;
+        UInt64 m_sum_compression_ratio = 0; // Three decimal precision, divide by 1000 to get actual sum compression ratio
         SubsecondTime m_total_compression_latency = SubsecondTime::Zero();
         SubsecondTime m_total_decompression_latency = SubsecondTime::Zero();
         std::map<IntPtr, UInt32> address_to_compressed_size;
