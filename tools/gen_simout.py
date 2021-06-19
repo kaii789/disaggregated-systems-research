@@ -158,11 +158,10 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
   bytes_saved = results['compression.bytes-saved'][0] if 'compression.bytes-saved' in results else 0
   if bytes_saved != 0:
     data_moves = results['dram.data-moves'][0]
-    sum_compression_ratio = results['compression.sum-compression-ratio'][0] / 1000
     total_compression_latency = results['compression.total-compression-latency'][0]
     total_decompression_latency = results['compression.total-decompression-latency'][0]
 
-    results['compression.avg-compression-ratio'] = float(sum_compression_ratio) / float(data_moves)
+    results['compression.avg-compression-ratio'] = float((data_moves * 4096)) / float(((data_moves * 4096) - bytes_saved))
     results['compression.avg-compression-latency'] = total_compression_latency / data_moves
     results['compression.avg-decompression-latency'] = total_decompression_latency / data_moves
 
