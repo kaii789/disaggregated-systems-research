@@ -10,7 +10,7 @@
 class QueueModelWindowedMG1Remote : public QueueModel
 {
 public:
-   QueueModelWindowedMG1Remote(String name, UInt32 id);
+   QueueModelWindowedMG1Remote(String name, UInt32 id, UInt64 bw_bits_per_us);
    ~QueueModelWindowedMG1Remote();
 
    SubsecondTime computeQueueDelay(SubsecondTime pkt_time, SubsecondTime processing_time, core_id_t requester = INVALID_CORE_ID);
@@ -21,11 +21,12 @@ public:
 
 private:
    const SubsecondTime m_window_size;
-   SubsecondTime m_queue_delay_cap;  // not including network latency
+   SubsecondTime m_queue_delay_cap;      // Only considered if m_use_separate_queue_delay_cap is true; cap applied before network additional latency
+   bool m_use_separate_queue_delay_cap;  // Whether to use a separate queue delay cap
 
    UInt64 m_total_requests;
-   UInt64 m_total_requests_queue_full;
-   UInt64 m_total_requests_capped_by_window_size;
+   UInt64 m_total_requests_queue_full;                 // The number of requests where queue utilization was full
+   UInt64 m_total_requests_capped_by_window_size;      // Note: When m_use_separate_queue_delay_cap is true, this counts requests with calculated queue delay larger than window_size, but weren't actually capped
    UInt64 m_total_requests_capped_by_queue_delay_cap;
    SubsecondTime m_total_utilized_time;
    SubsecondTime m_total_queue_delay;
@@ -38,7 +39,10 @@ private:
    const SubsecondTime m_r_added_latency; // Additional network latency from remote access
 
    String m_name;  // temporary, for debugging
-
+   
+   double m_specified_bw_GB_per_s;                         // The specified bandwidth this queue model is supposed to have, in GB/s
+   double m_max_bandwidth_allowable_excess_ratio;          // Allow effective bandwidth to exceed the specified bandwidth by at most this ratio
+   UInt64 m_effective_bandwidth_exceeded_allowable_max;    // The number of times the effective bandwidth in a window exceeded m_specified_bw_GB_per_s * m_max_bandwidth_allowable_excess_ratio
 
    UInt64 m_bytes_tracking;                                // track the total number of bytes being transferred in the current window
    double m_max_effective_bandwidth;                       // in bytes / ps

@@ -1,6 +1,9 @@
 /** This file is based off of the modified queue_model_windowed_mg1. 
- * At the time of writing, the main difference is the inclusion of remote_mem_add_lat
- * in the returned latency
+ * At the time of writing, the main differences are:
+ *  1) The inclusion of remote_mem_add_lat in the returned queue delay latency
+ *  2) The effective bandwidth within the window size is tracked, and if it
+ *     exceeds the specified bandwidth over a user-provided ratio, an error message
+ *     will be printed
 */
 
 #include "queue_model_windowed_mg1_remote.h"
@@ -11,9 +14,9 @@
 
 #include <algorithm>
 
-QueueModelWindowedMG1Remote::QueueModelWindowedMG1Remote(String name, UInt32 id)
-   : m_window_size(SubsecondTime::NS(Sim()->getCfg()->getInt("queue_model/windowed_mg1/window_size")))
-   , m_queue_delay_cap(SubsecondTime::NS(Sim()->getCfg()->getInt("queue_model/windowed_mg1/queue_delay_cap")))
+QueueModelWindowedMG1Remote::QueueModelWindowedMG1Remote(String name, UInt32 id, UInt64 bw_bits_per_us)
+   : m_window_size(SubsecondTime::NS(Sim()->getCfg()->getInt("queue_model/windowed_mg1_remote/window_size")))
+   , m_use_separate_queue_delay_cap(Sim()->getCfg()->getBool("queue_model/windowed_mg1_remote/use_separate_queue_delay_cap"))
    , m_total_requests(0)
    , m_total_requests_queue_full(0)
    , m_total_requests_capped_by_window_size(0)
@@ -25,6 +28,9 @@ QueueModelWindowedMG1Remote::QueueModelWindowedMG1Remote(String name, UInt32 id)
    , m_service_time_sum2(0)
    , m_r_added_latency(SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/remote_mem_add_lat"))) // Network latency for remote DRAM access 
    , m_name(name)
+   , m_specified_bw_GB_per_s((double)bw_bits_per_us / 8 / 1000)
+   , m_max_bandwidth_allowable_excess_ratio(Sim()->getCfg()->getFloat("queue_model/windowed_mg1_remote/bandwidth_allowable_excess_ratio"))
+   , m_effective_bandwidth_exceeded_allowable_max(0)
    , m_bytes_tracking(0)
    , m_max_effective_bandwidth(0.0)
    , m_max_effective_bandwidth_bytes(0)
@@ -34,17 +40,25 @@ QueueModelWindowedMG1Remote::QueueModelWindowedMG1Remote(String name, UInt32 id)
    // , m_975_percentile_effective_bandwidth_numerator(0)
    // , m_975_percentile_effective_bandwidth_denominator(1) // dummy value; can't be 0
 {  
+   if (m_use_separate_queue_delay_cap) {
+      m_queue_delay_cap = SubsecondTime::NS(Sim()->getCfg()->getInt("queue_model/windowed_mg1_remote/queue_delay_cap"));
+   } else {
+      m_queue_delay_cap = m_window_size;  // in this case m_queue_delay_cap won't be used, but set accordingly just in case
+   }
+   
    registerStatsMetric(name, id, "num-requests", &m_total_requests);
    registerStatsMetric(name, id, "total-time-used", &m_total_utilized_time);
    registerStatsMetric(name, id, "total-queue-delay", &m_total_queue_delay);
    registerStatsMetric(name, id, "num-requests-queue-full", &m_total_requests_queue_full);
-   
+
    registerStatsMetric(name, id, "num-requests-capped-by-window-size", &m_total_requests_capped_by_window_size);
    registerStatsMetric(name, id, "num-requests-capped-by-custom-cap", &m_total_requests_capped_by_queue_delay_cap);
    
    // Divide the first following stat by the second one to get bytes / ps (can't register a double type as a stat)
    registerStatsMetric(name, id, "max-effective-bandwidth-bytes", &m_max_effective_bandwidth_bytes);
    registerStatsMetric(name, id, "max-effective-bandwidth-ps", &m_max_effective_bandwidth_ps);
+
+   registerStatsMetric(name, id, "num-effective-bandwidth-exceeded-allowable-max", &m_effective_bandwidth_exceeded_allowable_max);
 
    // Testing: Divide the numerator stat by the denominator to get GB/s with around 12 decimal digits precision (NOT bytes/ps)
    // registerStatsMetric(name, id, "p975-effective-bandwidth-numerator", &m_975_percentile_effective_bandwidth_numerator);
@@ -56,14 +70,14 @@ QueueModelWindowedMG1Remote::QueueModelWindowedMG1Remote(String name, UInt32 id)
 QueueModelWindowedMG1Remote::~QueueModelWindowedMG1Remote()
 {
    // Print one time debug output in the destructor method, to be printed once when the program finishes
+   if (m_effective_bandwidth_tracker.size() < 1) {
+      return;
+   }
    std::cout << "Queue " << m_name << ":" << std::endl; 
    std::cout << "m_max_effective_bandwidth gave: " << 1000 * m_max_effective_bandwidth << " GB/s" << std::endl;
 
    // Compute approximate percentiles of m_effective_bandwidth_tracker
    std::sort(m_effective_bandwidth_tracker.begin(), m_effective_bandwidth_tracker.end());
-   if (m_effective_bandwidth_tracker.size() < 1) {
-      return;
-   }
 
    // Compute percentiles for stats
    UInt64 index;
@@ -104,6 +118,11 @@ QueueModelWindowedMG1Remote::~QueueModelWindowedMG1Remote()
 
    std::cout << "CDF X values (bandwidth), in GB/s:\n" << cdf_buffer.str() << std::endl;
    std::cout << "CDF Y values (probability):\n" << percentages_buffer.str() << std::endl;
+
+   if (m_effective_bandwidth_exceeded_allowable_max / m_total_requests > 0.01) {
+      std::cout << "Queue " << m_name << " had " << m_effective_bandwidth_exceeded_allowable_max / m_total_requests;
+      std::cout << "% of windows with effective bandwidth that exceeded the allowable max bandwidth of " << m_specified_bw_GB_per_s * m_max_bandwidth_allowable_excess_ratio << "GB/s" << std::endl;
+   }
 }
 
 SubsecondTime
@@ -238,13 +257,19 @@ QueueModelWindowedMG1Remote::computeQueueDelayTest(SubsecondTime pkt_time, Subse
                    (arrival_rate * service_time_Es2), (2 * (1. - utilization)), arrival_rate * service_time_Es2 / (2 * (1. - utilization)));
 
       // Our memory is limited in time to m_window_size. It would be strange to return more latency than that.
-      if (t_queue > m_window_size) {
+      if (!m_use_separate_queue_delay_cap && t_queue > m_window_size) {
+         // Normally, use m_window_size as the cap
+         t_queue = m_window_size;
          ++m_total_requests_capped_by_window_size;
-      }
-      // BUT, try using a custom queue_delay_cap to handle the cases when the queue is full
-      if (t_queue > m_queue_delay_cap) {
-         t_queue = m_queue_delay_cap;
-         ++m_total_requests_capped_by_queue_delay_cap;
+      } else if (m_use_separate_queue_delay_cap) {
+         if (t_queue > m_queue_delay_cap) {
+            // When m_use_separate_queue_delay_cap is true, try using a custom queue_delay_cap to handle the cases when the queue is full
+            t_queue = m_queue_delay_cap;
+            ++m_total_requests_capped_by_queue_delay_cap;
+         }
+         if (t_queue > m_window_size) {
+            ++m_total_requests_capped_by_window_size;  // still keep track of this stat when separate queue delay cap is used
+         }
       }
    }
    // Add additional network latency
@@ -288,12 +313,16 @@ QueueModelWindowedMG1Remote::removeItemsUpdateBytes(SubsecondTime earliest_time,
    // Compute the effective current window length, and calculate the current effective bandwidth
    // Note: bytes_in_window is used instead of m_bytes_tracking
    UInt64 effective_window_length_ps = (pkt_time - earliest_time).getPS();
-   double cur_effective_bandwidth = (double)bytes_in_window / effective_window_length_ps;
+   double cur_effective_bandwidth = (double)bytes_in_window / effective_window_length_ps;  // in bytes/ps
    if (cur_effective_bandwidth > m_max_effective_bandwidth) {
       m_max_effective_bandwidth = cur_effective_bandwidth;
       m_max_effective_bandwidth_bytes = bytes_in_window;
       m_max_effective_bandwidth_ps = effective_window_length_ps;
    }
+   if (cur_effective_bandwidth * 1000 > m_specified_bw_GB_per_s * m_max_bandwidth_allowable_excess_ratio) {  // GB/s used here
+      ++m_effective_bandwidth_exceeded_allowable_max;
+   }
+   
    m_effective_bandwidth_tracker.push_back(cur_effective_bandwidth);
 }
 

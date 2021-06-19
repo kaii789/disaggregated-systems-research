@@ -118,18 +118,18 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     if(m_r_partition_queues == 1) {
         m_data_movement = QueueModel::create(
                 name + "-datamovement-queue", core_id, data_movement_queue_model_type,
-                m_r_part_bandwidth.getRoundedLatency(8)); // bytes to bits
+                m_r_part_bandwidth.getRoundedLatency(8), m_r_part_bandwidth.getBandwidthBitsPerUs()); // bytes to bits
         m_data_movement_2 = QueueModel::create(
                 name + "-datamovement-queue-2", core_id, data_movement_queue_model_type,
-                m_r_part2_bandwidth.getRoundedLatency(8)); // bytes to bits
+                m_r_part2_bandwidth.getRoundedLatency(8), m_r_part2_bandwidth.getBandwidthBitsPerUs()); // bytes to bits
     } else {
         m_data_movement = QueueModel::create(
                 name + "-datamovement-queue", core_id, data_movement_queue_model_type,
-                m_r_bus_bandwidth.getRoundedLatency(8)); // bytes to bits
+                m_r_bus_bandwidth.getRoundedLatency(8), m_r_bus_bandwidth.getBandwidthBitsPerUs()); // bytes to bits
         // Note: currently m_data_movement_2 is not used anywhere when m_r_partition_queues != 1
         m_data_movement_2 = QueueModel::create(
                 name + "-datamovement-queue-2", core_id, data_movement_queue_model_type,
-                m_r_bus_bandwidth.getRoundedLatency(8)); // bytes to bits	
+                m_r_bus_bandwidth.getRoundedLatency(8), m_r_bus_bandwidth.getBandwidthBitsPerUs()); // bytes to bits	
     }
 
     for(UInt32 rank = 0; rank < m_total_ranks; ++rank) {

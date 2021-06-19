@@ -32,9 +32,43 @@ QueueModel::create(String name, UInt32 id, String model_type, SubsecondTime min_
    {
       return new QueueModelWindowedMG1(name, id);
    }
+   else if (model_type == "network_latency_only")
+   {
+      return new QueueModelNetworkLatencyOnly(name, id);
+   }
+   else
+   {
+      LOG_PRINT_ERROR("Unrecognized Queue Model Type(%s)", model_type.c_str());
+      return (QueueModel*) NULL;
+   }
+}
+
+// To create a windowed_mg1_remote queue model, must use this second create method
+QueueModel*
+QueueModel::create(String name, UInt32 id, String model_type, SubsecondTime min_processing_time, UInt64 bw_bits_per_us)
+{
+   if (model_type == "basic")
+   {
+      bool moving_avg_enabled = Sim()->getCfg()->getBool("queue_model/basic/moving_avg_enabled");
+      UInt32 moving_avg_window_size = Sim()->getCfg()->getInt("queue_model/basic/moving_avg_window_size");
+      String moving_avg_type = Sim()->getCfg()->getString("queue_model/basic/moving_avg_type");
+      return new QueueModelBasic(name, id, moving_avg_enabled, moving_avg_window_size, moving_avg_type);
+   }
+   else if (model_type == "history_list")
+   {
+      return new QueueModelHistoryList(name, id, min_processing_time);
+   }
+   else if (model_type == "contention")
+   {
+      return new QueueModelContention(name, id, 1);
+   }
+   else if (model_type == "windowed_mg1")
+   {
+      return new QueueModelWindowedMG1(name, id);
+   }
    else if (model_type == "windowed_mg1_remote")
    {
-      return new QueueModelWindowedMG1Remote(name, id);
+      return new QueueModelWindowedMG1Remote(name, id, bw_bits_per_us);
    }
    else if (model_type == "network_latency_only")
    {
