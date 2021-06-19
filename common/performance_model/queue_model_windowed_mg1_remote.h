@@ -18,6 +18,7 @@ public:
 
    SubsecondTime computeQueueDelayTest(SubsecondTime pkt_time, SubsecondTime processing_time, UInt64 num_bytes, core_id_t requester = INVALID_CORE_ID);
 
+   bool isQueueFull(SubsecondTime pkt_time);
 
 private:
    const SubsecondTime m_window_size;
@@ -57,7 +58,6 @@ private:
    // UInt64 m_975_percentile_effective_bandwidth_denominator;
    // UInt64 m_95_percentile_effective_bandwidth_numerator;
    // UInt64 m_95_percentile_effective_bandwidth_denominator;
-
 
    void addItem(SubsecondTime pkt_time, SubsecondTime service_time);
    void removeItems(SubsecondTime earliest_time);

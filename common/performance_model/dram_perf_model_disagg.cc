@@ -90,7 +90,8 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_extra_pages         (0)
     , m_redundant_moves     (0)
     , m_max_bufferspace     (0)
-    , m_bufferspace_full_move_page_cancelled(0)
+    , m_move_page_cancelled_bufferspace_full(0)
+    , m_move_page_cancelled_datamovement_queue_full(0)
     , m_unique_pages_accessed      (0)
     , m_total_queueing_delay(SubsecondTime::Zero())
     , m_total_local_access_latency(SubsecondTime::Zero())
@@ -186,7 +187,8 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     registerStatsMetric("dram", core_id, "extra-traffic", &m_extra_pages);
     registerStatsMetric("dram", core_id, "redundant-moves", &m_redundant_moves);
     registerStatsMetric("dram", core_id, "max-bufferspace", &m_max_bufferspace);
-    registerStatsMetric("dram", core_id, "bufferspace-full-move-page-cancelled", &m_bufferspace_full_move_page_cancelled);
+    registerStatsMetric("dram", core_id, "bufferspace-full-move-page-cancelled", &m_move_page_cancelled_bufferspace_full);
+    registerStatsMetric("dram", core_id, "queue-full-move-page-cancelled", &m_move_page_cancelled_datamovement_queue_full);
     registerStatsMetric("dram", core_id, "unique-pages-accessed", &m_unique_pages_accessed);
 }
 
@@ -481,17 +483,16 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     if(m_r_mode == 1 || m_r_mode == 3) {
         move_page = true; 
     }
+    // Cancel moving the page if the amount of reserved bufferspace in localdram for inflight + inflight_evicted pages is not enough to support an additional move
     if((m_r_reserved_bufferspace > 0) && ((m_inflight_pages.size() + m_inflightevicted_pages.size())  >= (m_r_reserved_bufferspace/100)*m_localdram_size/m_page_size)) {
         move_page = false;
-        ++m_bufferspace_full_move_page_cancelled;
+        ++m_move_page_cancelled_bufferspace_full;
     }
-
-
-    //if (m_r_enable_selective_moves) {
-    //	if(m_data_movement->isQueueFull())
-    //		move_page = false;
-    // } 
-
+    // Cancel moving the page if the queue used to move the page is already full
+    if(m_data_movement->isQueueFull(pkt_time)) {
+        move_page = false;
+        ++m_move_page_cancelled_datamovement_queue_full;
+    } 
 
     // Adding data movement cost of the entire page for now (this just adds contention in the queue)
     if (move_page) {
