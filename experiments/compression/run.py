@@ -47,6 +47,7 @@ def get_ipc(res_directory):
 def log_compression_stats(res_directory, result_filename, program_command, config_param, val):
     res = sniper_lib.get_results(resultsdir=res_directory)
     results = res['results']
+    config = res['config']
 
     # Compression
     bytes_saved = results['compression.bytes-saved'][0] if 'compression.bytes-saved' in results else 0
@@ -55,8 +56,8 @@ def log_compression_stats(res_directory, result_filename, program_command, confi
         total_compression_latency = results['compression.total-compression-latency'][0]
         total_decompression_latency = results['compression.total-decompression-latency'][0]
 
-        avg_compression_ratio = float((data_moves * 4096)) / float(((data_moves * 4096) - bytes_saved))
-
+        gran_size = 64 if config['perf_model/dram/remote_use_cacheline_granularity'] == "true" else 4096
+        avg_compression_ratio = float((data_moves * gran_size)) / float(((data_moves * gran_size) - bytes_saved))
         avg_compression_latency = total_compression_latency / data_moves
         avg_decompression_latency = total_decompression_latency / data_moves
 
