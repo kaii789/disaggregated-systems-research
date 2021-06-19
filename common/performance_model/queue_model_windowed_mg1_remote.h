@@ -21,10 +21,12 @@ public:
 
 private:
    const SubsecondTime m_window_size;
+   SubsecondTime m_queue_delay_cap;  // not including network latency
 
    UInt64 m_total_requests;
    UInt64 m_total_requests_queue_full;
    UInt64 m_total_requests_capped_by_window_size;
+   UInt64 m_total_requests_capped_by_queue_delay_cap;
    SubsecondTime m_total_utilized_time;
    SubsecondTime m_total_queue_delay;
 
@@ -36,6 +38,7 @@ private:
    const SubsecondTime m_r_added_latency; // Additional network latency from remote access
 
    String m_name;  // temporary, for debugging
+
 
    UInt64 m_bytes_tracking;                                // track the total number of bytes being transferred in the current window
    double m_max_effective_bandwidth;                       // in bytes / ps

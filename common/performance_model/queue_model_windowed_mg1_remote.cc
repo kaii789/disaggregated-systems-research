@@ -13,9 +13,11 @@
 
 QueueModelWindowedMG1Remote::QueueModelWindowedMG1Remote(String name, UInt32 id)
    : m_window_size(SubsecondTime::NS(Sim()->getCfg()->getInt("queue_model/windowed_mg1/window_size")))
+   , m_queue_delay_cap(SubsecondTime::NS(Sim()->getCfg()->getInt("queue_model/windowed_mg1/queue_delay_cap")))
    , m_total_requests(0)
    , m_total_requests_queue_full(0)
    , m_total_requests_capped_by_window_size(0)
+   , m_total_requests_capped_by_queue_delay_cap(0)
    , m_total_utilized_time(SubsecondTime::Zero())
    , m_total_queue_delay(SubsecondTime::Zero())
    , m_num_arrivals(0)
@@ -38,7 +40,8 @@ QueueModelWindowedMG1Remote::QueueModelWindowedMG1Remote(String name, UInt32 id)
    registerStatsMetric(name, id, "num-requests-queue-full", &m_total_requests_queue_full);
    
    registerStatsMetric(name, id, "num-requests-capped-by-window-size", &m_total_requests_capped_by_window_size);
-
+   registerStatsMetric(name, id, "num-requests-capped-by-custom-cap", &m_total_requests_capped_by_queue_delay_cap);
+   
    // Divide the first following stat by the second one to get bytes / ps (can't register a double type as a stat)
    registerStatsMetric(name, id, "max-effective-bandwidth-bytes", &m_max_effective_bandwidth_bytes);
    registerStatsMetric(name, id, "max-effective-bandwidth-ps", &m_max_effective_bandwidth_ps);
@@ -236,8 +239,12 @@ QueueModelWindowedMG1Remote::computeQueueDelayTest(SubsecondTime pkt_time, Subse
 
       // Our memory is limited in time to m_window_size. It would be strange to return more latency than that.
       if (t_queue > m_window_size) {
-         t_queue = m_window_size;
          ++m_total_requests_capped_by_window_size;
+      }
+      // BUT, try using a custom queue_delay_cap to handle the cases when the queue is full
+      if (t_queue > m_queue_delay_cap) {
+         t_queue = m_queue_delay_cap;
+         ++m_total_requests_capped_by_queue_delay_cap;
       }
    }
    // Add additional network latency
