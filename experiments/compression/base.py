@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 import pandas as pd
 import numpy as np
 import matplotlib as plt
@@ -47,22 +46,25 @@ def get_ipc(res_directory):
 def log_compression_stats(res_directory, result_filename, program_command, config_param, val):
     res = sniper_lib.get_results(resultsdir=res_directory)
     results = res['results']
+    config = res['config']
 
     # Compression
     bytes_saved = results['compression.bytes-saved'][0] if 'compression.bytes-saved' in results else 0
     if bytes_saved != 0:
         data_moves = results['dram.data-moves'][0]
-        sum_compression_ratio = results['compression.sum-compression-ratio'][0]
-        total_compression_latency = results['compression.total-compression-latency'][0]
-        total_decompression_latency = results['compression.total-decompression-latency'][0]
+        total_compression_latency = results['compression.total-compression-latency'][0] / 10**6 # convert to ns
+        total_decompression_latency = results['compression.total-decompression-latency'][0] / 10**6 # convert to ns
 
-        avg_compression_ratio = sum_compression_ratio / data_moves
+        gran_size = 64 if config['perf_model/dram/remote_use_cacheline_granularity'] == "true" else 4096
+        avg_compression_ratio = float((data_moves * gran_size)) / float(((data_moves * gran_size) - bytes_saved))
         avg_compression_latency = total_compression_latency / data_moves
         avg_decompression_latency = total_decompression_latency / data_moves
 
         f = open(result_filename, "a")
         f.write("Program Command: {}\n".format(program_command))
         f.write("Config Param: {}, Val: {}\n".format(config_param, val))
+        f.write("Data Moves: {}\n".format(data_moves))
+        f.write("Bytes Saved: {}\n".format(bytes_saved))
         f.write("Average Compression Ratio: {}\n".format(avg_compression_ratio))
         f.write("Average Compression Latency(ns): {}\n".format(avg_compression_latency))
         f.write("Average Decompression Latency(ns): {}\n\n".format(avg_decompression_latency))
@@ -134,33 +136,4 @@ def run_compression_queue_experiment(x_axis, x_axis_label, x_axis_config_param, 
     fig = graph.get_figure()
     fig.savefig(result_name)
 
-if __name__ == "__main__":
-    # Note: sniper is run in test/compression/{thread id}
-
-    # IPC vs Bandwidth
-    bandwidth_scalefactor = [4, 8, 16, 32]
-    x_axis_label = "Remote Bandwidth Scalefactor"
-    x_axis_config_param = "perf_model/dram/remote_mem_bw_scalefactor"
-    # program_command = "../../../test/crono/apps/sssp/sssp ../../../test/crono/inputs/bcsstk05.mtx 1"
-    # program_command = "../../../benchmarks/ligra/apps/BFS -s -rounds 1 ../../../benchmarks/ligra/inputs/rMat_1000000" # TODO: change me
-    result_name = "ipc_vs_bandwidth_scalefactor_bar"
-    # t1 = threading.Thread(target=run_compression_queue_experiment, args=(bandwidth_scalefactor, x_axis_label, x_axis_config_param, program_command, result_name))
-
-    # Darknet
-    program_command = "./darknet classifier predict cfg/imagenet1k.data cfg/darknet19.cfg tiny.weights data/dog.jpg" # TODO: change me
-    cwd = "../../benchmarks/darknet"
-    t1 = threading.Thread(target=run_compression_queue_experiment, args=(bandwidth_scalefactor, x_axis_label, x_axis_config_param, program_command, result_name, cwd))
-
-    # IPC vs Local DRAM Size
-    local_dram_size = [4194304, 8388608, 16777216, 33554432]
-    # local_dram_size = [4000, 8000, 16000, 32000]
-    x_axis_label = "Local DRAM Size(bytes)"
-    x_axis_config_param = "perf_model/dram/localdram_size"
-    program_command = "../../../test/crono/apps/sssp/sssp ../../../test/crono/inputs/bcsstk05.mtx 1"
-    # program_command = "../../../benchmarks/ligra/apps/BFS -s -rounds 1 ../../../benchmarks/ligra/inputs/rMat_1000000" # TODO: change me
-    result_name = "ipc_vs_local_dram_size_bar"
-    # t2 = threading.Thread(target=run_compression_queue_experiment, args=(local_dram_size, x_axis_label, x_axis_config_param, program_command, result_name))
-
-    t1.start()
-    # t2.start()
 
