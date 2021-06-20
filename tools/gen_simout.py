@@ -162,15 +162,18 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     total_decompression_latency = results['compression.total-decompression-latency'][0]
 
     gran_size = 64 if config['perf_model/dram/remote_use_cacheline_granularity'] == "true" else 4096
-    results['compression.avg-compression-ratio'] = float((data_moves * gran_size)) / float(((data_moves * gran_size) - bytes_saved))
-    results['compression.avg-compression-latency'] = total_compression_latency / data_moves
-    results['compression.avg-decompression-latency'] = total_decompression_latency / data_moves
+    results['compression.avg-compression-ratio'] = [float((data_moves * gran_size)) / float(((data_moves * gran_size) - bytes_saved))]
+    results['compression.avg-compression-latency'] = [total_compression_latency / data_moves]
+    results['compression.avg-decompression-latency'] = [total_decompression_latency / data_moves]
 
-    print("bytes_saved", bytes_saved)
-    print("data moves", data_moves)
-    print("avg compression ratio", results['compression.avg-compression-ratio'])
-    print("avg compression latency", results['compression.avg-compression-latency'])
-    print("avg decompression latency", results['compression.avg-decompression-latency'])
+    # print("bytes_saved", bytes_saved)
+    # print("data moves", data_moves)
+    # print("avg compression ratio", results['compression.avg-compression-ratio'])
+    # print("avg compression latency", results['compression.avg-compression-latency'])
+    # print("avg decompression latency", results['compression.avg-decompression-latency'])
+
+    # print("total compression latency", (results['compression.total-compression-latency'][0] / 10**6))
+    # print("avg compression latency", (results['compression.total-compression-latency'][0] / 10**6) / data_moves)
 
   template += [
     ('DRAM summary', '', ''),
@@ -202,9 +205,9 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
   if bytes_saved != 0:
     template += [
       ('  bytes saved', 'compression.bytes-saved', str),
-      # ('  avg compression ratio', 'compression.avg-compression-ratio', str), # TODO: why this crash?
-      # ('  avg compression latency(ns)', 'compression.avg-compression-latency', format_ns(2)),
-      # ('  avg decompression latency(ns)', 'compression.avg-decompression-latency', format_ns(2)),
+      ('  avg compression ratio', 'compression.avg-compression-ratio', str),
+      ('  avg compression latency(ns)', 'compression.avg-compression-latency', format_ns(2)),
+      ('  avg decompression latency(ns)', 'compression.avg-decompression-latency', format_ns(2)),
     ]
 
   if 'dram.total-read-queueing-delay' in results:

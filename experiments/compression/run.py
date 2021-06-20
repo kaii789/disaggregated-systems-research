@@ -53,8 +53,8 @@ def log_compression_stats(res_directory, result_filename, program_command, confi
     bytes_saved = results['compression.bytes-saved'][0] if 'compression.bytes-saved' in results else 0
     if bytes_saved != 0:
         data_moves = results['dram.data-moves'][0]
-        total_compression_latency = results['compression.total-compression-latency'][0]
-        total_decompression_latency = results['compression.total-decompression-latency'][0]
+        total_compression_latency = results['compression.total-compression-latency'][0] / 10**6 # convert to ns
+        total_decompression_latency = results['compression.total-decompression-latency'][0] / 10**6 # convert to ns
 
         gran_size = 64 if config['perf_model/dram/remote_use_cacheline_granularity'] == "true" else 4096
         avg_compression_ratio = float((data_moves * gran_size)) / float(((data_moves * gran_size) - bytes_saved))
