@@ -26,6 +26,14 @@ CompressionModelFPC::CompressionModelFPC(String name, UInt32 page_size, UInt32 c
     m_data_buffer = new char[m_page_size];
     m_compressed_data_buffer = new char[m_page_size + m_cacheline_count];
     m_compressed_cache_line_sizes = new UInt32[m_cacheline_count];
+
+    // Set compression/decompression cycle latencies if configured
+    UInt32 compression_latency_config = Sim()->getCfg()->getInt("perf_model/dram/compression_model/compression_latency");
+    UInt32 decompression_latency_config = Sim()->getCfg()->getInt("perf_model/dram/compression_model/decompression_latency");
+    if (compression_latency_config != -1)
+        m_compression_latency = compression_latency_config;
+    if (decompression_latency_config != -1)
+        m_decompression_latency = decompression_latency_config;
 }
 
 SubsecondTime

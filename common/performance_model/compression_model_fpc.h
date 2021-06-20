@@ -24,9 +24,9 @@ private:
     UInt32 *m_compressed_cache_line_sizes;
     UInt32 m_cacheline_count;
 
-    // Compression latency per cache line TODO: correct?
-    UInt32 m_compression_latency = 1;
-    // Decompression latency per cache line TODO: correct?
+    // Compression latency per cache line
+    UInt32 m_compression_latency = 3;
+    // Decompression latency per cache line
     UInt32 m_decompression_latency = 5;
 
     // FPC
