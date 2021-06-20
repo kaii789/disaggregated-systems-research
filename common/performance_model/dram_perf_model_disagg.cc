@@ -484,12 +484,12 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         move_page = true; 
     }
     // Cancel moving the page if the amount of reserved bufferspace in localdram for inflight + inflight_evicted pages is not enough to support an additional move
-    if((m_r_reserved_bufferspace > 0) && ((m_inflight_pages.size() + m_inflightevicted_pages.size())  >= (m_r_reserved_bufferspace/100)*m_localdram_size/m_page_size)) {
+    if(move_page && (m_r_reserved_bufferspace > 0) && ((m_inflight_pages.size() + m_inflightevicted_pages.size())  >= (m_r_reserved_bufferspace/100)*m_localdram_size/m_page_size)) {
         move_page = false;
         ++m_move_page_cancelled_bufferspace_full;
     }
     // Cancel moving the page if the queue used to move the page is already full
-    if(m_data_movement->isQueueFull(pkt_time)) {
+    if(move_page && m_data_movement->isQueueFull(pkt_time)) {
         move_page = false;
         ++m_move_page_cancelled_datamovement_queue_full;
     } 
