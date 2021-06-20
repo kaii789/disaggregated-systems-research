@@ -9,7 +9,7 @@
 class CompressionModelFPC : public CompressionModel
 {
 public:
-   CompressionModelFPC(String name, UInt32 page_size, UInt32 cache_line_size);
+   CompressionModelFPC(String name, UInt32 page_size, UInt32 cache_line_size, int compression_latency_config, int decompression_latency_config);
    ~CompressionModelFPC();
 
    SubsecondTime compress(IntPtr addr, size_t data_size, core_id_t core_id, UInt32 *compressed_page_size, UInt32 *compressed_cache_lines);
