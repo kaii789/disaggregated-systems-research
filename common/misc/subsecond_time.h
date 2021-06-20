@@ -416,6 +416,12 @@ public:
       m_bw_in_bits_per_us = bw_in_bits_per_ns * TimeConverter<float>::UStoNS(1); // bits_per_ns * num_ns_per_us = bits_per_us
    }
 
+   // Return bandwidth, in bits per us
+   uint64_t getBandwidthBitsPerUs() const
+   {
+      return m_bw_in_bits_per_us;
+   }
+
    // X bits * microseconds-per-cycle / bits/cycle = microseconds
    // Multiply by the time unit first to keep the integer result above zero
    SubsecondTime getLatency(uint64_t bits_transmitted) const

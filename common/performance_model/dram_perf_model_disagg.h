@@ -87,8 +87,8 @@ class DramPerfModelDisagg : public DramPerfModel
         std::vector<QueueModel*> m_rank_avail;
         std::vector<QueueModel*> m_bank_group_avail;
 
-        QueueModel* m_data_movement;
-        QueueModel* m_data_movement_2;
+        QueueModel* m_data_movement;        // Normally, this is the combined queue for pages and cachelines. When partitioned queues are enabled, this is the page queue
+        QueueModel* m_data_movement_2;      // When partitioned queues are enabled, this is the cacheline queue
 
         struct BankInfo
         {
@@ -137,6 +137,8 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_extra_pages;
         UInt64 m_redundant_moves;
         UInt64 m_max_bufferspace;
+        UInt64 m_move_page_cancelled_bufferspace_full;
+        UInt64 m_move_page_cancelled_datamovement_queue_full;
         std::map<UInt64, UInt32> m_page_usage_map;  // track number of times each phys page is accessed
         UInt64 m_unique_pages_accessed;             // track number of unique pages accessed
 
