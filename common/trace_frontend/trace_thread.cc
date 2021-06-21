@@ -27,11 +27,11 @@
 
 int TraceThread::m_isa = 0;
 
-TraceThread::TraceThread(Thread *thread, SubsecondTime time_start, String tracefile, String responsefile, app_id_t app_id, bool cleanup)
+TraceThread::TraceThread(Thread *thread, SubsecondTime time_start, String tracefile, String responsefile, String data_request_filename, String data_response_filename, app_id_t app_id, bool cleanup)
    : m__thread(NULL)
    , m_thread(thread)
    , m_time_start(time_start)
-   , m_trace(tracefile.c_str(), responsefile.c_str(), thread->getId())
+   , m_trace(tracefile.c_str(), responsefile.c_str(), data_request_filename.c_str(), data_response_filename.c_str(), thread->getId())
    , m_trace_has_pa(false)
    , m_address_randomization(Sim()->getCfg()->getBool("traceinput/address_randomization"))
    , m_appid_from_coreid(Sim()->getCfg()->getString("scheduler/type") == "sequential" ? true : false)
@@ -872,6 +872,45 @@ UInt64 TraceThread::getProgressExpect()
 UInt64 TraceThread::getProgressValue()
 {
    return m_trace.getPosition();
+}
+
+// Get Application Data
+void TraceThread::handleGetApplicationData(Core::lock_signal_t lock_signal, Core::mem_op_t mem_op_type, IntPtr d_addr, char* data_buffer, UInt32 data_size)
+{
+   Sift::MemoryLockType sift_lock_signal;
+   Sift::MemoryOpType sift_mem_op;
+
+   switch (lock_signal)
+   {
+      case (Core::NONE):
+         sift_lock_signal = Sift::MemNoLock;
+         break;
+      case (Core::LOCK):
+         sift_lock_signal = Sift::MemLock;
+         break;
+      case (Core::UNLOCK):
+         sift_lock_signal = Sift::MemUnlock;
+         break;
+      default:
+         sift_lock_signal = Sift::MemInvalidLock;
+         break;
+   }
+
+   switch (mem_op_type)
+   {
+      case (Core::READ):
+      case (Core::READ_EX):
+         sift_mem_op = Sift::MemRead;
+         break;
+      case (Core::WRITE):
+         sift_mem_op = Sift::MemWrite;
+         break;
+      default:
+         sift_mem_op = Sift::MemInvalidOp;
+         break;
+   }
+
+   m_trace.GetApplicationData(sift_lock_signal, sift_mem_op, d_addr, (uint8_t*)data_buffer, data_size);
 }
 
 void TraceThread::handleAccessMemory(Core::lock_signal_t lock_signal, Core::mem_op_t mem_op_type, IntPtr d_addr, char* data_buffer, UInt32 data_size)

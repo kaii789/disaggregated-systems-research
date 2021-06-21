@@ -81,6 +81,8 @@ namespace Sift
 
          char *m_filename;
          char *m_response_filename;
+         char *m_filename_data_request;
+         char *m_filename_data_response;
 
          uint64_t last_address;
          std::unordered_map<uint64_t, const uint8_t*> icache;
@@ -92,7 +94,7 @@ namespace Sift
          bool m_trace_has_pa;
          bool m_seen_end;
          const StaticInstruction *m_last_sinst;
-         
+
          int m_isa;
 
          bool initResponse();
@@ -102,12 +104,21 @@ namespace Sift
          void sendEmuResponse(bool handled, EmuReply res);
          void sendSimpleResponse(RecOtherType type, void *data = NULL, uint32_t size = 0);
 
+         // Get Application Data
+         vostream *data_server_request;
+         vistream *data_server_response;
+         bool initRequestDataServer();
+         bool initResponseDataServer();
+
       public:
-         Reader(const char *filename, const char *response_filename = "", uint32_t id = 0);
+         Reader(const char *filename, const char *response_filename = "", const char *data_request_filename = "", const char *data_response_filename = "", uint32_t id = 0);
          ~Reader();
          bool initStream();
          bool Read(Instruction&);
          bool AccessMemory(MemoryLockType lock_signal, MemoryOpType mem_op, uint64_t d_addr, uint8_t *data_buffer, uint32_t data_size);
+
+         // Get Application Data
+         bool GetApplicationData(MemoryLockType lock_signal, MemoryOpType mem_op, uint64_t d_addr, uint8_t *data_buffer, uint32_t data_size);
 
          void setHandleInstructionCountFunc(HandleInstructionCountFunc func, void* arg = NULL) { handleInstructionCountFunc = func; handleInstructionCountArg = arg; }
          void setHandleCacheOnlyFunc(HandleCacheOnlyFunc func, void* arg = NULL) { handleCacheOnlyFunc = func; handleCacheOnlyArg = arg; }

@@ -16,7 +16,7 @@
 #define VERBOSE_HEX 0
 #define VERBOSE_ICACHE 0
 
-Sift::Reader::Reader(const char *filename, const char *response_filename, uint32_t id)
+Sift::Reader::Reader(const char *filename, const char *response_filename, const char *data_request_filename, const char *data_response_filename, uint32_t id)
    : input(NULL)
    , response(NULL)
    , handleInstructionCountFunc(NULL)
@@ -39,7 +39,7 @@ Sift::Reader::Reader(const char *filename, const char *response_filename, uint32
    , handleEmuArg(NULL)
    , handleRoutineChangeFunc(NULL)
    , handleRoutineAnnounceFunc(NULL)
-   , handleRoutineArg(NULL)   
+   , handleRoutineArg(NULL)
    , filesize(0)
    , last_address(0)
    , icache()
@@ -51,6 +51,9 @@ Sift::Reader::Reader(const char *filename, const char *response_filename, uint32
 {
    m_filename = strdup(filename);
    m_response_filename = strdup(response_filename);
+   m_filename_data_request = strdup(data_request_filename);
+   m_filename_data_response =  strdup(data_response_filename);
+
 
    // initing stream here could cause deadlock when using pipes, as this should be able to be new()ed from
    // a thread that should not block
@@ -60,6 +63,8 @@ Sift::Reader::~Reader()
 {
    free(m_filename);
    free(m_response_filename);
+   free(m_filename_data_request);
+   free(m_filename_data_response);
    if (input)
       delete input;
    if (response)
@@ -542,6 +547,78 @@ bool Sift::Reader::Read(Instruction &inst)
 
    // We should not return false (no more instructions) unless we get the End packet.
    // Return true in case we get to this point (which we shouldn't).
+   return true;
+}
+
+// Get Application Data
+bool Sift::Reader::GetApplicationData(MemoryLockType lock_signal, MemoryOpType mem_op, uint64_t d_addr, uint8_t *data_buffer, uint32_t data_size)
+{
+   #if VERBOSE > 0
+   if (mem_op == MemWrite)
+      std::cerr << "[DEBUG:" << m_id << "] Write MemoryRequest - Write" << std::endl;
+   if (mem_op == MemWrite)
+      std::cerr << "[DEBUG:" << m_id << "] Write MemoryRequest - Read" << std::endl;
+   #endif
+
+   if (!initRequestDataServer()) {
+      return false;
+   }
+
+   if (!initResponseDataServer()) {
+      return false;
+   }
+
+   // Send data request
+   data_server_request->write(reinterpret_cast<char*>(&d_addr), sizeof(d_addr));
+   data_server_request->write(reinterpret_cast<char*>(&data_size), sizeof(data_size));
+   data_server_request->write(reinterpret_cast<char*>(&lock_signal), sizeof(lock_signal));
+   data_server_request->flush();
+
+   // Get data
+   uint64_t addr;
+   data_server_response->read(reinterpret_cast<char*>(&addr), sizeof(addr));
+   data_server_response->read(reinterpret_cast<char*>(data_buffer), data_size);
+
+   return true;
+}
+
+bool Sift::Reader::initRequestDataServer()
+{
+   if (!data_server_request)
+   {
+      if (strcmp(m_filename_data_request, "") == 0)
+      {
+         std::cerr << "[SIFT:" << m_id << "] Request filename not set\n";
+         return false;
+      }
+
+      data_server_request = new vofstream(m_filename_data_request, std::ios::out);
+
+      if ((!data_server_request->is_open()) || data_server_request->fail())
+      {
+         return false;
+      }
+   }
+   return true;
+}
+
+bool Sift::Reader::initResponseDataServer()
+{
+   if (!data_server_response)
+   {
+      if (strcmp(m_filename_data_response, "") == 0)
+      {
+         std::cerr << "[SIFT:" << m_id << "] Request filename not set\n";
+         return false;
+      }
+
+      data_server_response = new vifstream(m_filename_data_response, std::ios::in);
+
+      if (data_server_response->fail())
+      {
+         return false;
+      }
+   }
    return true;
 }
 

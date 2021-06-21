@@ -3,6 +3,7 @@
 
 #include "dram_perf_model.h"
 #include "queue_model.h"
+#include "compression_model.h"
 #include "fixed_types.h"
 #include "subsecond_time.h"
 #include "dram_cntlr_interface.h"
@@ -58,6 +59,7 @@ class DramPerfModelDisagg : public DramPerfModel
         const SubsecondTime m_refresh_length;           // tRFC
         const SubsecondTime m_r_added_latency; // Additional remote latency
         const UInt32 m_r_datamov_threshold; // Move data if greater than yy
+        const UInt32 m_cache_line_size;
         const UInt32 m_page_size; // Memory page size (in bytes) in disagg.cc (different from ddr page size)
         const UInt32 m_localdram_size; // Local DRAM size
         const bool m_enable_remote_mem; // Enable remote memory with the same DDR type as local for now
@@ -85,8 +87,8 @@ class DramPerfModelDisagg : public DramPerfModel
         std::vector<QueueModel*> m_rank_avail;
         std::vector<QueueModel*> m_bank_group_avail;
 
-        QueueModel* m_data_movement;
-        QueueModel* m_data_movement_2;
+        QueueModel* m_data_movement;        // Normally, this is the combined queue for pages and cachelines. When partitioned queues are enabled, this is the page queue
+        QueueModel* m_data_movement_2;      // When partitioned queues are enabled, this is the cacheline queue
 
         struct BankInfo
         {
@@ -110,6 +112,15 @@ class DramPerfModelDisagg : public DramPerfModel
         std::map<UInt64, UInt32> m_inflight_redundant; 
         std::map<UInt64, SubsecondTime> m_inflightevicted_pages; // Inflight pages that are being transferred from local memory to remote memory
 
+        // TODO: Compression
+        bool m_use_compression;
+        CompressionModel *m_compression_model;
+        UInt64 bytes_saved = 0;
+        SubsecondTime m_total_compression_latency = SubsecondTime::Zero();
+        SubsecondTime m_total_decompression_latency = SubsecondTime::Zero();
+        std::map<IntPtr, UInt32> address_to_compressed_size;
+        std::map<IntPtr, UInt32> address_to_num_cache_lines;
+
         // Variables to keep track of stats
         UInt64 m_dram_page_hits;
         UInt64 m_dram_page_empty;
@@ -123,14 +134,16 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_writeback_pages;
         UInt64 m_local_evictions;
         UInt64 m_extra_pages;
-        UInt64 m_redundant_moves;
+        UInt64 m_redundant_moves;                   // number of times both a cacheline and its containing page are requested together
         UInt64 m_redundant_moves_type1;
         UInt64 m_redundant_moves_type1_cache_slower_than_page;
         UInt64 m_redundant_moves_type2;
-        UInt64 m_max_bufferspace;
+        UInt64 m_cacheline_queue_request_cancelled; // number of times a cacheline queue request is cancelled (currently, due to m_r_limit_redundant_moves)
+        UInt64 m_max_bufferspace;                   // the maximum number of localdram pages actually used to back inflight and inflight_evicted pages 
+        UInt64 m_move_page_cancelled_bufferspace_full;         // the number of times moving a remote page to local was cancelled due to localdram bufferspace being full
+        UInt64 m_move_page_cancelled_datamovement_queue_full;  // the number of times moving a remote page to local was cancelled due to the queue for pages being full
         std::map<UInt64, UInt32> m_page_usage_map;  // track number of times each phys page is accessed
         UInt64 m_unique_pages_accessed;             // track number of unique pages accessed
-
         SubsecondTime m_redundant_moves_type1_time_savings;
         SubsecondTime m_redundant_moves_type2_time_savings;
 

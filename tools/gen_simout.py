@@ -154,6 +154,26 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
   if 'dram-datamovement-queue-2.num-requests' in results and sum(results['dram-datamovement-queue-2.num-requests']) > 0:
     results['dram.remotequeuemodel_datamovement2_avgdelay'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram-datamovement-queue-2.total-queue-delay'], results['dram-datamovement-queue-2.num-requests']))
 
+  # Compression
+  bytes_saved = results['compression.bytes-saved'][0] if 'compression.bytes-saved' in results else 0
+  if bytes_saved != 0:
+    data_moves = results['dram.page-moves'][0]
+    total_compression_latency = results['compression.total-compression-latency'][0]
+    total_decompression_latency = results['compression.total-decompression-latency'][0]
+
+    gran_size = 64 if config['perf_model/dram/remote_use_cacheline_granularity'] == "true" else 4096
+    results['compression.avg-compression-ratio'] = [float((data_moves * gran_size)) / float(((data_moves * gran_size) - bytes_saved))]
+    results['compression.avg-compression-latency'] = [total_compression_latency / data_moves]
+    results['compression.avg-decompression-latency'] = [total_decompression_latency / data_moves]
+
+    # print("bytes_saved", bytes_saved)
+    # print("data moves", data_moves)
+    # print("avg compression ratio", results['compression.avg-compression-ratio'])
+    # print("avg compression latency", results['compression.avg-compression-latency'])
+    # print("avg decompression latency", results['compression.avg-decompression-latency'])
+
+    # print("total compression latency", (results['compression.total-compression-latency'][0] / 10**6))
+    # print("avg compression latency", (results['compression.total-compression-latency'][0] / 10**6) / data_moves)
 
   template += [
     ('DRAM summary', '', ''),
@@ -182,7 +202,19 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     ('      num type1 cache slower than page', 'dram.redundant-moves-type1-cache-slower-than-page', str),
     ('    num redundant moves type2', 'dram.redundant-moves-type2', str),
     ('  max simultaneous # inflight pages (bufferspace)', 'dram.max-bufferspace', str),
+    ('  remote page move cancelled due to full bufferspace', 'dram.bufferspace-full-move-page-cancelled', str),
+    ('  remote page move cancelled due to full queue', 'dram.queue-full-move-page-cancelled', str),
   ]
+
+  # Compression
+  if bytes_saved != 0:
+    template += [
+      ('  bytes saved', 'compression.bytes-saved', str),
+      ('  avg compression ratio', 'compression.avg-compression-ratio', str),
+      ('  avg compression latency(ns)', 'compression.avg-compression-latency', format_ns(2)),
+      ('  avg decompression latency(ns)', 'compression.avg-decompression-latency', format_ns(2)),
+    ]
+
   if 'dram.total-read-queueing-delay' in results:
     results['dram.avgqueueread'] = map(lambda (a,b): a/(b or 1), zip(results['dram.total-read-queueing-delay'], results['dram.reads']))
     results['dram.avgqueuewrite'] = map(lambda (a,b): a/(b or 1), zip(results['dram.total-write-queueing-delay'], results['dram.writes']))
@@ -195,12 +227,34 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     results['dram.bandwidth'] = map(lambda a: 100*a/time0 if time0 else float('inf'), results['dram-queue.total-time-used'])
     template.append(('  average dram bandwidth utilization', 'dram.bandwidth', lambda v: '%.2f%%' % v))
 
-  # if 'dram.redundant-moves-type1-time-savings' in results:
+  if 'dram-datamovement-queue.max-effective-bandwidth-ps' in results and sum(results['dram-datamovement-queue.max-effective-bandwidth-ps']) > 0:
+    results['dram.remotequeuemodel_datamovement_max_effective_bandwidth'] = map(lambda (a,b): 1000*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue.max-effective-bandwidth-bytes'], results['dram-datamovement-queue.max-effective-bandwidth-ps']))
+  if 'dram-datamovement-queue-2.max-effective-bandwidth-ps' in results and sum(results['dram-datamovement-queue-2.max-effective-bandwidth-ps']) > 0:
+    results['dram.remotequeuemodel_datamovement2_max_effective_bandwidth'] = map(lambda (a,b): 1000*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue-2.max-effective-bandwidth-bytes'], results['dram-datamovement-queue-2.max-effective-bandwidth-ps']))
+
+  if 'dram-datamovement-queue.num-requests' in results and sum(results['dram-datamovement-queue.num-requests']) > 0:
+    results['dram.remotequeuemodel_datamovement_percent_capped_by_window_size'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue.num-requests-capped-by-window-size'], results['dram-datamovement-queue.num-requests']))
+    results['dram.remotequeuemodel_datamovement_percent_queue_full'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue.num-requests-queue-full'], results['dram-datamovement-queue.num-requests']))
+    results['dram.remotequeuemodel_datamovement_percent_capped_by_custom_cap'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue.num-requests-capped-by-custom-cap'], results['dram-datamovement-queue.num-requests']))
+  if 'dram-datamovement-queue-2.num-requests' in results and sum(results['dram-datamovement-queue-2.num-requests']) > 0:
+    results['dram.remotequeuemodel_datamovement2_percent_capped_by_window_size'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue-2.num-requests-capped-by-window-size'], results['dram-datamovement-queue-2.num-requests']))
+    results['dram.remotequeuemodel_datamovement2_percent_queue_full'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue-2.num-requests-queue-full'], results['dram-datamovement-queue-2.num-requests']))
+    results['dram.remotequeuemodel_datamovement2_percent_capped_by_custom_cap'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue-2.num-requests-capped-by-custom-cap'], results['dram-datamovement-queue-2.num-requests']))
+
+  # if 'dram.redundant-moves-temp1-time-savings' in results:
   template.extend([
       ('Experiment stats', '', ''),
       ('  PQ=1 type1 time savings (ns)', 'dram.redundant-moves-type1-time-savings', format_ns(2)),
       ('  PQ=1 type2 time savings (ns)', 'dram.redundant-moves-type2-time-savings', format_ns(2)),
       ('  num unique pages accessed', 'dram.unique-pages-accessed', str),
+      ('  remote datamovement max effective bandwidth (GB/s)', 'dram.remotequeuemodel_datamovement_max_effective_bandwidth', format_float(4)),
+      ('  remote datamovement2 max effective bandwidth (GB/s)', 'dram.remotequeuemodel_datamovement2_max_effective_bandwidth', format_float(4)),
+      ('  remote datamovement % capped by window size', 'dram.remotequeuemodel_datamovement_percent_capped_by_window_size', format_float(2)),
+      ('  remote datamovement % queue utilization full', 'dram.remotequeuemodel_datamovement_percent_queue_full', format_float(2)),
+      ('  remote datamovement % queue capped by custom cap', 'dram.remotequeuemodel_datamovement_percent_capped_by_custom_cap', format_float(2)),
+      ('  remote datamovement2 % capped by window size', 'dram.remotequeuemodel_datamovement2_percent_capped_by_window_size', format_float(2)),
+      ('  remote datamovement2 % queue utilization full', 'dram.remotequeuemodel_datamovement2_percent_queue_full', format_float(2)),
+      ('  remote datamovement2 % queue capped by custom cap', 'dram.remotequeuemodel_datamovement2_percent_capped_by_custom_cap', format_float(2)),
   ])
 
   if 'ddr.page-hits' in results:

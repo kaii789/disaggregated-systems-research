@@ -76,6 +76,9 @@ class TraceManager
       void endApplication(TraceThread *thread, SubsecondTime time);
       void accessMemory(int core_id, Core::lock_signal_t lock_signal, Core::mem_op_t mem_op_type, IntPtr d_addr, char* data_buffer, UInt32 data_size);
 
+      // Get Application Data
+      void getApplicationData(int core_id, Core::lock_signal_t lock_signal, Core::mem_op_t mem_op_type, IntPtr d_addr, char* data_buffer, UInt32 data_size);
+
       UInt64 getProgressExpect();
       UInt64 getProgressValue();
 };

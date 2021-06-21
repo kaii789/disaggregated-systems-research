@@ -70,8 +70,20 @@ void TraceManager::init()
 String TraceManager::getFifoName(app_id_t app_id, UInt64 thread_num, bool response, bool create)
 {
    String filename = m_trace_prefix + (response ? "_response" : "") + ".app" + itostr(app_id) + ".th" + itostr(thread_num) + ".sift";
-   if (create)
+   if (create)  {
+
       mkfifo(filename.c_str(), 0600);
+
+      if(response == true) {
+        String request_filename = m_trace_prefix + "_data_request_pipe.app" + itostr(app_id) + ".th" + itostr(thread_num);
+        mkfifo(request_filename.c_str(), 0600);
+      } else {
+        String response_filename = m_trace_prefix + "_data_response_pipe.app" + itostr(app_id) + ".th" + itostr(thread_num);
+        mkfifo(response_filename.c_str(), 0600);
+      }
+
+   }
+
    return filename;
 }
 
@@ -119,9 +131,13 @@ thread_id_t TraceManager::newThread(app_id_t app_id, bool first, bool init_fifo,
          responsefile = getFifoName(app_id, thread_num, true /*response*/, true /*create*/);
    }
 
+   // Get Application Data
+   String data_request_filename = m_trace_prefix + "_data_request_pipe.app" + itostr(app_id) + ".th" + itostr(thread_num);
+   String data_response_filename = m_trace_prefix +  "_data_response_pipe.app" + itostr(app_id) + ".th" + itostr(thread_num);
+
    m_num_threads_running++;
    Thread *thread = Sim()->getThreadManager()->createThread(app_id, creator_thread_id);
-   TraceThread *tthread = new TraceThread(thread, time, tracefile, responsefile, app_id, init_fifo /*cleaup*/);
+   TraceThread *tthread = new TraceThread(thread, time, tracefile, responsefile, data_request_filename, data_response_filename, app_id, init_fifo /*cleaup*/);
    m_threads.push_back(tthread);
 
    if (spawn)
@@ -306,6 +322,28 @@ UInt64 TraceManager::getProgressValue()
       }
    }
    return value;
+}
+
+// Get Application Data
+void TraceManager::getApplicationData(int core_id, Core::lock_signal_t lock_signal, Core::mem_op_t mem_op_type, IntPtr d_addr, char* data_buffer, UInt32 data_size) 
+{
+   for(std::vector<TraceThread *>::iterator it = m_threads.begin(); it != m_threads.end(); ++it)
+   {
+      TraceThread *tthread = *it;
+      assert(tthread != NULL);
+      if (tthread->getThread() && tthread->getThread()->getCore() && core_id == tthread->getThread()->getCore()->getId())
+      {
+         if (tthread->m_stopped)
+         {
+            // FIXME: should we try doing the memory access through another thread in the same application?
+            LOG_PRINT_WARNING_ONCE("accessMemory() called but thread already killed since application ended");
+            return;
+         }
+         tthread->handleGetApplicationData(lock_signal, mem_op_type, d_addr, data_buffer, data_size);
+         return;
+      }
+   }
+   LOG_PRINT_ERROR("Unable to find core %d", core_id);
 }
 
 // This should only be called when already holding the thread lock to prevent migrations while we scan for a core id match

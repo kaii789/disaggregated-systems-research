@@ -445,6 +445,16 @@ Core::initiateMemoryAccess(MemComponent::component_t mem_component,
    return makeMemoryResult(hit_where, shmem_time);
 }
 
+// Get Application Data
+MemoryResult
+Core::getApplicationData(lock_signal_t lock_signal, mem_op_t mem_op_type, IntPtr d_addr, char* data_buffer, UInt32 data_size, MemModeled modeled, IntPtr eip, SubsecondTime now, bool is_fault_mask)
+{
+    // Copy data from real memory using PINTOOL
+    Sim()->getTraceManager()->getApplicationData(m_core_id, lock_signal, mem_op_type, d_addr, data_buffer, data_size);
+
+    return makeMemoryResult(HitWhere::UNKNOWN, SubsecondTime::Zero());
+}
+
 // FIXME: This should actually be 'accessDataMemory()'
 /*
  * accessMemory (lock_signal_t lock_signal, mem_op_t mem_op_type, IntPtr d_addr, char* data_buffer, UInt32 data_size)
