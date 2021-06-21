@@ -157,7 +157,7 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
   # Compression
   bytes_saved = results['compression.bytes-saved'][0] if 'compression.bytes-saved' in results else 0
   if bytes_saved != 0:
-    data_moves = results['dram.data-moves'][0]
+    data_moves = results['dram.page-moves'][0]
     total_compression_latency = results['compression.total-compression-latency'][0]
     total_decompression_latency = results['compression.total-decompression-latency'][0]
 
@@ -191,13 +191,16 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     ('    remote dram avg access latency (ns)', 'dram.remoteavglatency', format_ns(2)),
     ('      remote datamovement queue model avg access latency (ns)', 'dram.remotequeuemodel_datamovement_avgdelay', format_ns(2)),
     ('      remote datamovement2 queue model avg access latency (ns)', 'dram.remotequeuemodel_datamovement2_avgdelay', format_ns(2)),
-    ('  num data moves', 'dram.data-moves', str),
+    ('  num page moves', 'dram.page-moves', str),
     ('  num page prefetches', 'dram.page-prefetches', str),
     ('  num inflight hits', 'dram.inflight-hits', str),
     ('  num writeback pages', 'dram.writeback-pages', str),
     ('  num local evictions', 'dram.local-evictions', str),
     ('  num pages disturbed by extra traffic', 'dram.extra-traffic', str),
-    ('  num redundant moves', 'dram.redundant-moves', str),
+    ('  num redundant moves total', 'dram.redundant-moves', str),
+    ('    num redundant moves type1', 'dram.redundant-moves-type1', str),
+    ('      num type1 cache slower than page', 'dram.redundant-moves-type1-cache-slower-than-page', str),
+    ('    num redundant moves type2', 'dram.redundant-moves-type2', str),
     ('  max simultaneous # inflight pages (bufferspace)', 'dram.max-bufferspace', str),
     ('  remote page move cancelled due to full bufferspace', 'dram.bufferspace-full-move-page-cancelled', str),
     ('  remote page move cancelled due to full queue', 'dram.queue-full-move-page-cancelled', str),
@@ -241,6 +244,8 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
   # if 'dram.redundant-moves-temp1-time-savings' in results:
   template.extend([
       ('Experiment stats', '', ''),
+      ('  PQ=1 type1 time savings (ns)', 'dram.redundant-moves-type1-time-savings', format_ns(2)),
+      ('  PQ=1 type2 time savings (ns)', 'dram.redundant-moves-type2-time-savings', format_ns(2)),
       ('  num unique pages accessed', 'dram.unique-pages-accessed', str),
       ('  remote datamovement max effective bandwidth (GB/s)', 'dram.remotequeuemodel_datamovement_max_effective_bandwidth', format_float(4)),
       ('  remote datamovement2 max effective bandwidth (GB/s)', 'dram.remotequeuemodel_datamovement2_max_effective_bandwidth', format_float(4)),

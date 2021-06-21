@@ -17,5 +17,6 @@ viz/
 !Makefile
 
 mem_test
+mem_test_varied
 *.png
 *.jpg
