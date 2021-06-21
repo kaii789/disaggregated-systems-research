@@ -133,6 +133,6 @@ SubsecondTime
 CompressionModelFPC::decompress(IntPtr addr, UInt32 compressed_cache_lines, core_id_t core_id)
 {
     Core *core = Sim()->getCoreManager()->getCoreFromID(core_id);
-    ComponentLatency decompress_latency(ComponentLatency(core->getDvfsDomain(), m_cacheline_count * m_decompression_latency));
+    ComponentLatency decompress_latency(ComponentLatency(core->getDvfsDomain(), compressed_cache_lines * m_decompression_latency));
     return decompress_latency.getLatency();
 }
