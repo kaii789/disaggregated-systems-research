@@ -1,10 +1,12 @@
 # Python 3
+from __future__ import annotations
 import sys
 import os
 import stat
 import time
 import traceback
 import datetime
+import copy
 import getopt
 import shutil
 import subprocess
@@ -14,7 +16,7 @@ import typing
 from typing import Dict, List, Iterable, Optional, TextIO, Union, TypeVar
 
 # import plot_graph
-import plot_graph_pq
+# import plot_graph_pq
 
 PathLike = TypeVar("PathLike", str, bytes, os.PathLike)  # Type for file/directory paths
 
@@ -46,6 +48,13 @@ class ConfigEntry:
         if category[0] == "[" and category[-1] == "]":
             self.category = category[1:-1]  # Strip enclosing square brackets
 
+    def __copy__(self) -> ConfigEntry:
+        return self.__deepcopy__(memo={})  # Deep copy is the same in this case
+
+    def __deepcopy__(self, memo) -> ConfigEntry:
+        # No recursive data structures, so we can ignore  the memo argument
+        return ConfigEntry(self.category, self.name, self.value)
+
 
 class ExperimentRunConfig:
     """A collection of additional configs to specify for a particular
@@ -57,13 +66,18 @@ class ExperimentRunConfig:
         self.add_config_entries(config_entries)
 
     def add_config_entry(self, config_entry: ConfigEntry):
-        """Add a ConfigEntry to this collection. config_entry should not be a
-        duplicate, ie have the same category and name as a ConfigEntry that is
-        already in this collection.
+        """Add a ConfigEntry to this collection. config_entry should not
+        conflict with existing entries in the ExperimentRunConfig, ie it
+        should not have the same category and name yet have a different value
+        than a ConfigEntry that is already in this collection.
         """
         if config_entry.category not in self.config_tree:
             self.config_tree[config_entry.category] = {}
-        if config_entry.name in self.config_tree[config_entry.category]:
+        if (
+            config_entry.name in self.config_tree[config_entry.category]
+            and config_entry.value
+            == self.config_tree[config_entry.category][config_entry.name]
+        ):
             raise ValueError(
                 "Attempted to add duplicate config entry: attempted to assign config {}/{} with value {} when it already had value {}".format(
                     config_entry.category,
@@ -76,8 +90,10 @@ class ExperimentRunConfig:
 
     def add_config_entries(self, config_entries: Iterable[ConfigEntry]) -> None:
         """Add the specified ConfigEntry's to this collection. None of the entries
-        should be duplicates, ie none should have the same category and name as a
-        ConfigEntry in config_entries or already in this collection.
+        should conflict with each other or existing entries in the
+        ExperimentRunConfig, ie none should have the same category and name yet
+        have a different value than a ConfigEntry in config_entries or one already
+        in this collection.
         """
         for config_entry in config_entries:
             self.add_config_entry(config_entry)
@@ -97,6 +113,17 @@ class ExperimentRunConfig:
             )
             lines.append("")
         return "\n".join(lines)
+
+    def __copy__(self) -> ExperimentRunConfig:
+        return self.__deepcopy__(memo={})  # Want deep copy behaviour in this case
+
+    def __deepcopy__(self, memo) -> ExperimentRunConfig:
+        # Referenced from https://stackoverflow.com/a/15774013
+        result = self.__class__.__new__(self.__class__)
+        memo[id(self)] = result
+        for key, value in self.__dict__.items():
+            setattr(result, key, copy.deepcopy(value, memo))
+        return result
 
 
 class ExperimentRun:
@@ -292,12 +319,12 @@ class Experiment:
                 )
             )
 
-            # Provide extra context to console output
-            print("Experiment {}:".format(self.experiment_name))
-            # Custom graph plotting function
-            plot_graph_pq.run_from_experiment(
-                self._experiment_output_dir_abspath, log_file
-            )
+            # # Provide extra context to console output
+            # print("Experiment {}:".format(self.experiment_name))
+            # # Custom graph plotting function
+            # plot_graph_pq.run_from_experiment(
+            #     self._experiment_output_dir_abspath, log_file
+            # )
 
     ### The following are older versions of methods used to run experiments
     def run_and_graph(self):
@@ -609,16 +636,23 @@ class ExperimentManager:
                             process_info[index].log_file = None
 
                             # Create backup of temp folder; we should have cwd of self.output_directory_abspath
+                            # Note: this doesn't work now, since some experiment runs could be run in the same process
+                            # and have the same temp folder name, which causes shutil.copytree() to fail
                             time.sleep(5)  # give a bit of time for things to settle in
-                            shutil.copytree(
-                                process_info[index].temp_dir,
-                                os.path.join(
-                                    process_info[
-                                        index
-                                    ].experiment_run.experiment_output_directory,
-                                    "process_{}_temp_copy".format(index),
-                                ),
-                            )
+                            # try:
+                            #     shutil.copytree(
+                            #         process_info[index].temp_dir,
+                            #         os.path.join(
+                            #             process_info[
+                            #                 index
+                            #             ].experiment_run.experiment_output_directory,
+                            #             "process_{}_temp_copy".format(index),
+                            #         ),
+                            #     )
+                            # except Exception as e:
+                            #     # Print exception details but don't let this copying crash the entire ExperimentManager
+                            #     traceback.print_exc()
+                            #     traceback.print_exc(file=self.log_file)
 
                 # Process experiments that have all runs completed
                 i = 0
@@ -697,10 +731,13 @@ if __name__ == "__main__":
     command_str1b = "{sniper_root}/run-sniper -d {{sniper_output_dir}} -n 1 -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg --roi -- {sniper_root}/test/a_disagg_test/mem_test_varied".format(
         sniper_root=subfolder_sniper_root_relpath
     )
-    command_str2a = "{sniper_root}/run-sniper -d {{sniper_output_dir}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg -- {sniper_root}/test/crono/apps/sssp/sssp {sniper_root}/test/crono/inputs/bcsstk05.mtx 1".format(
+    command_str2a_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/test/crono/apps/sssp/sssp {sniper_root}/test/crono/inputs/bcsstk05.mtx 1".format(
         sniper_root=subfolder_sniper_root_relpath
     )
-    command_str2b = "{sniper_root}/run-sniper -d {{sniper_output_dir}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg -- {sniper_root}/test/crono/apps/sssp/sssp {sniper_root}/test/crono/inputs/bcsstk25.mtx 1".format(
+    command_str2b_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/test/crono/apps/sssp/sssp {sniper_root}/test/crono/inputs/bcsstk25.mtx 1".format(
+        sniper_root=subfolder_sniper_root_relpath
+    )
+    command_str2c_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/test/crono/apps/sssp/sssp {sniper_root}/test/crono/inputs/bcsstk32.mtx 1".format(
         sniper_root=subfolder_sniper_root_relpath
     )
 
@@ -750,17 +787,17 @@ if __name__ == "__main__":
         "-s stop-by-icount:{}".format(100 * ONE_MILLION),
     )
 
-    # 16 MB for ligra_bfs + rMat_1000000
-    command_strs["ligra_bfs_localdram_16MB"] = ligra_base_str_options.format(
+    # 8 MB for ligra_bfs + rMat_1000000
+    command_strs["ligra_bfs_localdram_8MB"] = ligra_base_str_options.format(
         "BFS",
         ligra_input_to_file["regular_input"],
-        "-g perf_model/dram/localdram_size={}".format(16 * ONE_MB_TO_BYTES),
+        "-g perf_model/dram/localdram_size={}".format(int(8 * ONE_MB_TO_BYTES)),
     )
     # 1 MB for ligra_bfs + rMat_100000
     command_strs["ligra_bfs_small_input_localdram_1MB"] = ligra_base_str_options.format(
         "BFS",
         ligra_input_to_file["small_input"],
-        "-g perf_model/dram/localdram_size={}".format(1 * ONE_MB_TO_BYTES),
+        "-g perf_model/dram/localdram_size={}".format(int(1 * ONE_MB_TO_BYTES)),
     )
 
     partition_queue_series_experiment_run_configs = [
@@ -823,17 +860,292 @@ if __name__ == "__main__":
         ),
     ]
 
+    bandwidth_verification_configs = [
+        # 1) test_bandwidth = 0, pq = 0
+        ExperimentRunConfig(
+            [
+                ConfigEntry("perf_model/dram", "test_bandwidth", "0"),
+                ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+            ]
+        ),
+        # 2) test_bandwidth = 2, pq = 0
+        ExperimentRunConfig(
+            [
+                ConfigEntry("perf_model/dram", "test_bandwidth", "2"),
+                ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+            ]
+        ),
+        # 3) test_bandwidth = 0, pq = 1
+        ExperimentRunConfig(
+            [
+                ConfigEntry("perf_model/dram", "test_bandwidth", "0"),
+                ConfigEntry("perf_model/dram", "remote_partitioned_queues", "1"),
+                ConfigEntry(
+                    "perf_model/dram", "remote_cacheline_queue_fraction", "0.5"
+                ),
+            ]
+        ),
+        # 4) test_bandwidth = 2, pq = 1
+        ExperimentRunConfig(
+            [
+                ConfigEntry("perf_model/dram", "test_bandwidth", "2"),
+                ConfigEntry("perf_model/dram", "remote_partitioned_queues", "1"),
+                ConfigEntry(
+                    "perf_model/dram", "remote_cacheline_queue_fraction", "0.5"
+                ),
+            ]
+        ),
+    ]
+
+    queue_delay_cap_configs_base = [
+        # 1) test_bandwidth = 0, default
+        ExperimentRunConfig(
+            [
+                ConfigEntry("queue_model/windowed_mg1_remote", "window_size", "10000"),
+                ConfigEntry(
+                    "queue_model/windowed_mg1_remote", "queue_delay_cap", "10000"
+                ),
+                ConfigEntry(
+                    "queue_model/windowed_mg1_remote",
+                    "use_separate_queue_delay_cap",
+                    "false",
+                ),
+            ]
+        ),
+        # 2) test_bandwidth = 0, window_size 10x larger (adjust queue_delay_cap too)
+        ExperimentRunConfig(
+            [
+                ConfigEntry("queue_model/windowed_mg1_remote", "window_size", "100000"),
+                ConfigEntry(
+                    "queue_model/windowed_mg1_remote", "queue_delay_cap", "100000"
+                ),
+                ConfigEntry(
+                    "queue_model/windowed_mg1_remote",
+                    "use_separate_queue_delay_cap",
+                    "false",
+                ),
+            ]
+        ),
+        # 3) test_bandwidth = 0, window_size 100x larger (adjust queue_delay_cap too)
+        ExperimentRunConfig(
+            [
+                ConfigEntry(
+                    "queue_model/windowed_mg1_remote", "window_size", "1000000"
+                ),
+                ConfigEntry(
+                    "queue_model/windowed_mg1_remote", "queue_delay_cap", "1000000"
+                ),
+                ConfigEntry(
+                    "queue_model/windowed_mg1_remote",
+                    "use_separate_queue_delay_cap",
+                    "false",
+                ),
+            ]
+        ),
+        # 4) test_bandwidth = 0, window_size 1000x larger (adjust queue_delay_cap too)
+        ExperimentRunConfig(
+            [
+                ConfigEntry(
+                    "queue_model/windowed_mg1_remote", "window_size", "10000000"
+                ),
+                ConfigEntry(
+                    "queue_model/windowed_mg1_remote", "queue_delay_cap", "10000000"
+                ),
+                ConfigEntry(
+                    "queue_model/windowed_mg1_remote",
+                    "use_separate_queue_delay_cap",
+                    "false",
+                ),
+            ]
+        ),
+        # 5) test_bandwidth = 0, window_size 10000x larger (adjust queue_delay_cap too)
+        ExperimentRunConfig(
+            [
+                ConfigEntry(
+                    "queue_model/windowed_mg1_remote", "window_size", "100000000"
+                ),
+                ConfigEntry(
+                    "queue_model/windowed_mg1_remote", "queue_delay_cap", "100000000"
+                ),
+                ConfigEntry(
+                    "queue_model/windowed_mg1_remote",
+                    "use_separate_queue_delay_cap",
+                    "false",
+                ),
+            ]
+        ),
+        # 6) test_bandwidth = 0, window_size orig, queue_delay_cap 10x larger
+        ExperimentRunConfig(
+            [
+                ConfigEntry("queue_model/windowed_mg1_remote", "window_size", "10000"),
+                ConfigEntry(
+                    "queue_model/windowed_mg1_remote", "queue_delay_cap", "100000"
+                ),
+                ConfigEntry(
+                    "queue_model/windowed_mg1_remote",
+                    "use_separate_queue_delay_cap",
+                    "true",
+                ),
+            ]
+        ),
+        # 7) test_bandwidth = 0, window_size orig, queue_delay_cap 100x larger
+        ExperimentRunConfig(
+            [
+                ConfigEntry("queue_model/windowed_mg1_remote", "window_size", "10000"),
+                ConfigEntry(
+                    "queue_model/windowed_mg1_remote", "queue_delay_cap", "1000000"
+                ),
+                ConfigEntry(
+                    "queue_model/windowed_mg1_remote",
+                    "use_separate_queue_delay_cap",
+                    "true",
+                ),
+            ]
+        ),
+        # 8) test_bandwidth = 0,window_size orig, queue_delay_cap 1000x larger
+        ExperimentRunConfig(
+            [
+                ConfigEntry("queue_model/windowed_mg1_remote", "window_size", "10000"),
+                ConfigEntry(
+                    "queue_model/windowed_mg1_remote", "queue_delay_cap", "10000000"
+                ),
+                ConfigEntry(
+                    "queue_model/windowed_mg1_remote",
+                    "use_separate_queue_delay_cap",
+                    "true",
+                ),
+            ]
+        ),
+        # 9) test_bandwidth = 0,window_size 10x, queue_delay_cap 100x larger
+        ExperimentRunConfig(
+            [
+                ConfigEntry("queue_model/windowed_mg1_remote", "window_size", "100000"),
+                ConfigEntry(
+                    "queue_model/windowed_mg1_remote", "queue_delay_cap", "1000000"
+                ),
+                ConfigEntry(
+                    "queue_model/windowed_mg1_remote",
+                    "use_separate_queue_delay_cap",
+                    "true",
+                ),
+            ]
+        ),
+        # 10) test_bandwidth = 0,window_size 10x, queue_delay_cap 1000x larger
+        ExperimentRunConfig(
+            [
+                ConfigEntry("queue_model/windowed_mg1_remote", "window_size", "100000"),
+                ConfigEntry(
+                    "queue_model/windowed_mg1_remote", "queue_delay_cap", "10000000"
+                ),
+                ConfigEntry(
+                    "queue_model/windowed_mg1_remote",
+                    "use_separate_queue_delay_cap",
+                    "true",
+                ),
+            ]
+        ),
+    ]
+
+    # Alternate with pq0 then pq1, etc
+    queue_delay_cap_configs = []
+    for base_run_config in queue_delay_cap_configs_base:
+        pq0_version = copy.deepcopy(base_run_config)
+        pq0_version.add_config_entry(ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"))
+        queue_delay_cap_configs.append(pq0_version)
+        pq1_version = copy.deepcopy(base_run_config)
+        pq1_version.add_config_entry(ConfigEntry("perf_model/dram", "remote_partitioned_queues", "1"))
+        queue_delay_cap_configs.append(pq1_version)
+
+
     experiments = []
 
-    experiments.append(
-            Experiment(
-                experiment_name="test".format(
+    bcsstk32_experiments = []
+    for num_B in [65536, 131072]:
+        for bw_scalefactor in [4, 8, 32]:
+            localdram_size_str = "{}B".format(num_B)
+            command_str = command_str2c_base_options.format(
+                sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={}".format(
+                    num_B, 120, bw_scalefactor
                 ),
-                command_str=command_str2a,
-                experiment_run_configs=partition_queue_series_experiment_run_configs,
-                output_root_directory=".",
             )
-        )
+
+            bcsstk32_experiments.append(
+                Experiment(
+                    experiment_name="bcsstk25_localdram_{}_bw_scalefactor_{}_verification_series".format(
+                        localdram_size_str, bw_scalefactor
+                    ),
+                    command_str=command_str,
+                    experiment_run_configs=queue_delay_cap_configs,
+                    output_root_directory=".",
+                )
+            )
+
+    # BFS, 8, 16 MB
+    bfs_bw_experiments = []
+    ligra_input_selection = "regular_input"  # "regular_input" OR "small_input"
+    ligra_input_file = ligra_input_to_file[ligra_input_selection]
+    application_name = "BFS"
+    for num_MB in [8, 16]:
+        for bw_scalefactor in [4, 8, 32]:
+            localdram_size_str = "{}MB".format(num_MB)
+            command_str = ligra_base_str_options.format(
+                application_name,
+                ligra_input_file,
+                "-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={}".format(
+                    int(num_MB * ONE_MB_TO_BYTES), 120, bw_scalefactor
+                ),
+            )
+
+            bfs_bw_experiments.append(
+                Experiment(
+                    experiment_name="ligra_{}_{}localdram_{}_netlat_120_bw_scalefactor_{}_verification_series".format(
+                        application_name.lower(),
+                        ""
+                        if ligra_input_selection == "regular_input"
+                        else ligra_input_selection + "_",
+                        localdram_size_str,
+                        bw_scalefactor,
+                    ),
+                    command_str=command_str,
+                    experiment_run_configs=queue_delay_cap_configs,
+                    output_root_directory=".",
+                )
+            )
+
+    # bfs_small_bw_experiments = []
+    # ligra_input_selection = "small_input"  # "regular_input" OR "small_input"
+    # ligra_input_file = ligra_input_to_file[ligra_input_selection]
+    # application_name = "BFS"
+    # for num_MB in [0.5, 1]:
+    #     for bw_scalefactor in [4, 8, 32]:
+    #         localdram_size_str = "{}MB".format(num_MB)
+    #         command_str = ligra_base_str_options.format(
+    #             application_name,
+    #             ligra_input_file,
+    #             "-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={}".format(
+    #                 int(num_MB * ONE_MB_TO_BYTES), 120, bw_scalefactor
+    #             ),
+    #         )
+
+    #         bfs_small_bw_experiments.append(
+    #             Experiment(
+    #                 experiment_name="ligra_{}_{}localdram_{}_netlat_120_bw_scalefactor_{}_verification_series".format(
+    #                     application_name.lower(),
+    #                     ""
+    #                     if ligra_input_selection == "regular_input"
+    #                     else ligra_input_selection + "_",
+    #                     localdram_size_str,
+    #                     bw_scalefactor
+    #                 ),
+    #                 command_str=command_str,
+    #                 experiment_run_configs=bandwidth_verification_configs,
+    #                 output_root_directory=".",
+    #             )
+    #         )
+
+    experiments.extend(bcsstk32_experiments)
+    experiments.extend(bfs_bw_experiments)
+    # experiments.extend(bfs_small_bw_experiments)
 
     # Partition queue series, 6 runs per series
     # Darknet tiny, partition queue series, net_lat = 120 (default)
@@ -845,7 +1157,7 @@ if __name__ == "__main__":
         command_str = darknet_base_str_options.format(
             model_type,
             "-g perf_model/dram/localdram_size={} -s stop-by-icount:{}".format(
-                num_MB * ONE_MB_TO_BYTES, 1000 * ONE_MILLION
+                int(num_MB * ONE_MB_TO_BYTES), int(1000 * ONE_MILLION)
             ),
         )
         # 1 billion instructions cap
@@ -872,7 +1184,9 @@ if __name__ == "__main__":
         command_str = ligra_base_str_options.format(
             application_name,
             ligra_input_file,
-            "-g perf_model/dram/localdram_size={}".format(num_MB * ONE_MB_TO_BYTES),
+            "-g perf_model/dram/localdram_size={}".format(
+                int(num_MB * ONE_MB_TO_BYTES)
+            ),
         )
 
         bfs_small_pq_experiments.append(
@@ -900,7 +1214,9 @@ if __name__ == "__main__":
         command_str = ligra_base_str_options.format(
             application_name,
             ligra_input_file,
-            "-g perf_model/dram/localdram_size={}".format(num_MB * ONE_MB_TO_BYTES),
+            "-g perf_model/dram/localdram_size={}".format(
+                int(num_MB * ONE_MB_TO_BYTES)
+            ),
         )
 
         bfs_small_cacheline_ratio_experiments.append(
@@ -932,7 +1248,7 @@ if __name__ == "__main__":
             application_name,
             ligra_input_file,
             "-g perf_model/dram/localdram_size={} -s stop-by-icount:{}".format(
-                num_MB * ONE_MB_TO_BYTES, 1000 * ONE_MILLION
+                int(num_MB * ONE_MB_TO_BYTES), int(1000 * ONE_MILLION)
             ),
         )
         # BFS only has 220M instructions, so won't be limited by the 1 billion instructions cap
@@ -963,7 +1279,7 @@ if __name__ == "__main__":
             application_name,
             ligra_input_file,
             "-g perf_model/dram/localdram_size={} -s stop-by-icount:{}".format(
-                num_MB * ONE_MB_TO_BYTES, 1000 * ONE_MILLION
+                int(num_MB * ONE_MB_TO_BYTES), int(1000 * ONE_MILLION)
             ),
         )
         # Cap Pagerank at 1 Billion instructions
@@ -1130,7 +1446,7 @@ if __name__ == "__main__":
         #         traceback.print_exc(file=log_file)
 
         experiment_manager = ExperimentManager(
-            output_root_directory=".", max_concurrent_processes=6, log_file=log_file
+            output_root_directory=".", max_concurrent_processes=15, log_file=log_file
         )
         experiment_manager.add_experiments(experiments)
         experiment_manager.start()
