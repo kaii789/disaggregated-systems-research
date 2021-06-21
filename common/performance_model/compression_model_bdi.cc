@@ -170,25 +170,6 @@ void
 CompressionModelBDI::repeatedValues(void* in, m_compress_info *res, void* out)
 {
     //  Repeated value compression checks if a cache line has the same 1/2/4/8 byte value repeated. If so, it compresses the cache line to the corresponding value
-    /*
-    //  FIXME cgiannoula - now it only works with 8-byte granularity
-    SInt64 base;
-    UInt32 i;
-    base = ((SInt64*)in)[0];
-    for (i=1; i < (m_cache_line_size / 8); i++) 
-        if ((base - ((SInt64*)in)[i]) !=0)
-            break;
-    
-    if (i == m_cache_line_size) {
-        res->is_compressible = true;
-        res->compressed_size = 8;
-        writeWord(out, 0, base, 8);
-    } else {
-        res->is_compressible = false;
-        res->compressed_size = m_cache_line_size;
-    }
-    */
-
     SInt64 base;
     bool repeated;
     UInt32 i;
