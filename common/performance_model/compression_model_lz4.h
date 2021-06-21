@@ -1,13 +1,13 @@
-#ifndef __COMPRESSION_MODEL_FPC_H__
-#define __COMPRESSION_MODEL_FPC_H__
+#ifndef __COMPRESSION_MODEL_LZ4_H__
+#define __COMPRESSION_MODEL_LZ4_H__
 
 #include "compression_model.h"
 
-class CompressionModelFPC : public CompressionModel
+class CompressionModelLZ4 : public CompressionModel
 {
 public:
-   CompressionModelFPC(String name, UInt32 page_size, UInt32 cache_line_size, int compression_latency_config, int decompression_latency_config);
-   ~CompressionModelFPC();
+   CompressionModelLZ4(String name, UInt32 page_size, UInt32 cache_line_size, int compression_latency_config, int decompression_latency_config);
+   ~CompressionModelLZ4();
 
    SubsecondTime compress(IntPtr addr, size_t data_size, core_id_t core_id, UInt32 *compressed_page_size, UInt32 *compressed_cache_lines);
    SubsecondTime decompress(IntPtr addr, UInt32 compressed_cache_lines, core_id_t core_id);
@@ -18,7 +18,7 @@ private:
     UInt32 m_cache_line_size;
     char *m_data_buffer;
     char *m_compressed_data_buffer;
-    UInt32 *m_compressed_cache_line_sizes;
+    // UInt32 *m_compressed_cache_line_sizes;
     UInt32 m_cacheline_count;
 
     // Compression latency per cache line
@@ -26,13 +26,9 @@ private:
     // Decompression latency per cache line
     UInt32 m_decompression_latency = 5;
 
-    // FPC
-    static const UInt32 mask[6];
-    static const UInt32 neg_check[6];
-
-    UInt32 compressCacheLine(void *in, void *out);
-    UInt32 decompressCacheLine(void *in, void *out);
+    // UInt32 compressCacheLine(void *in, void *out);
+    // UInt32 decompressCacheLine(void *in, void *out);
 
 };
 
-#endif /* __COMPRESSION_MODEL_FPC_H__ */
+#endif /* __COMPRESSION_MODEL_LZ4_H__ */
