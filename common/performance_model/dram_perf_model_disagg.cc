@@ -88,11 +88,13 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_local_evictions     (0)
     , m_extra_pages         (0)
     , m_redundant_moves     (0)
+    , m_cacheline_queue_request_cancelled(0)
     , m_max_bufferspace     (0)
     , m_move_page_cancelled_bufferspace_full(0)
     , m_move_page_cancelled_datamovement_queue_full(0)
     , m_unique_pages_accessed      (0)
     , m_total_queueing_delay(SubsecondTime::Zero())
+    , m_total_access_latency(SubsecondTime::Zero())
     , m_total_local_access_latency(SubsecondTime::Zero())
     , m_total_remote_access_latency(SubsecondTime::Zero())
 {
@@ -169,7 +171,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     if(m_randomize_address)
         LOG_ASSERT_ERROR(m_num_bank_groups == 4 || m_num_bank_groups == 8, "Number of bank groups incorrect for address randomization!");
     // Probably m_page_size needs to be < or <= 2^32 bytes
-    LOG_ASSERT_ERROR(m_page_size > 0 && isPower2(m_page_size), "page_size must be a positive power of 2");
+    LOG_ASSERT_ERROR(m_page_size > 0 && isPower2(m_page_size) && floorLog2(m_page_size) >= floorLog2(m_cache_line_size), "page_size must be a positive power of 2 (and page_size must be larger than the cacheline size)");
 
     registerStatsMetric("ddr", core_id, "page-hits", &m_dram_page_hits);
     registerStatsMetric("ddr", core_id, "page-empty", &m_dram_page_empty);
@@ -560,8 +562,10 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
 
     //std::cout << "Remote Latency: " << t_now - pkt_time << std::endl;
     possiblyPrefetch(phys_page, t_now, requester);
-    m_total_remote_access_latency += (t_now - pkt_time);
-    return t_now - pkt_time;
+    SubsecondTime access_latency = t_now - pkt_time;
+    m_total_remote_access_latency += access_latency;
+    m_total_access_latency += access_latency;
+    return access_latency;
 }
 
 
@@ -728,8 +732,10 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
 
     if((m_inflight_pages.find(phys_page) == m_inflight_pages.end()) || m_r_enable_selective_moves) {
         // The phys_page is not included in m_inflight_pages or m_r_enable_selective_moves is true, then total access latency = t_now - pkt_time
-        m_total_local_access_latency += (t_now - pkt_time);
-        return t_now - pkt_time;
+        SubsecondTime access_latency = t_now - pkt_time;
+        m_total_local_access_latency += access_latency;
+        m_total_access_latency += access_latency;
+        return access_latency;
     } else {
         // The phys_age is an inflight page and m_r_enable_selective_moves is false
         //SubsecondTime current_time = std::min(Sim()->getClockSkewMinimizationServer()->getGlobalTime(), t_now);
@@ -739,27 +745,36 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
             // The page is still in transit from remote to local memory
             m_inflight_hits++; 
 
-            if(m_r_partition_queues == 1 && m_inflight_redundant[phys_page] < m_r_limit_redundant_moves) {
-                // Compare the arrival time of the inflight page vs requesting the cache line using the cacheline queue
-               if(m_r_throttle_redundant_moves) {
-                    SubsecondTime datamov_queue_delay = m_data_movement_2->computeQueueDelayNoEffect(t_now, m_r_part2_bandwidth.getRoundedLatency(8*pkt_size), requester);
-                    if ((datamov_queue_delay + t_now - pkt_time) < access_latency) {
-                        datamov_queue_delay = m_data_movement_2->computeQueueDelayTrackBytes(t_now, m_r_part2_bandwidth.getRoundedLatency(8*pkt_size), pkt_size, requester);
-                        access_latency = datamov_queue_delay + t_now - pkt_time;
-                        ++m_redundant_moves;
-                    } 
-                } else {
-                    SubsecondTime datamov_queue_delay = m_data_movement_2->computeQueueDelayNoEffect(t_now, m_r_part2_bandwidth.getRoundedLatency(8*pkt_size), requester);
-                    if ((datamov_queue_delay + t_now - pkt_time) < access_latency) {
-                        datamov_queue_delay = m_data_movement_2->computeQueueDelayTrackBytes(t_now, m_r_part2_bandwidth.getRoundedLatency(8*pkt_size), pkt_size, requester);
-                        access_latency = datamov_queue_delay + t_now - pkt_time;
+            if(m_r_partition_queues == 1) {
+                if (m_inflight_redundant[phys_page] < m_r_limit_redundant_moves) {
+                    // Main difference when m_r_throttle_redundant_moves is on: reduce traffic sent through cacheline queue
+                    if(m_r_throttle_redundant_moves) {
+                        // Don't request cacheline via the cacheline queue if the inflight page arrives sooner
+                        // But otherwise use the earlier arrival time to determine access_latency
+                        SubsecondTime datamov_queue_delay = m_data_movement_2->computeQueueDelayNoEffect(t_now, m_r_part2_bandwidth.getRoundedLatency(8*pkt_size), requester);
+                        if ((datamov_queue_delay + t_now - pkt_time) < access_latency) {
+                            datamov_queue_delay = m_data_movement_2->computeQueueDelayTrackBytes(t_now, m_r_part2_bandwidth.getRoundedLatency(8*pkt_size), pkt_size, requester);
+                            access_latency = datamov_queue_delay + t_now - pkt_time;
+                            ++m_redundant_moves;
+                            m_inflight_redundant[phys_page] = m_inflight_redundant[phys_page] + 1; 
+                        }
+                    } else {
+                        // Always request cacheline via the cacheline queue, then use the earlier arrival time to determine access_latency
+                        SubsecondTime datamov_queue_delay = m_data_movement_2->computeQueueDelayTrackBytes(t_now, m_r_part2_bandwidth.getRoundedLatency(8*pkt_size), pkt_size, requester);
                         ++m_redundant_moves;
                         m_inflight_redundant[phys_page] = m_inflight_redundant[phys_page] + 1; 
-                    } 
+                        if ((datamov_queue_delay + t_now - pkt_time) < access_latency) {
+                            access_latency = datamov_queue_delay + t_now - pkt_time;
+                        }
+                    }
+                } else {
+                    ++m_cacheline_queue_request_cancelled;
+                    // std::cout << "Inflight page " << phys_page << " redundant moves > limit, = " << m_inflight_redundant[phys_page] << std::endl;
                 }
             }
         }
         m_total_local_access_latency += access_latency;
+        m_total_access_latency += access_latency;
         return access_latency;  
     }
 }

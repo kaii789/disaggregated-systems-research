@@ -134,10 +134,11 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_writeback_pages;
         UInt64 m_local_evictions;
         UInt64 m_extra_pages;
-        UInt64 m_redundant_moves;
-        UInt64 m_max_bufferspace;
-        UInt64 m_move_page_cancelled_bufferspace_full;
-        UInt64 m_move_page_cancelled_datamovement_queue_full;
+        UInt64 m_redundant_moves;                   // number of times both a cacheline and its containing page are requested together
+        UInt64 m_cacheline_queue_request_cancelled; // number of times a cacheline queue request is cancelled (currently, due to m_r_limit_redundant_moves)
+        UInt64 m_max_bufferspace;                   // the maximum number of localdram pages actually used to back inflight and inflight_evicted pages 
+        UInt64 m_move_page_cancelled_bufferspace_full;         // the number of times moving a remote page to local was cancelled due to localdram bufferspace being full
+        UInt64 m_move_page_cancelled_datamovement_queue_full;  // the number of times moving a remote page to local was cancelled due to the queue for pages being full
         std::map<UInt64, UInt32> m_page_usage_map;  // track number of times each phys page is accessed
         UInt64 m_unique_pages_accessed;             // track number of unique pages accessed
 
