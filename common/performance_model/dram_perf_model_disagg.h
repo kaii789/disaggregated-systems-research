@@ -44,9 +44,9 @@ class DramPerfModelDisagg : public DramPerfModel
         const UInt32 m_randomize_offset;
         const UInt32 m_column_bits_shift; // Position of column bits for closed-page mapping (after cutting interleaving/channel/rank/bank from bottom)
         const ComponentBandwidth m_bus_bandwidth;
-        const ComponentBandwidth m_r_bus_bandwidth;   // Remote
-        const ComponentBandwidth m_r_part_bandwidth;  // Remote - Partitioned Queues => Page Queue
-        const ComponentBandwidth m_r_part2_bandwidth; // Remote - Partitioned Queues => Cacheline Queue
+        ComponentBandwidth m_r_bus_bandwidth;   // Remote
+        ComponentBandwidth m_r_part_bandwidth;  // Remote - Partitioned Queues => Page Queue
+        ComponentBandwidth m_r_part2_bandwidth; // Remote - Partitioned Queues => Cacheline Queue
         const SubsecondTime m_bank_keep_open;
         const SubsecondTime m_bank_open_delay;
         const SubsecondTime m_bank_close_delay;
@@ -106,6 +106,7 @@ class DramPerfModelDisagg : public DramPerfModel
 
         std::map<UInt64, UInt32> m_remote_access_tracker; 
         std::list<UInt64> m_local_pages; // Pages of local memory
+        std::map<UInt64, char> m_local_pages_remote_origin;  // Pages of local memory that were originally in remote
         std::list<UInt64> m_remote_pages; // Pages of remote memory
         std::list<UInt64> m_dirty_pages; // Dirty pages of local memory
         std::map<UInt64, SubsecondTime> m_inflight_pages; // Inflight pages that are being transferred from remote memory to local memory
@@ -126,6 +127,8 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_dram_page_empty;
         UInt64 m_dram_page_closing;
         UInt64 m_dram_page_misses;
+        UInt64 m_local_reads_remote_origin;
+        UInt64 m_local_writes_remote_origin;
         UInt64 m_remote_reads;
         UInt64 m_remote_writes;
         UInt64 m_page_moves;

@@ -120,7 +120,7 @@ bool QueueModelWindowedMG1Remote::isQueueFull(SubsecondTime pkt_time) {
 
    // Use queue utilization as measure to determine whether the queue is full
    double utilization = (double)m_service_time_sum / m_window_size.getPS();
-   return utilization > .9999;
+   return utilization > .99;
 }
 
 // With computeQueueDelayTrackBytes(), computeQueueDelay() shouldn't be used anymore
@@ -215,18 +215,14 @@ QueueModelWindowedMG1Remote::computeQueueDelayNoEffect(SubsecondTime pkt_time, S
       t_queue = SubsecondTime::PS(arrival_rate * service_time_Es2 / (2 * (1. - utilization)));
 
       // Our memory is limited in time to m_window_size. It would be strange to return more latency than that.
+      // Don't update stats here for computeQueueDelayNoEffect
       if (!m_use_separate_queue_delay_cap && t_queue > m_window_size) {
          // Normally, use m_window_size as the cap
          t_queue = m_window_size;
-         ++m_total_requests_capped_by_window_size;
       } else if (m_use_separate_queue_delay_cap) {
          if (t_queue > m_queue_delay_cap) {
             // When m_use_separate_queue_delay_cap is true, try using a custom queue_delay_cap to handle the cases when the queue is full
             t_queue = m_queue_delay_cap;
-            ++m_total_requests_capped_by_queue_delay_cap;
-         }
-         if (t_queue > m_window_size) {
-            ++m_total_requests_capped_by_window_size;  // still keep track of this stat when separate queue delay cap is used
          }
       }
    }

@@ -79,6 +79,8 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_dram_page_empty          (0)
     , m_dram_page_closing        (0)
     , m_dram_page_misses         (0)
+    , m_local_reads_remote_origin(0)
+    , m_local_writes_remote_origin(0)
     , m_remote_reads        (0)
     , m_remote_writes       (0)
     , m_page_moves          (0)
@@ -185,6 +187,8 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     registerStatsMetric("dram", core_id, "total-access-latency", &m_total_access_latency); // cgiannoula
     registerStatsMetric("dram", core_id, "total-local-access-latency", &m_total_local_access_latency);
     registerStatsMetric("dram", core_id, "total-remote-access-latency", &m_total_remote_access_latency);
+    registerStatsMetric("dram", core_id, "local-reads-remote-origin", &m_local_reads_remote_origin);
+    registerStatsMetric("dram", core_id, "local-writes-remote-origin", &m_local_writes_remote_origin);
     registerStatsMetric("dram", core_id, "remote-reads", &m_remote_reads);
     registerStatsMetric("dram", core_id, "remote-writes", &m_remote_writes);
     registerStatsMetric("dram", core_id, "page-moves", &m_page_moves);
@@ -451,8 +455,6 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     SubsecondTime datamovement_queue_delay;
     if (m_r_partition_queues == 1) {
         datamovement_queue_delay = m_data_movement_2->computeQueueDelayTrackBytes(t_now, m_r_part2_bandwidth.getRoundedLatency(8*size), size, requester);
-        m_redundant_moves++;
-        ++m_redundant_moves_type1;
     } else {
         datamovement_queue_delay = m_data_movement->computeQueueDelayTrackBytes(t_now, m_r_bus_bandwidth.getRoundedLatency(8*size), size, requester);
     }
@@ -536,6 +538,9 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             }
 
             if(m_r_partition_queues == 1) {
+                m_redundant_moves++;
+                ++m_redundant_moves_type1;
+
                 page_datamovement_queue_delay = m_data_movement->computeQueueDelayTrackBytes(t_now, m_r_part_bandwidth.getRoundedLatency(8*page_size), page_size, requester);
 
                 // Approximation of time savings:
@@ -569,6 +574,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         assert(std::find(m_local_pages.begin(), m_local_pages.end(), phys_page) == m_local_pages.end()); 
         assert(std::find(m_remote_pages.begin(), m_remote_pages.end(), phys_page) != m_remote_pages.end()); 
         m_local_pages.push_back(phys_page);
+        m_local_pages_remote_origin[phys_page] = 1;
         if(m_r_exclusive_cache)
             m_remote_pages.remove(phys_page);
 
@@ -602,13 +608,6 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
     if(m_r_cacheline_gran) 
         phys_page =  address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1); // Was << 6
     UInt64 cacheline =  address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1); // Was << 6
-
-    if (m_page_usage_map.count(phys_page) == 0) {
-        ++m_unique_pages_accessed;
-        m_page_usage_map[phys_page] = 0;
-    } else {
-        m_page_usage_map[phys_page] += 1;
-    }
 
     if (m_page_usage_map.count(phys_page) == 0) {
         ++m_unique_pages_accessed;
@@ -659,6 +658,14 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
         }
         //	printf("Remote access: %d\n",m_remote_reads); 
         return (getAccessLatencyRemote(pkt_time, pkt_size, requester, address, access_type, perf)); 
+    }
+    // m_local_reads_remote_origin
+    if (m_local_pages_remote_origin.count(phys_page)) {
+        if (access_type == DramCntlrInterface::READ) {
+            ++m_local_reads_remote_origin;
+        } else {  // access_type == DramCntlrInterface::WRITE
+            ++m_local_writes_remote_origin;
+        }
     }
 
     // pkt_size is in 'Bytes'
@@ -908,14 +915,16 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
             }	
             // If a non-dirty page is found, just remove this page to make space
             if (found) {
-                m_local_pages.remove(evicted_page); 
+                m_local_pages.remove(evicted_page);
+                m_local_pages_remote_origin.erase(evicted_page);
             }
         }
 
         // If found==false, remove the first page
         if(!found) {
             evicted_page = m_local_pages.front(); // Evict the least recently used page
-            m_local_pages.pop_front(); 
+            m_local_pages.pop_front();
+            m_local_pages_remote_origin.erase(evicted_page);
         }
         ++m_local_evictions; 
 
@@ -1032,6 +1041,7 @@ DramPerfModelDisagg::possiblyPrefetch(UInt64 phys_page, SubsecondTime t_now, cor
         assert(std::find(m_local_pages.begin(), m_local_pages.end(), pref_page) == m_local_pages.end()); 
         assert(std::find(m_remote_pages.begin(), m_remote_pages.end(), pref_page) != m_remote_pages.end()); 
         m_local_pages.push_back(pref_page);
+        m_local_pages_remote_origin.erase(pref_page);
         if(m_r_exclusive_cache)
             m_remote_pages.remove(pref_page);
         m_inflight_pages.erase(pref_page);
