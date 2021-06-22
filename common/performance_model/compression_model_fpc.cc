@@ -1,4 +1,5 @@
 #include "compression_model_fpc.h"
+#include "utils.h"
 
 // Assume 32 bit word
 const UInt32 CompressionModelFPC::mask[6]=
@@ -39,7 +40,12 @@ CompressionModelFPC::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
 {
     // Get Data
     Core *core = Sim()->getCoreManager()->getCoreFromID(core_id);
-    core->getApplicationData(Core::NONE, Core::READ, addr, m_data_buffer, data_size, Core::MEM_MODELED_NONE); // Assume addr already points to page or cache line
+    if (data_size == m_cache_line_size)  { // If we compress in cache_line granularity
+        core->getApplicationData(Core::NONE, Core::READ, addr, m_data_buffer, data_size, Core::MEM_MODELED_NONE); // Assume addr already points to page or cache line
+    } else { // If we compress in page_size granularity, we shift to move to the start_addr of the corresponding page
+        UInt64 page = addr & ~((UInt64(1) << floorLog2(m_page_size)) - 1);
+        core->getApplicationData(Core::NONE, Core::READ, page, m_data_buffer, data_size, Core::MEM_MODELED_NONE);
+    }
 
     // FPC
     UInt32 total_bytes = 0;
