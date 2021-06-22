@@ -8,10 +8,10 @@ def run_compression_vs_no_compression_experiment(x_axis, x_axis_label, x_axis_co
     t1 = threading.Thread(target=thread_experiment, args=(x_axis_label, x_axis, "c0", os.path.abspath("./no_compression_no_partition_queues"), x_axis_config_param, program_command, res1, cwd))
     t2 = threading.Thread(target=thread_experiment, args=(x_axis_label, x_axis, "c1", os.path.abspath("./yes_compression_no_partition_queues"), x_axis_config_param, program_command, res2, cwd))
 
-    for t in [t1, t2, t3]:
+    for t in [t1, t2]:
         t.start()
 
-    for t in [t1, t2, t3]:
+    for t in [t1, t2]:
         t.join()
 
     no_compression = res1[0]
