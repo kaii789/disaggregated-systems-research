@@ -28,7 +28,7 @@ private:
    UInt64 m_total_requests;
    UInt64 m_total_requests_queue_full;                 // The number of requests where queue utilization was full
    UInt64 m_total_requests_capped_by_window_size;      // Note: When m_use_separate_queue_delay_cap is true, this counts requests with calculated queue delay larger than window_size, but weren't actually capped
-   UInt64 m_total_requests_capped_by_queue_delay_cap;
+   UInt64 m_total_requests_capped_by_queue_delay_cap;  // The number of requests where the returned queue delay was capped by the separate m_queue_delay_cap
    SubsecondTime m_total_utilized_time;
    SubsecondTime m_total_queue_delay;
 

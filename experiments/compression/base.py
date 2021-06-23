@@ -51,7 +51,7 @@ def log_compression_stats(res_directory, result_filename, program_command, confi
     # Compression
     bytes_saved = results['compression.bytes-saved'][0] if 'compression.bytes-saved' in results else 0
     if bytes_saved != 0:
-        data_moves = results['dram.data-moves'][0]
+        data_moves = results['dram.page-moves'][0]
         total_compression_latency = results['compression.total-compression-latency'][0] / 10**6 # convert to ns
         total_decompression_latency = results['compression.total-decompression-latency'][0] / 10**6 # convert to ns
 
