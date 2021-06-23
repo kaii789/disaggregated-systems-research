@@ -509,7 +509,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         ++m_move_page_cancelled_bufferspace_full;
     }
     // Cancel moving the page if the queue used to move the page is already full
-    if(move_page && m_data_movement->isQueueFull(pkt_time)) {
+    if(move_page && m_data_movement->getQueueUtilizationPercentage(pkt_time) > 0.95) {  // save 5% for evicted pages?
         move_page = false;
         ++m_move_page_cancelled_datamovement_queue_full;
     } 

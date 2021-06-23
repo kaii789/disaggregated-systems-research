@@ -108,7 +108,22 @@ QueueModelWindowedMG1Remote::~QueueModelWindowedMG1Remote()
    }
 }
 
-bool QueueModelWindowedMG1Remote::isQueueFull(SubsecondTime pkt_time) {
+// bool QueueModelWindowedMG1Remote::isQueueFull(SubsecondTime pkt_time) {
+//    // Remove packets that now fall outside the window
+//    // Advance the window based on the global (barrier) time, as this guarantees the earliest time any thread may be at.
+//    // Use a backup value of 10 window sizes before the current request to avoid excessive memory usage in case something fishy is going on.
+//    SubsecondTime backup = pkt_time > 10*m_window_size ? pkt_time - 10*m_window_size : SubsecondTime::Zero();
+//    SubsecondTime main = Sim()->getClockSkewMinimizationServer()->getGlobalTime() > m_window_size ? Sim()->getClockSkewMinimizationServer()->getGlobalTime() - m_window_size : SubsecondTime::Zero();
+//    SubsecondTime time_point = SubsecondTime::max(main, backup);
+//    removeItems(time_point);
+//    removeItemsUpdateBytes(time_point, pkt_time);
+
+//    // Use queue utilization as measure to determine whether the queue is full
+//    double utilization = (double)m_service_time_sum / m_window_size.getPS();
+//    return utilization > .99;  // TODO: which value to choose as queue full threshold?
+// }
+
+double QueueModelWindowedMG1Remote::getQueueUtilizationPercentage(SubsecondTime pkt_time) {
    // Remove packets that now fall outside the window
    // Advance the window based on the global (barrier) time, as this guarantees the earliest time any thread may be at.
    // Use a backup value of 10 window sizes before the current request to avoid excessive memory usage in case something fishy is going on.
@@ -120,7 +135,7 @@ bool QueueModelWindowedMG1Remote::isQueueFull(SubsecondTime pkt_time) {
 
    // Use queue utilization as measure to determine whether the queue is full
    double utilization = (double)m_service_time_sum / m_window_size.getPS();
-   return utilization > .99;
+   return utilization;
 }
 
 // With computeQueueDelayTrackBytes(), computeQueueDelay() shouldn't be used anymore
