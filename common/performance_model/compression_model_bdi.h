@@ -35,10 +35,10 @@ private:
        UInt32 compressed_size; // In bytes
     } ;
 
-    // Compression latency per cache line - cgiannoula: To be checked
-    UInt32 m_compression_latency = 3; // cgiannoula: Could be given in config file
+    // Compression latency per cache line 
+    UInt32 m_compression_latency = 3; 
     // Decompression latency per cache line
-    UInt32 m_decompression_latency = 3; // cgiannoula: Could be given in config file
+    UInt32 m_decompression_latency = 3; 
 
 
     SInt64 readWord(void*, UInt32, UInt32);
