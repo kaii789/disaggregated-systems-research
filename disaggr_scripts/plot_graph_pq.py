@@ -252,8 +252,9 @@ def save_graph_pq(
     plt.plot(x_axis, y_values[0], ".--r", label=stat_settings[0].name_for_legend)
     # Uniform scale among experiments for the same application and input
     y_axis_top = 0.55
-    if max(y_values[0]) > y_axis_top:
-        y_axis_top = max(y_values[0])
+    data_y_max = max(y_values[0])
+    if data_y_max > y_axis_top:
+        y_axis_top = data_y_max + max(0.2, data_y_max * 0.05)
     plt.ylim(bottom=0, top=y_axis_top)
     plt.yticks(
         np.arange(0, y_axis_top + 0.01, step=0.05)

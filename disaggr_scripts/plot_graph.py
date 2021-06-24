@@ -253,6 +253,17 @@ def save_graph(
             line_style,
             label=stat_settings[i].name_for_legend,
         )
+
+    # For IPC
+    y_axis_top = 0.55
+    data_y_max = max(y_values[0])
+    if data_y_max > y_axis_top:
+        y_axis_top = data_y_max + max(0.2, data_y_max * 0.05)
+    plt.ylim(bottom=0, top=y_axis_top)
+    plt.yticks(
+        np.arange(0, y_axis_top + 0.01, step=0.05)
+    )  # +0.01 to include y_axis_top
+
     # title_str = "IPC vs Remote Memory Additional Latency"
     # title_str = "IPC vs Remote Memory Bandwidth"
     # title_str = "IPC vs Local DRAM Size"

@@ -788,6 +788,8 @@ if __name__ == "__main__":
     ligra_input_to_file = {
         "regular_input": "rMat_1000000",
         "small_input": "rMat_100000",
+        "reg_10x": "rMat_10000000",
+        "reg_8x": "rMat_8000000",
     }
     command_strs["ligra_bfs"] = ligra_base_str_options.format(
         "BFS", ligra_input_to_file["regular_input"], sniper_options=""
