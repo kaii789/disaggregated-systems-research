@@ -1,11 +1,13 @@
 #include "compression_model_lz4.h"
 #include <lz4.h>
 #include "utils.h"
+#include "config.hpp"
 
 CompressionModelLZ4::CompressionModelLZ4(String name, UInt32 page_size, UInt32 cache_line_size, int compression_latency_config, int decompression_latency_config, double freq_norm)
     : m_name(name)
     , m_page_size(page_size)
     , m_cache_line_size(cache_line_size)
+    , m_compression_granularity(Sim()->getCfg()->getInt("perf_model/dram/compression_model/compression_granularity"))
 {
     m_cacheline_count = m_page_size / m_cache_line_size;
     m_data_buffer = new char[m_page_size];
@@ -33,10 +35,21 @@ CompressionModelLZ4::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
     }
 
     // LZ4
-    clock_t begin = clock();
-    int total_bytes = LZ4_compress_default(m_data_buffer, m_compressed_data_buffer, m_page_size, m_page_size);
-    clock_t end = clock();
-    double compression_latency = (double)(end - begin) / CLOCKS_PER_SEC;
+    int total_bytes = 0;
+    double compression_latency = 0;
+    if (m_compression_granularity == -1) {
+        clock_t begin = clock();
+        total_bytes = LZ4_compress_default(m_data_buffer, m_compressed_data_buffer, m_page_size, m_page_size);
+        clock_t end = clock();
+        compression_latency = (double)(end - begin) / CLOCKS_PER_SEC;
+    } else {
+        for (int i = 0; i < m_page_size / (UInt32)m_compression_granularity; i++) {
+            clock_t begin = clock();
+            total_bytes += LZ4_compress_default(&m_data_buffer[m_compression_granularity * i], &m_compressed_data_buffer[total_bytes], m_compression_granularity, m_page_size - total_bytes);
+            clock_t end = clock();
+            compression_latency += (double)(end - begin) / CLOCKS_PER_SEC;
+        }
+    }
     // printf("[LZ4] Compression latency: %f ns\n", compression_latency * 1000000000);
 
     // Normalize latency
@@ -72,7 +85,14 @@ CompressionModelLZ4::decompress(IntPtr addr, UInt32 compressed_cache_lines, core
     // Need to get compressed data in order to decompress
     UInt32 compressed_page_size;
     UInt32 compressed_cachelines;
-    compress(addr, m_page_size, core_id, &compressed_page_size, &compressed_cachelines);
+    int total_bytes = 0;
+    if (m_compression_granularity == -1) {
+        total_bytes = LZ4_compress_default(m_data_buffer, m_compressed_data_buffer, m_page_size, m_page_size);
+    } else {
+        for (int i = 0; i < m_page_size / (UInt32)m_compression_granularity; i++) {
+            total_bytes += LZ4_compress_default(&m_data_buffer[m_compression_granularity * i], &m_compressed_data_buffer[total_bytes], m_compression_granularity, m_page_size - total_bytes);
+        }
+    }
 
     clock_t begin = clock();
     LZ4_decompress_safe(m_compressed_data_buffer, m_data_buffer, compressed_page_size, m_page_size);

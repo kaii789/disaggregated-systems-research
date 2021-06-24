@@ -26,6 +26,7 @@ private:
     UInt32 m_decompression_latency = 5;
 
     double m_freq_norm;
+    int m_compression_granularity;
 
 };
 
