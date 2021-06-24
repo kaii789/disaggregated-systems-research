@@ -1,24 +1,32 @@
 #!/usr/bin/env python
 from base import *
 
+def sweep_thread_two_config(data, result_filename, config_name, config_param1, config_param2, val, program_command, cwd):
+    run_directory = "./{}-{}-{}".format(result_filename, config_param1.split("/")[-1], val)
+    sniper_path = os.path.abspath("../../run-sniper")
+    output_directory = os.path.abspath("./{}".format(run_directory))
+    if not cwd: cwd = run_directory
+    command = "{} -v -n 1 -c {} -g --{}={} -g --{}={} -d {} -- {}".format(sniper_path, config_name, config_param1, val, config_param2, val, output_directory, program_command)
+    subprocess.call("mkdir {}".format(run_directory), shell=True)
+    subprocess.call(command, shell=True, cwd=cwd)
+    ipc = get_ipc(run_directory)
+    print(ipc)
+    data['IPC'].append(ipc)
+    log_compression_stats(run_directory, "{}.log".format(result_filename), program_command, config_param1, val)
+
 def run_experiment_two_config(x_axis, x_axis_init, result_filename, config_name, config_param1, config_param2, program_command, cwd):
 
     data = {x_axis:x_axis_init,
             'IPC':[]}
 
+    thread_pool = []
     for val in x_axis_init:
-        run_directory = "./{}-{}-{}".format(result_filename, config_param1.split("/")[-1], val)
-        sniper_path = os.path.abspath("../../run-sniper")
-        output_directory = os.path.abspath("./{}".format(run_directory))
-        if not cwd: cwd = run_directory
-        command = "{} -v -n 1 -c {} -g --{}={} -g --{}={} -d {} -- {}".format(sniper_path, config_name, config_param1, val, config_param2, val, output_directory, program_command)
-        subprocess.call("mkdir {}".format(run_directory), shell=True)
-        subprocess.call(command, shell=True, cwd=cwd)
-        ipc = get_ipc(run_directory)
-        print(ipc)
-        data['IPC'].append(ipc)
-        log_compression_stats(run_directory, "{}.log".format(result_filename), program_command, config_param1, val)
-        # subprocess.call("rm -r {}".format(run_directory), shell=True)
+        t = threading.Thread(target=sweep_thread_two_config, args=(data, result_filename, config_name, config_param1, config_param2, val, program_command, cwd))
+        thread_pool.append(t)
+        t.start()
+
+    for t in thread_pool:
+        t.join()
 
     # df = pd.DataFrame(data)
     # graph = df.plot(x=x_axis, y="IPC")
