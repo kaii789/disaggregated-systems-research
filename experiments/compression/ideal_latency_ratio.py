@@ -7,7 +7,7 @@ def run_experiment_two_config(x_axis, x_axis_init, result_filename, config_name,
             'IPC':[]}
 
     for val in x_axis_init:
-        run_directory = "./{}-{}-{}".format(result_filename, config_param.split("/")[-1], val)
+        run_directory = "./{}-{}-{}".format(result_filename, config_param1.split("/")[-1], val)
         sniper_path = os.path.abspath("../../run-sniper")
         output_directory = os.path.abspath("./{}".format(run_directory))
         if not cwd: cwd = run_directory
@@ -17,7 +17,7 @@ def run_experiment_two_config(x_axis, x_axis_init, result_filename, config_name,
         ipc = get_ipc(run_directory)
         print(ipc)
         data['IPC'].append(ipc)
-        log_compression_stats(run_directory, "{}.log".format(result_filename), program_command, config_param, val)
+        log_compression_stats(run_directory, "{}.log".format(result_filename), program_command, config_param1, val)
         # subprocess.call("rm -r {}".format(run_directory), shell=True)
 
     # df = pd.DataFrame(data)
@@ -101,7 +101,7 @@ if __name__ == "__main__":
     program_command = "../../../test/crono/apps/sssp/sssp ../../../test/crono/inputs/bcsstk05.mtx 1"
     # program_command = "../../../benchmarks/ligra/apps/BFS -s -rounds 1 ../../../benchmarks/ligra/inputs/rMat_1000000" # TODO: change me
     result_name = "ipc_vs_compressed_page_size"
-    t2 = threading.Thread(target=run_ideal_latency_ratio, args=(compressed_page_size, x_axis_label, x_axis_config_param, program_command, result_name))
+    t2 = threading.Thread(target=run_ideal_latency, args=(compressed_page_size, x_axis_label, x_axis_config_param, program_command, result_name))
 
     t1.start()
     t2.start()
