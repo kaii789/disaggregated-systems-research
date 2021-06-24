@@ -40,6 +40,8 @@ private:
     // Decompression latency per cache line
     UInt32 m_decompression_latency = 3; 
 
+    int m_compression_granularity;
+
 
     SInt64 readWord(void*, UInt32, UInt32);
     void writeWord(void*, UInt32, SInt64, UInt32);
