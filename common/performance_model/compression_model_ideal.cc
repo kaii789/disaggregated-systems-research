@@ -1,10 +1,13 @@
 #include "compression_model_ideal.h"
 #include "utils.h"
+#include "config.h"
+#include "config.hpp"
 
 CompressionModelIdeal::CompressionModelIdeal(String name, UInt32 page_size, UInt32 cache_line_size, int compression_latency_config, int decompression_latency_config)
     : m_name(name)
     , m_page_size(page_size)
     , m_cache_line_size(cache_line_size)
+    , m_compressed_page_size(Sim()->getCfg()->getInt("perf_model/dram/compression_model/ideal/compressed_page_size"))
 {
     m_cacheline_count = m_page_size / m_cache_line_size;
 
@@ -28,7 +31,7 @@ CompressionModelIdeal::compress(IntPtr addr, size_t data_size, core_id_t core_id
     *compressed_cache_lines = m_cacheline_count;
 
     // Return compressed pages size in Bytes
-    *compressed_page_size = 1; // compress all data to 1 byte
+    *compressed_page_size = m_compressed_page_size;
 
     // Return compression latency
     ComponentLatency compress_latency(ComponentLatency(core->getDvfsDomain(), m_cacheline_count  * m_compression_latency));

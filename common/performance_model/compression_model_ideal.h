@@ -21,6 +21,7 @@ private:
     UInt32 m_page_size; 
     UInt32 m_cache_line_size;
     UInt32 m_cacheline_count;
+    UInt32 m_compressed_page_size;
 
     // Compression latency per cache line
     UInt32 m_compression_latency = 1; 
