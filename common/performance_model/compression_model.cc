@@ -9,7 +9,7 @@
 #include "compression_model_lz4.h"
 
 CompressionModel*
-CompressionModel::create(String name, UInt32 page_size, UInt32 cache_line_size, String compression_type, int compression_latency_config, int decompression_latency_config, double m_freq_norm)
+CompressionModel::create(String name, UInt32 page_size, UInt32 cache_line_size, String compression_type, int compression_latency_config, int decompression_latency_config)
 {
     if (compression_type == "ideal")
 	{
@@ -25,7 +25,7 @@ CompressionModel::create(String name, UInt32 page_size, UInt32 cache_line_size, 
 	}
     else if (compression_type == "lz4")
 	{
-        return new CompressionModelLZ4(name, page_size, cache_line_size, compression_latency_config, decompression_latency_config, m_freq_norm);
+        return new CompressionModelLZ4(name, page_size, cache_line_size, compression_latency_config, decompression_latency_config);
 	}
     else
     {
