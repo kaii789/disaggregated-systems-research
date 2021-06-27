@@ -82,8 +82,6 @@ SubsecondTime
 CompressionModelLZ4::decompress(IntPtr addr, UInt32 compressed_cache_lines, core_id_t core_id)
 {
     // Need to get compressed data in order to decompress
-    UInt32 compressed_page_size;
-    UInt32 compressed_cachelines;
     int total_bytes = 0;
     if (m_compression_granularity == -1) {
         total_bytes = LZ4_compress_default(m_data_buffer, m_compressed_data_buffer, m_page_size, m_page_size);
@@ -94,7 +92,7 @@ CompressionModelLZ4::decompress(IntPtr addr, UInt32 compressed_cache_lines, core
     }
 
     clock_t begin = clock();
-    LZ4_decompress_safe(m_compressed_data_buffer, m_data_buffer, compressed_page_size, m_page_size);
+    LZ4_decompress_safe(m_compressed_data_buffer, m_data_buffer, total_bytes, m_page_size);
     clock_t end = clock();
     double decompression_latency = (double)(end - begin) / CLOCKS_PER_SEC;
     decompression_latency *= m_freq_norm;
@@ -148,7 +146,6 @@ CompressionModelLZ4::compress_multipage(std::vector<UInt64> addr_list, UInt32 nu
 SubsecondTime
 CompressionModelLZ4::decompress_multipage(std::vector<UInt64> addr_list, UInt32 num_pages, core_id_t core_id, std::map<UInt64, UInt32> *address_to_num_cache_lines)
 {
-    printf("[LZ4] Hi!");
     UInt32 compressed_multipage_size;
     CompressionModelLZ4::compress_multipage(addr_list, num_pages, core_id, &compressed_multipage_size, NULL);
 

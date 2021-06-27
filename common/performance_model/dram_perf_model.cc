@@ -31,7 +31,7 @@ DramPerfModel* DramPerfModel::createDramPerfModel(core_id_t core_id, UInt32 cach
    }
    else if (type == "disaggregated_multipage")
    {
-      return new DramPerfModelDisagg(core_id, cache_block_size, address_home_lookup);
+      return new DramPerfModelDisaggMultipage(core_id, cache_block_size, address_home_lookup);
    }
    else
    {
