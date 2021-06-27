@@ -22,7 +22,7 @@ public:
    // virtual bool isQueueFull(SubsecondTime pkt_time) {
    //    return false;  // placeholder since the method is currently only implemented in the windowed_mg1_remote QueueModel
    // };
-   double getQueueUtilizationPercentage(SubsecondTime pkt_time) {
+   virtual double getQueueUtilizationPercentage(SubsecondTime pkt_time) {
       return 0.0;  // placeholder since the method is currently only implemented in the windowed_mg1_remote QueueModel
    }
 

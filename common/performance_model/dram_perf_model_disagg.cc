@@ -202,6 +202,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     registerStatsMetric("dram", core_id, "bufferspace-full-move-page-cancelled", &m_move_page_cancelled_bufferspace_full);
     registerStatsMetric("dram", core_id, "queue-full-move-page-cancelled", &m_move_page_cancelled_datamovement_queue_full);
     registerStatsMetric("dram", core_id, "unique-pages-accessed", &m_unique_pages_accessed);
+    registerStatsMetric("dram", core_id, "cacheline-queue-request-cancelled", &m_cacheline_queue_request_cancelled);
 
     // Stats for partition_queues experiments
     if (m_r_partition_queues) {
@@ -480,14 +481,8 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     if (!m_r_use_separate_queue_model) {  // when a separate remote QueueModel is used, the network latency is added there
         t_now += m_r_added_latency;
     }
-    if(m_r_mode != 4 && !m_r_enable_selective_moves) {
-        t_now += datamovement_queue_delay;
-    } 
-
-    perf->updateTime(t_now, ShmemPerf::DRAM_BUS);
 
     // Track access to page
-    // UInt64 phys_page = address & ~((UInt64(1) << floorLog2(m_page_size)) - 1);
     if(m_r_cacheline_gran) 
         phys_page =  address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1); // Was << 6
     bool move_page = false; 
@@ -504,15 +499,21 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         move_page = true; 
     }
     // Cancel moving the page if the amount of reserved bufferspace in localdram for inflight + inflight_evicted pages is not enough to support an additional move
-    if(move_page && (m_r_reserved_bufferspace > 0) && ((m_inflight_pages.size() + m_inflightevicted_pages.size())  >= (m_r_reserved_bufferspace/100)*m_localdram_size/m_page_size)) {
+    if(move_page && m_r_reserved_bufferspace > 0 && ((m_inflight_pages.size() + m_inflightevicted_pages.size())  >= (m_r_reserved_bufferspace/100)*m_localdram_size/m_page_size)) {
         move_page = false;
         ++m_move_page_cancelled_bufferspace_full;
     }
     // Cancel moving the page if the queue used to move the page is already full
-    if(move_page && m_data_movement->getQueueUtilizationPercentage(pkt_time) > 0.95) {  // save 5% for evicted pages?
+    if(move_page && m_data_movement->getQueueUtilizationPercentage(t_now) > 0.95) {  // save 5% for evicted pages?
         move_page = false;
         ++m_move_page_cancelled_datamovement_queue_full;
     } 
+
+    if(m_r_mode != 4 && !m_r_enable_selective_moves) {
+        t_now += datamovement_queue_delay;
+    } 
+
+    perf->updateTime(t_now, ShmemPerf::DRAM_BUS);
 
     // Adding data movement cost of the entire page for now (this just adds contention in the queue)
     if (move_page) {
@@ -661,6 +662,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
     }
     // m_local_reads_remote_origin
     if (m_local_pages_remote_origin.count(phys_page)) {
+        m_local_pages_remote_origin[phys_page] += 1;
         if (access_type == DramCntlrInterface::READ) {
             ++m_local_reads_remote_origin;
         } else {  // access_type == DramCntlrInterface::WRITE
@@ -1041,7 +1043,7 @@ DramPerfModelDisagg::possiblyPrefetch(UInt64 phys_page, SubsecondTime t_now, cor
         assert(std::find(m_local_pages.begin(), m_local_pages.end(), pref_page) == m_local_pages.end()); 
         assert(std::find(m_remote_pages.begin(), m_remote_pages.end(), pref_page) != m_remote_pages.end()); 
         m_local_pages.push_back(pref_page);
-        m_local_pages_remote_origin.erase(pref_page);
+        m_local_pages_remote_origin[pref_page] = 1;
         if(m_r_exclusive_cache)
             m_remote_pages.remove(pref_page);
         m_inflight_pages.erase(pref_page);
