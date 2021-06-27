@@ -518,7 +518,8 @@ DramPerfModelDisaggMultipage::getAccessLatencyRemote(SubsecondTime pkt_time, UIn
     // Adding data movement cost of the entire page for now (this just adds contention in the queue)
     if (move_page) {
         // Add to page buffer
-        page_buffer.push_back(phys_page);
+        if (std::find(page_buffer.begin(), page_buffer.end(), phys_page) == page_buffer.end())
+            page_buffer.push_back(phys_page);
         if (page_buffer.size() == m_page_buffer_capacity) {
             // TODO: Page buffer capacity hit, so move pages
 
