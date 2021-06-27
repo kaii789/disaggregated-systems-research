@@ -32,6 +32,8 @@ private:
     double m_freq_norm;
     int m_compression_granularity;
 
+    char *multipage_data_buffer;
+    char *multipage_compressed_buffer;
 };
 
 #endif /* __COMPRESSION_MODEL_LZ4_H__ */
