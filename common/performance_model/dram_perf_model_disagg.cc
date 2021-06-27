@@ -73,6 +73,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_r_limit_redundant_moves      (Sim()->getCfg()->getInt("perf_model/dram/remote_limit_redundant_moves"))
     , m_r_throttle_redundant_moves      (Sim()->getCfg()->getBool("perf_model/dram/remote_throttle_redundant_moves"))
     , m_r_use_separate_queue_model      (Sim()->getCfg()->getBool("perf_model/dram/queue_model/use_separate_remote_queue_model")) // Whether to use the separate remote queue model
+    , m_r_page_queue_utilization_threshold   (Sim()->getCfg()->getFloat("perf_model/dram/remote_page_queue_utilization_threshold")) // When the datamovement queue for pages has percentage utilization above this, remote pages aren't moved to local
     , m_banks               (m_total_banks)
     , m_r_banks               (m_total_banks)
     , m_dram_page_hits           (0)
@@ -504,7 +505,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         ++m_move_page_cancelled_bufferspace_full;
     }
     // Cancel moving the page if the queue used to move the page is already full
-    if(move_page && m_data_movement->getQueueUtilizationPercentage(t_now) > 0.95) {  // save 5% for evicted pages?
+    if(move_page && m_data_movement->getQueueUtilizationPercentage(t_now) > m_r_page_queue_utilization_threshold) {  // save 5% for evicted pages?
         move_page = false;
         ++m_move_page_cancelled_datamovement_queue_full;
     } 

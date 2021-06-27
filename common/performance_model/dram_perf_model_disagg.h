@@ -81,6 +81,7 @@ class DramPerfModelDisagg : public DramPerfModel
         const UInt32 m_r_limit_redundant_moves; 
         const bool m_r_throttle_redundant_moves;
         const bool m_r_use_separate_queue_model;  // Whether to use the separate remote queue model
+        double m_r_page_queue_utilization_threshold;  // When the datamovement queue for pages has percentage utilization above this, remote pages aren't moved to local
 
         // Local Memory
         std::vector<QueueModel*> m_queue_model;
