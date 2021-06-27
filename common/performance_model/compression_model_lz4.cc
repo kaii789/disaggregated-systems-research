@@ -3,22 +3,25 @@
 #include "utils.h"
 #include "config.hpp"
 
-CompressionModelLZ4::CompressionModelLZ4(String name, UInt32 page_size, UInt32 cache_line_size, int compression_latency_config, int decompression_latency_config)
+CompressionModelLZ4::CompressionModelLZ4(String name, UInt32 page_size, UInt32 cache_line_size)
     : m_name(name)
     , m_page_size(page_size)
     , m_cache_line_size(cache_line_size)
-    , m_compression_granularity(Sim()->getCfg()->getInt("perf_model/dram/compression_model/compression_granularity"))
-    , m_freq_norm(Sim()->getCfg()->getFloat("perf_model/dram/compression_model/frequency_normalization"))
+    , m_compression_granularity(Sim()->getCfg()->getInt("perf_model/dram/compression_model/lz4/compression_granularity"))
+    , m_freq_norm(Sim()->getCfg()->getFloat("perf_model/dram/compression_model/lz4/frequency_normalization"))
 {
+    // Set compression/decompression cycle latencies if configured
+    if (Sim()->getCfg()->getInt("perf_model/dram/compression_model/lz4/compression_latency") != -1)
+        m_compression_latency = Sim()->getCfg()->getInt("perf_model/dram/compression_model/lz4/compression_latency");
+    if (Sim()->getCfg()->getInt("perf_model/dram/compression_model/lz4/decompression_latency") != -1)
+        m_decompression_latency = Sim()->getCfg()->getInt("perf_model/dram/compression_model/lz4/decompression_latency");
+
+    if (m_compression_granularity == -1)
+        m_compression_granularity = m_page_size;
+
     m_cacheline_count = m_page_size / m_cache_line_size;
     m_data_buffer = new char[m_page_size];
     m_compressed_data_buffer = new char[m_page_size + m_cacheline_count];
-
-    // Set compression/decompression cycle latencies if configured
-    if (compression_latency_config != -1)
-        m_compression_latency = compression_latency_config;
-    if (decompression_latency_config != -1)
-        m_decompression_latency = decompression_latency_config;
 }
 
 SubsecondTime
