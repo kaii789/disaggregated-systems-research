@@ -1,95 +1,111 @@
 #include "CAM.h"
 
-CAM::CAM(unsigned int size):_size(size)
+CAM::CAM(UInt32 size):m_size(size)
 {
-    FV_table=new unsigned long int[size]();
-    LRU=new unsigned char[size]();
+    dictionary_table = new UInt64[size]();
+    LRU = new UInt8[size]();
 }
 
 CAM::~CAM()
 {
-    delete [] FV_table;
+    delete [] dictionary_table;
     delete [] LRU;
 }
 
-unsigned long int CAM::Read(unsigned char indx)
+UInt64
+CAM::read_value(UInt8 indx)
 {
-    return FV_table[indx];
+    return dictionary_table[indx];
 }
 
-void CAM::Write(unsigned char indx,unsigned long int x)
+void 
+CAM::write_value(UInt8 indx, UInt64 word)
 {
-    FV_table[indx]=x;
+    dictionary_table[indx] = word;
 }
 
-unsigned char CAM::Replace(unsigned long int x)
+UInt8 
+CAM::replace_value(UInt64 word)
 {
-    unsigned char indx=0,older=0xff,i=0;
-    for(i=0;i<_size;i++)
+    UInt8 indx=0, older=0xff, i=0;
+    for(i=0; i<m_size; i++)
     {
-        if(LRU[i]<older)
+        if(LRU[i] < older)
         {
-            indx=i;
-            older=LRU[i];
+            indx = i;
+            older = LRU[i];
         }
-
     }
 
-    FV_table[indx]=x;
-    LRU[indx]=0x00;
+    dictionary_table[indx] = word;
+    LRU[indx] = 0x00;
 
     return indx;
 }
 
-void CAM::Update_Lru(unsigned char indx)
+void 
+CAM::update_LRU(UInt8 indx)
 {
-    unsigned char i,mask=0x80;
+    UInt8 i, mask=0x80;
 
-    for(i=0;i<_size;i++)
+    for(i=0; i<m_size; i++)
     {
-        LRU[i]>>=1;
-        if(i==indx) LRU[i]|=mask;
+        LRU[i] >>= 1;
+        if(i == indx) 
+            LRU[i] |= mask;
+    }
+}
+
+dictionary_info
+CAM::search_value(UInt64 word)
+{
+    UInt8 i=0;
+    dictionary_info res;
+    res.found = false;
+    res.indx = 0;
+
+    for (i=0; i<m_size; i++) {
+        if(dictionary_table[i] == word)
+        {
+            res.found = true;
+            res.indx = i;
+        }
     }
 
+    if(!res.found)
+        res.indx = replace_value(word);
+
+    update_LRU(res.indx);
+
+    return res;
 }
 
-std::pair<bool,unsigned char> CAM::Search(unsigned long int x)
+dictionary_info
+CAM::find_min_diff(UInt64 word, UInt8 threshold)
 {
-    unsigned char i=0;
-    std::pair<bool,unsigned char> result(0,0);
-    for (i=0;i<_size;i++)
-        if(FV_table[i]==x)
+    UInt8 indx, i=0;
+    SInt8 diff=threshold;
+    bool found=0;
+
+    for (i=0; i<m_size; i++) {
+        if(abs((SInt64)(dictionary_table[i] - word)) < (abs(diff)))
         {
-            result.first=1;
-            result.second=i;
+            found = 1;
+            diff = (SInt8)(dictionary_table[i]-word);
+            indx = i;
         }
-    if(!result.first)
-        result.second=Replace(x);
+    }
 
-    Update_Lru(result.second);
+    if (found) 
+        write_value(indx, word);
 
-    return result;
-}
+    if(!found)
+        indx = replace_value(word);
 
-
-boost::tuple<bool,unsigned char, char>CAM::Find_min_diff(unsigned long int x, unsigned char threshold)
-{
-    unsigned char indx,i=0;
-    char diff=threshold;
-    bool hit=0;
-
-    for (i=0;i<_size;i++)
-        if(abs((long int)(FV_table[i]-x))<(abs(diff)))
-        {
-            hit=1;
-            diff=(char)(FV_table[i]-x);
-            indx=i;
-        }
-    if(hit) Write(indx,x);
-    if(!hit)
-        indx=Replace(x);
-
-    Update_Lru(indx);
-    boost::tuple<bool,unsigned char,char> result = boost::make_tuple(hit,indx,diff);
-    return result;
+    update_LRU(indx);
+    dictionary_info res;
+    res.found = found;
+    res.indx = indx;
+    res.diff = diff;
+    return res;
 }

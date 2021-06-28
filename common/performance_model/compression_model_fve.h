@@ -30,31 +30,25 @@ class CompressionModelFVE : public CompressionModel
         UInt8 m_word_size_bits = 32;
         UInt32 m_word_size_bytes = 4;
         UInt8 m_cam_size = 64;
-        CAM* CAM_C;
-        CAM* CAM_D;
+        CAM* compression_CAM;
+        CAM* decompression_CAM;
 
         typedef struct {
-            unsigned char *BytePtr;
-            unsigned int  BitPos;
-            unsigned int  NumBytes;
+            UInt8 *byte_ptr;
+            UInt32  bit_pos;
+            UInt32  num_bytes;
         } bitstream;
 
-
-        UInt32 compressCacheLine(void *in, void *out);
-        UInt32 decompressCacheLine(void *in, void *out);
-
+        void initBitstream(bitstream*, void*, UInt32);
+        UInt64 readBit(bitstream*);
+        void writeBit(bitstream*, UInt64);
+        void encodeWord(bitstream*, UInt64, UInt32);
+        UInt64 decodeWord(bitstream*, UInt32);
         SInt64 readWord(void*, UInt32, UInt32);
         void writeWord(void*, UInt32, SInt64, UInt32);
 
-
-        void InitBitstream(bitstream*, void*, unsigned int);
-        unsigned long int ReadBit(bitstream*);
-        void WriteBit(bitstream*, unsigned long int);
-        void EncodeWord( bitstream*,unsigned long int,unsigned int);
-        unsigned long int DecodeWord(bitstream*,unsigned int);
-        Byte* MakeCompBuf();
-
-
+        UInt32 compressCacheLine(void *in, void *out);
+        UInt32 decompressCacheLine(void *in, void *out);
 };
 
 #endif /* __COMPRESSION_MODEL_FVE_H__ */

@@ -28,8 +28,8 @@ CompressionModelFVE::CompressionModelFVE(String name, UInt32 page_size, UInt32 c
         m_cam_size = (UInt8) Sim()->getCfg()->getInt("perf_model/dram/compression_model/fve/dict_table_entries");
     }
 
-    CAM_C = new CAM(m_cam_size);
-    CAM_D = new CAM(m_cam_size);
+    compression_CAM = new CAM(m_cam_size);
+    decompression_CAM = new CAM(m_cam_size);
 }
 
 SubsecondTime
@@ -70,57 +70,9 @@ CompressionModelFVE::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
 
 CompressionModelFVE::~CompressionModelFVE()
 {
-    delete CAM_C;
-    delete CAM_D;
+    delete compression_CAM;
+    delete decompression_CAM;
 }
-
-UInt32 CompressionModelFVE::compressCacheLine(void* _inbuf, void* _outbuf)
-{
-    bitstream stream;
-    unsigned int  i,incount;
-    unsigned long int x;
-
-    unsigned int insize=m_cache_line_size;
-
-    incount = insize / (m_word_size_bytes);	// right sift bits to bytes conversion,incount has the number of words of my input buf
-
-    /* Do we have anything to compress? */
-    if( incount == 0 )
-    {
-        return 0;
-    }
-
-    /* Initialize output bitsream && Change the outstream pointer to show after the compr/decom header*/
-
-    switch(m_word_size_bits)
-    {
-        case 32:
-            InitBitstream(&stream, _outbuf, insize+2); //stream pointer to chr=out,stram bitpos=0 stream bytes=insize+1
-            stream.BitPos=16;
-            break;
-
-        case 64:
-            InitBitstream(&stream, _outbuf, insize+1);
-            stream.BitPos=8;
-            break;
-
-        default:
-            return 0;	
-    }
-
-
-    /*Encode words of input and store them in bitstream*/
-    for(i=0;i<incount;i++)
-    { 
-        x = readWord(_inbuf, i, m_word_size_bytes);
-        LOG_PRINT("%ith word is:%lu\n",i,x);
-        EncodeWord(&stream, x, i);
-
-    }
-
-    return (UInt32) ((stream.BitPos+7)>>3); // +7 γιατί αν το BitPos είναι μέσα στο 6ο ας πούμε byte επειδή μετράμε από το 0, το index του byte θα είναι το 5 και όχι το 6, και επειδή εδώ θέλουμε να στείλουμε αριθμό bytes με το +7 προσθέτουμε ένα byte. 
-
-};
 
 SubsecondTime
 CompressionModelFVE::decompress(IntPtr addr, UInt32 compressed_cache_lines, core_id_t core_id)
@@ -130,158 +82,140 @@ CompressionModelFVE::decompress(IntPtr addr, UInt32 compressed_cache_lines, core
     return decompress_latency.getLatency();
 }
 
-
-Byte* CompressionModelFVE::MakeCompBuf()
+void 
+CompressionModelFVE::initBitstream(bitstream *stream, void *buf, UInt32 bytes)
 {
-    Byte* buf = new Byte[m_cache_line_size+2]();
-    return buf; 
+    stream->byte_ptr = (UInt8 *)buf;
+    stream->bit_pos = 0;
+    stream->num_bytes = bytes;
+    return;
 }
 
-
-void CompressionModelFVE::InitBitstream( bitstream *stream,
-        void *buf, unsigned int bytes )
+UInt64 
+CompressionModelFVE::readBit(bitstream *stream)
 {
-    stream->BytePtr  = (unsigned char *) buf;
-    stream->BitPos   = 0;
-    stream->NumBytes = bytes;
-}
+    UInt32 idx;
+    UInt64 word, bit;
 
-
-
-
-unsigned long int CompressionModelFVE::ReadBit(bitstream *stream )
-{
-    unsigned int idx;
-    unsigned long int x, bit;
-
-    idx = stream->BitPos >> 3;
-    if( idx < stream->NumBytes )
+    idx = stream->bit_pos / 8;
+    if(idx < stream->num_bytes)
     {
-        bit = (stream->BitPos & 7);
-        x = (stream->BytePtr[ idx ] >> bit) & 1UL;
-        ++ stream->BitPos;
+        bit = (stream->bit_pos & 7);
+        word = (stream->byte_ptr[idx] >> bit) & 1UL;
+        stream->bit_pos++;
     }
     else
     {
-        x = 0;
+        word = 0;
     }
-    return x;
+    return word;
 }
 
-
-
-
-void CompressionModelFVE::WriteBit( bitstream *stream, unsigned  long int x  ) /*Αλλάζω, για φορά LSB->MSB από rice όπου ήταν MSB->LSB*/ 
+void 
+CompressionModelFVE::writeBit(bitstream *stream, UInt64 x) 
 {
-    unsigned int bit, idx, mask;
-    unsigned long int set;
+    UInt32 bit, idx, mask;
+    UInt64 set;
 
-    idx = stream->BitPos >> 3;	//idx pointing to byte
-    if( idx < stream->NumBytes ) 
+    idx = stream->bit_pos / 8;	// bit to byte
+    if(idx < stream->num_bytes) 
     {
-        bit  = (stream->BitPos & 7);// σε ποιο bit μεσα στο byte είμαι
-        mask = 0xff ^ (1 << bit); //η μασκα έχει 0 μόνο στο πολυπόθητο bit
-        set  = (x & 1UL) << bit;// το set έχει x (1 ή 0) μόνο στο πολυπόθητο bit
-        stream->BytePtr[ idx ] = (stream->BytePtr[ idx ] & mask) | set; //???? types?
-        ++ stream->BitPos;
+        bit  = (stream->bit_pos & 7); // find bit inside a specific byte 
+        mask = 0xff ^ (1 << bit); // mask has 0 in the desired bit
+        set  = (x & 1UL) << bit; // set has 1 or 0 only in the desired bit
+        stream->byte_ptr[idx] = (stream->byte_ptr[idx] & mask) | set; 
+        stream->bit_pos++;
     }
 }
 
-
-
-
-void CompressionModelFVE::EncodeWord(bitstream *stream, unsigned long int x, unsigned int indx)
+void 
+CompressionModelFVE::encodeWord(bitstream *stream, UInt64 word, UInt32 indx)
 {
-    unsigned long int bit=0,mask2=0;
-    unsigned char i=0,mask=0;
-    std::pair<bool,unsigned char> result; 
+    UInt64 bit=0, mask2=0;
+    UInt8 i=0, mask=0;
+    dictionary_info res; 
 
+    res = compression_CAM->search_value(word);
 
-    /*Search CAM*/
-    result = CAM_C->Search(x);
+    LOG_PRINT("%ith word %lu was found in CAM: %i and in place %i with BitPos %d\n",indx, word, res.found, res.indx, stream->bit_pos);
 
-    LOG_PRINT("%ith word %lu was found in CAM: %i and in place: %i floor %d BitPos %d\n",indx,x,result.first,result.second, floorLog2(m_cam_size), stream->BitPos);
-
-    if(result.first) // found in FV table
+    if(res.found) // Found in dictionary table 
     { 
-        /*Write in header that this is in compressed form*/
-        mask=0x01<<(indx%8); // div because bits 0->7, for different wordsizes though it responds to different bytes, solved below
-        stream->BytePtr[indx>>3]|=mask;
-
-        mask=0x01;
-        /*Write the index that was found in FV table in output stream->encoding*/
-        for(i=0;i<floorLog2(m_cam_size);i++)
+        /*
+         * Set the corresponding bit in compr header to indicate a compressed format 
+         */
+        mask = 0x01 << (indx % 8); // bits 0->7, for the different wordsizes we move to different bytes using the indx of the next line
+        stream->byte_ptr[indx/8] |= mask;
+        mask = 0x01;
+        /*
+         * Write the index that was found in the dictionary table in output stream
+         */
+        for(i=0; i<floorLog2(m_cam_size); i++)
         {
-            bit=(result.second>>i)&mask;
-            WriteBit(stream,bit);
+            bit = (res.indx >> i) & mask;
+            writeBit(stream, bit);
         }
     } 
-
     else
     {
-        /*Write the whole word in the output */
+        /*
+         * Write the (uncompressed) word in the output 
+         */
         mask2=0x0000000000000001;
-        for(i=0;i<(m_word_size_bits);i++)
+        for(i=0; i<(m_word_size_bits); i++)
         {
-            bit=(x>>i)&mask2;
-            WriteBit(stream,bit);
+            bit = (word>>i) & mask2;
+            writeBit(stream,bit);
         } 
-
     }
-
-
 
 }
 
-
-
-
-unsigned long int CompressionModelFVE::DecodeWord(bitstream *stream, unsigned int indx)
+UInt64 
+CompressionModelFVE::decodeWord(bitstream *stream, UInt32 indx)
 {
-    unsigned long int bit=0,x=0;
-    unsigned char mask,i,compressed,cam_indx=0;
+    UInt64 bit=0, word=0;
+    UInt8 mask, i, compressed, cam_indx=0;
 
-    /*Read from header if this is compressed or not*/
-    mask=0x01<<(indx%8); // div because bits 0->7, for different wordsizes though it responds to different bytes, solved below
-    compressed=stream->BytePtr[indx>>3]&mask;
+    /*
+     * Read a specific bit from the header to find if the corresponding word is compressed format or not
+     */
+    mask = 0x01 << (indx%8); // bits 0->7, for the different wordsizes we move to different bytes using the indx of the next line
+    compressed = stream->byte_ptr[indx/8] & mask;
+    LOG_PRINT("%ith word recieved for decode is compressed: %i\n", indx, compressed);
 
-    LOG_PRINT("%ith word recieved for decode is compressed: %i",indx,compressed);
 
-
-    if(compressed!=0)
+    if(compressed != 0)
     {
-        /*Read indx*/
         for(i=0;i<floorLog2(m_cam_size);i++)
         {
-            bit=ReadBit(stream);
-            bit<<=i;
-            cam_indx|=(unsigned char)bit;
+            bit = readBit(stream);
+            bit <<= i;
+            cam_indx |= (UInt8)bit;
         }
-        x=CAM_D->Read(cam_indx);
-        CAM_D->Update_Lru(cam_indx);
-
+        word = decompression_CAM->read_value(cam_indx);
+        decompression_CAM->update_LRU(cam_indx);
     }
-
     else
     {
-        /*Read the whole word from input*/
+        /*
+         * Read the (uncompressed) word from the input
+         */
         for(i=0;i<m_word_size_bits;i++)
         {
-            bit=ReadBit(stream);
-            bit<<=i;
-            x|=bit;
+            bit = readBit(stream);
+            bit <<= i;
+            word |= bit;
         }
-        cam_indx=CAM_D->Replace(x);
-        CAM_D->Update_Lru(cam_indx);
-
+        cam_indx=decompression_CAM->replace_value(word);
+        decompression_CAM->update_LRU(cam_indx);
     }
 
-    return x;
+    return word;
 }
 
-
 SInt64
-CompressionModelFVE::readWord(void *ptr, UInt32 idx, UInt32 word_size_bytes) // idx: which word of input ptr to read 
+CompressionModelFVE::readWord(void *ptr, UInt32 idx, UInt32 word_size_bytes) 
 {
     SInt64 word;
     switch (word_size_bytes)
@@ -329,48 +263,93 @@ CompressionModelFVE::writeWord(void *ptr, UInt32 idx, SInt64 word, UInt32 word_s
     }      
 }
 
-
-UInt32 CompressionModelFVE::decompressCacheLine(void *in, void *out)
+UInt32 
+CompressionModelFVE::compressCacheLine(void* _inbuf, void* _outbuf)
 {
     bitstream stream;
-    unsigned int     i,outcount;
-    unsigned long int x;
+    UInt32 i, word_count;
+    UInt64 word;
 
-    unsigned int outsize=m_cache_line_size;
-
-    outcount = outsize / (m_word_size_bytes);
-
-    /* Do we have anything to decompress? */
-    if( outcount == 0 )
+    word_count = m_cache_line_size / (m_word_size_bytes);
+    if(word_count == 0)
     {
         return 0;
     }
 
-    /* Initialize input bitsream - compressed buffer*/
+    /* 
+     * Outstream pointer shows after the compr/decompr header
+     */
     switch(m_word_size_bits)
     {
         case 32:
-            InitBitstream( &stream, in, outsize+2 ); //stream pointer to chr=out,stram bitpos=0 stream bytes=insize+1
-            stream.BitPos=16;
+            initBitstream(&stream, _outbuf, m_cache_line_size + 2); // +2 bytes = 16-bits for compr/decompr header
+            stream.bit_pos = 16;
             break;
 
         case 64:
-            InitBitstream( &stream, in, outsize+1);
-            stream.BitPos=8;
+            initBitstream(&stream, _outbuf, m_cache_line_size + 1); // +1 bytes = 8-bits for compr/decompr header
+            stream.bit_pos = 8;
             break;
 
         default:
             return 0;	
     }
 
-    /*main decoding loop*/
-    for(i=0;i<outcount;i++)
+
+    /*
+     * Encode the words from the input and store them in bitstream
+     */
+    for(i=0; i<word_count; i++)
+    { 
+        word = readWord(_inbuf, i, m_word_size_bytes);
+        LOG_PRINT("%ith word is: %lu\n", i, word);
+        encodeWord(&stream, word, i);
+    }
+
+    return (UInt32) ((stream.bit_pos + 7) / 8);  
+};
+
+
+UInt32
+CompressionModelFVE::decompressCacheLine(void *in, void *out)
+{
+    bitstream stream;
+    UInt32 i, word_count;
+    UInt64 word;
+
+    word_count = m_cache_line_size / (m_word_size_bytes);
+
+    /* Do we have anything to decompress? */
+    if(word_count == 0)
     {
-        x=DecodeWord(&stream,i);
-        LOG_PRINT("%ith decoded word: %lu",i,x);
-        writeWord(out, i, x, m_word_size_bytes);
+        return 0;
+    }
+
+    /* 
+     * Outstream pointer shows after the compr/decompr header
+     */
+    switch(m_word_size_bits)
+    {
+        case 32:
+            initBitstream(&stream, in, m_cache_line_size + 2); // +2 bytes = 16-bits for compr/decompr header
+            stream.bit_pos = 16;
+            break;
+
+        case 64:
+            initBitstream(&stream, in, m_cache_line_size + 1); // +1 byte = 8-bits for compr/decompr header
+            stream.bit_pos = 8;
+            break;
+
+        default:
+            return 0;	
+    }
+
+    for(i=0; i<word_count; i++)
+    {
+        word = decodeWord(&stream, i);
+        LOG_PRINT("%ith decoded word: %lu\n", i, word);
+        writeWord(out, i, word, m_word_size_bytes);
     } 
 
     return 0;
-
 } 
