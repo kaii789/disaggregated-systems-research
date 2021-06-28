@@ -47,10 +47,7 @@ CompressionModelFVE::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
         total_bytes += m_compressed_cache_line_sizes[i];
         if (m_compressed_cache_line_sizes[i] < m_cache_line_size)
             total_compressed_cache_lines++;
-        printf("total bytes %d\n", total_bytes);
     }
-    if (total_bytes > m_page_size) // FIXME
-        total_bytes = m_page_size;
     //assert(total_bytes <= m_page_size && "[FVE] Wrong compression!"); 
 
     // Return compressed cache lines
