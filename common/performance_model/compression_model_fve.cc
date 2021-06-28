@@ -19,11 +19,17 @@ CompressionModelFVE::CompressionModelFVE(String name, UInt32 page_size, UInt32 c
     m_compressed_data_buffer = new char[m_page_size + m_cacheline_count];
     m_compressed_cache_line_sizes = new UInt32[m_cacheline_count];
 
-    _wordsize = 32;
-    m_word_size = 4;
-    CAM_C = new CAM(64);
-    CAM_D = new CAM(64);
-    _cam_size = 64;
+    if (Sim()->getCfg()->getInt("perf_model/dram/compression_model/fve/word_size_bits") != -1) {
+        m_word_size_bits = Sim()->getCfg()->getInt("perf_model/dram/compression_model/fve/word_size_bits");
+        m_word_size_bytes = m_word_size_bits / 8;
+    }
+
+    if (Sim()->getCfg()->getInt("perf_model/dram/compression_model/fve/dict_table_entries") != -1) {
+        m_cam_size = (UInt8) Sim()->getCfg()->getInt("perf_model/dram/compression_model/fve/dict_table_entries");
+    }
+
+    CAM_C = new CAM(m_cam_size);
+    CAM_D = new CAM(m_cam_size);
 }
 
 SubsecondTime
@@ -55,7 +61,6 @@ CompressionModelFVE::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
 
     // Return compressed pages size in Bytes
     *compressed_page_size = total_bytes;
-
     // printf("[FVE Compression] Compressed Page Size: %u bytes", total_bytes);
 
     // Return compression latency
@@ -77,7 +82,7 @@ UInt32 CompressionModelFVE::compressCacheLine(void* _inbuf, void* _outbuf)
 
     unsigned int insize=m_cache_line_size;
 
-    incount = insize / (_wordsize>>3);	// right sift bits to bytes conversion,incount has the number of words of my input buf
+    incount = insize / (m_word_size_bytes);	// right sift bits to bytes conversion,incount has the number of words of my input buf
 
     /* Do we have anything to compress? */
     if( incount == 0 )
@@ -87,7 +92,7 @@ UInt32 CompressionModelFVE::compressCacheLine(void* _inbuf, void* _outbuf)
 
     /* Initialize output bitsream && Change the outstream pointer to show after the compr/decom header*/
 
-    switch(_wordsize)
+    switch(m_word_size_bits)
     {
         case 32:
             InitBitstream(&stream, _outbuf, insize+2); //stream pointer to chr=out,stram bitpos=0 stream bytes=insize+1
@@ -107,7 +112,7 @@ UInt32 CompressionModelFVE::compressCacheLine(void* _inbuf, void* _outbuf)
     /*Encode words of input and store them in bitstream*/
     for(i=0;i<incount;i++)
     { 
-        x = readWord(_inbuf, i, m_word_size);
+        x = readWord(_inbuf, i, m_word_size_bytes);
         LOG_PRINT("%ith word is:%lu\n",i,x);
         EncodeWord(&stream, x, i);
 
@@ -189,13 +194,13 @@ void CompressionModelFVE::EncodeWord(bitstream *stream, unsigned long int x, uns
 {
     unsigned long int bit=0,mask2=0;
     unsigned char i=0,mask=0;
-    std::pair <bool,unsigned char> result; 
+    std::pair<bool,unsigned char> result; 
 
 
     /*Search CAM*/
     result = CAM_C->Search(x);
 
-    LOG_PRINT("%ith word %lu was found in CAM: %i and in place: %i floor %d BitPos %d\n",indx,x,result.first,result.second, floorLog2(_cam_size), stream->BitPos);
+    LOG_PRINT("%ith word %lu was found in CAM: %i and in place: %i floor %d BitPos %d\n",indx,x,result.first,result.second, floorLog2(m_cam_size), stream->BitPos);
 
     if(result.first) // found in FV table
     { 
@@ -205,7 +210,7 @@ void CompressionModelFVE::EncodeWord(bitstream *stream, unsigned long int x, uns
 
         mask=0x01;
         /*Write the index that was found in FV table in output stream->encoding*/
-        for(i=0;i<floorLog2(_cam_size);i++)
+        for(i=0;i<floorLog2(m_cam_size);i++)
         {
             bit=(result.second>>i)&mask;
             WriteBit(stream,bit);
@@ -216,7 +221,7 @@ void CompressionModelFVE::EncodeWord(bitstream *stream, unsigned long int x, uns
     {
         /*Write the whole word in the output */
         mask2=0x0000000000000001;
-        for(i=0;i<(_wordsize);i++)
+        for(i=0;i<(m_word_size_bits);i++)
         {
             bit=(x>>i)&mask2;
             WriteBit(stream,bit);
@@ -246,7 +251,7 @@ unsigned long int CompressionModelFVE::DecodeWord(bitstream *stream, unsigned in
     if(compressed!=0)
     {
         /*Read indx*/
-        for(i=0;i<floorLog2(_cam_size);i++)
+        for(i=0;i<floorLog2(m_cam_size);i++)
         {
             bit=ReadBit(stream);
             bit<<=i;
@@ -260,7 +265,7 @@ unsigned long int CompressionModelFVE::DecodeWord(bitstream *stream, unsigned in
     else
     {
         /*Read the whole word from input*/
-        for(i=0;i<_wordsize;i++)
+        for(i=0;i<m_word_size_bits;i++)
         {
             bit=ReadBit(stream);
             bit<<=i;
@@ -276,10 +281,10 @@ unsigned long int CompressionModelFVE::DecodeWord(bitstream *stream, unsigned in
 
 
 SInt64
-CompressionModelFVE::readWord(void *ptr, UInt32 idx, UInt32 word_size) // idx: which word of input ptr to read 
+CompressionModelFVE::readWord(void *ptr, UInt32 idx, UInt32 word_size_bytes) // idx: which word of input ptr to read 
 {
     SInt64 word;
-    switch (word_size)
+    switch (word_size_bytes)
     {
         case 8:
             word = ((SInt64 *)ptr)[idx];
@@ -302,9 +307,9 @@ CompressionModelFVE::readWord(void *ptr, UInt32 idx, UInt32 word_size) // idx: w
 }
 
 void 
-CompressionModelFVE::writeWord(void *ptr, UInt32 idx, SInt64 word, UInt32 word_size)
+CompressionModelFVE::writeWord(void *ptr, UInt32 idx, SInt64 word, UInt32 word_size_bytes)
 {
-    switch(word_size)
+    switch(word_size_bytes)
     {
         case 8:   
             ((SInt64 *)ptr)[idx] = (SInt64)word;
@@ -333,7 +338,7 @@ UInt32 CompressionModelFVE::decompressCacheLine(void *in, void *out)
 
     unsigned int outsize=m_cache_line_size;
 
-    outcount = outsize / (_wordsize>>3);
+    outcount = outsize / (m_word_size_bytes);
 
     /* Do we have anything to decompress? */
     if( outcount == 0 )
@@ -342,7 +347,7 @@ UInt32 CompressionModelFVE::decompressCacheLine(void *in, void *out)
     }
 
     /* Initialize input bitsream - compressed buffer*/
-    switch(_wordsize)
+    switch(m_word_size_bits)
     {
         case 32:
             InitBitstream( &stream, in, outsize+2 ); //stream pointer to chr=out,stram bitpos=0 stream bytes=insize+1
@@ -363,7 +368,7 @@ UInt32 CompressionModelFVE::decompressCacheLine(void *in, void *out)
     {
         x=DecodeWord(&stream,i);
         LOG_PRINT("%ith decoded word: %lu",i,x);
-        writeWord(out, i, x, m_word_size);
+        writeWord(out, i, x, m_word_size_bytes);
     } 
 
     return 0;

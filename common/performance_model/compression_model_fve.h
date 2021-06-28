@@ -3,9 +3,6 @@
 
 #include "compression_model.h"
 #include "CAM.h"
-#include "bitstream.h"
-
-
 
 class CompressionModelFVE : public CompressionModel
 {
@@ -30,23 +27,31 @@ class CompressionModelFVE : public CompressionModel
         // Decompression latency per cache line
         UInt32 m_decompression_latency = 10;
 
+        UInt8 m_word_size_bits = 32;
+        UInt32 m_word_size_bytes = 4;
+        UInt8 m_cam_size = 64;
+        CAM* CAM_C;
+        CAM* CAM_D;
+
+        typedef struct {
+            unsigned char *BytePtr;
+            unsigned int  BitPos;
+            unsigned int  NumBytes;
+        } bitstream;
+
+
         UInt32 compressCacheLine(void *in, void *out);
         UInt32 decompressCacheLine(void *in, void *out);
 
         SInt64 readWord(void*, UInt32, UInt32);
         void writeWord(void*, UInt32, SInt64, UInt32);
- 
+
+
         void InitBitstream(bitstream*, void*, unsigned int);
         unsigned long int ReadBit(bitstream*);
         void WriteBit(bitstream*, unsigned long int);
         void EncodeWord( bitstream*,unsigned long int,unsigned int);
         unsigned long int DecodeWord(bitstream*,unsigned int);
-
-        unsigned char _wordsize;
-        UInt32 m_word_size;
-        unsigned char _cam_size;
-        CAM* CAM_C;
-        CAM* CAM_D;
         Byte* MakeCompBuf();
 
 
