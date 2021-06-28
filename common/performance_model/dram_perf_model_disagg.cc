@@ -439,7 +439,11 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     {
         UInt32 compressed_cache_lines;
         SubsecondTime compression_latency = m_compression_model->compress(phys_page, m_cache_line_size, m_core_id, &size, &compressed_cache_lines);
-        bytes_saved += m_cache_line_size - size;
+        if (m_cache_line_size > size)
+            bytes_saved += m_cache_line_size - size;
+        else
+            bytes_saved -= size - m_cache_line_size;
+
         address_to_compressed_size[phys_page] = size;
         address_to_num_cache_lines[phys_page] = compressed_cache_lines;
         m_total_compression_latency += compression_latency;
@@ -526,7 +530,11 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             {
                 UInt32 compressed_cache_lines;
                 SubsecondTime compression_latency = m_compression_model->compress(phys_page, m_page_size, m_core_id, &page_size, &compressed_cache_lines);
-                bytes_saved += m_page_size - page_size;
+                if (m_page_size > page_size)
+                    bytes_saved += m_page_size - page_size;
+                else
+                    bytes_saved -= page_size - m_page_size;
+         
                 address_to_compressed_size[phys_page] = page_size;
                 address_to_num_cache_lines[phys_page] = compressed_cache_lines;
                 m_total_compression_latency += compression_latency;
@@ -925,7 +933,11 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
                 UInt32 gran_size = size;
                 UInt32 compressed_cache_lines;
                 SubsecondTime compression_latency = m_compression_model->compress(phys_page, gran_size, m_core_id, &size, &compressed_cache_lines);
-                bytes_saved += gran_size - size;
+                if (gran_size > size)
+                    bytes_saved += gran_size - size;
+                else
+                    bytes_saved -= size - gran_size;
+ 
                 address_to_compressed_size[phys_page] = size;
                 address_to_num_cache_lines[phys_page] = compressed_cache_lines;
                 evict_compression_latency += compression_latency;
@@ -969,7 +981,11 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
                 UInt32 gran_size = size;
                 UInt32 compressed_cache_lines;
                 SubsecondTime compression_latency = m_compression_model->compress(phys_page, gran_size, m_core_id, &size, &compressed_cache_lines);
-                bytes_saved += gran_size - size;
+                if (gran_size > size)
+                    bytes_saved += gran_size - size;
+                else
+                    bytes_saved -= size - gran_size;
+ 
                 address_to_compressed_size[phys_page] = size;
                 address_to_num_cache_lines[phys_page] = compressed_cache_lines;
                 evict_compression_latency += compression_latency;

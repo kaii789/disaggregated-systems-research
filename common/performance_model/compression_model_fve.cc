@@ -6,7 +6,7 @@
 CompressionModelFVE::CompressionModelFVE(String name, UInt32 page_size, UInt32 cache_line_size)
     : m_name(name)
     , m_page_size(page_size)
-    , m_cache_line_size(cache_line_size)
+      , m_cache_line_size(cache_line_size)
 {
     // Set compression/decompression cycle latencies if configured
     if (Sim()->getCfg()->getInt("perf_model/dram/compression_model/fve/compression_latency") != -1)
@@ -19,9 +19,11 @@ CompressionModelFVE::CompressionModelFVE(String name, UInt32 page_size, UInt32 c
     m_compressed_data_buffer = new char[m_page_size + m_cacheline_count];
     m_compressed_cache_line_sizes = new UInt32[m_cacheline_count];
 
-   _wordsize = 32;
-   CAM_C = new CAM(256);
-   CAM_D = new CAM(256);
+    _wordsize = 32;
+    m_word_size = 4;
+    CAM_C = new CAM(64);
+    CAM_D = new CAM(64);
+    _cam_size = 64;
 }
 
 SubsecondTime
@@ -45,7 +47,10 @@ CompressionModelFVE::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
         total_bytes += m_compressed_cache_line_sizes[i];
         if (m_compressed_cache_line_sizes[i] < m_cache_line_size)
             total_compressed_cache_lines++;
+        printf("total bytes %d\n", total_bytes);
     }
+    if (total_bytes > m_page_size) // FIXME
+        total_bytes = m_page_size;
     //assert(total_bytes <= m_page_size && "[FVE] Wrong compression!"); 
 
     // Return compressed cache lines
@@ -54,7 +59,7 @@ CompressionModelFVE::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
     // Return compressed pages size in Bytes
     *compressed_page_size = total_bytes;
 
-    // printf("[FPC Compression] Compressed Page Size: %u bytes", total_bytes);
+    // printf("[FVE Compression] Compressed Page Size: %u bytes", total_bytes);
 
     // Return compression latency
     ComponentLatency compress_latency(ComponentLatency(core->getDvfsDomain(), m_cacheline_count * m_compression_latency));
@@ -63,14 +68,14 @@ CompressionModelFVE::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
 
 CompressionModelFVE::~CompressionModelFVE()
 {
-	delete CAM_C;
-	delete CAM_D;
+    delete CAM_C;
+    delete CAM_D;
 }
 
 UInt32 CompressionModelFVE::compressCacheLine(void* _inbuf, void* _outbuf)
 {
     bitstream stream;
-    unsigned int     i,incount;
+    unsigned int  i,incount;
     unsigned long int x;
 
     unsigned int insize=m_cache_line_size;
@@ -83,37 +88,35 @@ UInt32 CompressionModelFVE::compressCacheLine(void* _inbuf, void* _outbuf)
         return 0;
     }
 
-     /* Initialize output bitsream && Change the outstream pointer to show after the compr/decom header*/
-    
-	switch(_wordsize)
-	{
-		case 32:
-    	InitBitstream(&stream, _outbuf, insize+2); //stream pointer to chr=out,stram bitpos=0 stream bytes=insize+1
-        stream.BitPos=16;
-		break;
+    /* Initialize output bitsream && Change the outstream pointer to show after the compr/decom header*/
 
-		case 64:
-		InitBitstream(&stream, _outbuf, insize+1);
-        stream.BitPos=8;
-		break;
+    switch(_wordsize)
+    {
+        case 32:
+            InitBitstream(&stream, _outbuf, insize+2); //stream pointer to chr=out,stram bitpos=0 stream bytes=insize+1
+            stream.BitPos=16;
+            break;
 
-		default:
-		return 0;	
-	}
-    
+        case 64:
+            InitBitstream(&stream, _outbuf, insize+1);
+            stream.BitPos=8;
+            break;
+
+        default:
+            return 0;	
+    }
+
 
     /*Encode words of input and store them in bitstream*/
-    
     for(i=0;i<incount;i++)
     { 
-        x=ReadWord(_inbuf,i);
-		  LOG_PRINT("%ith word is:%lu",i,x);
-        EncodeWord(&stream,x,i);
-        
-    }
-    return (UInt32) (stream.BitPos/8); // +7 γιατί αν το BitPos είναι μέσα στο 6ο ας πούμε byte επειδή μετράμε από το 0, το index του byte θα είναι το 5 και όχι το 6, και επειδή εδώ θέλουμε να στείλουμε αριθμό bytes με το +7 προσθέτουμε ένα byte. 
+        x = readWord(_inbuf, i, m_word_size);
+        LOG_PRINT("%ith word is:%lu\n",i,x);
+        EncodeWord(&stream, x, i);
 
-    //return (UInt32) ((stream.BitPos+7)>>3); // +7 γιατί αν το BitPos είναι μέσα στο 6ο ας πούμε byte επειδή μετράμε από το 0, το index του byte θα είναι το 5 και όχι το 6, και επειδή εδώ θέλουμε να στείλουμε αριθμό bytes με το +7 προσθέτουμε ένα byte. 
+    }
+
+    return (UInt32) ((stream.BitPos+7)>>3); // +7 γιατί αν το BitPos είναι μέσα στο 6ο ας πούμε byte επειδή μετράμε από το 0, το index του byte θα είναι το 5 και όχι το 6, και επειδή εδώ θέλουμε να στείλουμε αριθμό bytes με το +7 προσθέτουμε ένα byte. 
 
 };
 
@@ -128,13 +131,13 @@ CompressionModelFVE::decompress(IntPtr addr, UInt32 compressed_cache_lines, core
 
 Byte* CompressionModelFVE::MakeCompBuf()
 {
-   Byte* buf = new Byte[m_cache_line_size+2]();
-   return buf; 
+    Byte* buf = new Byte[m_cache_line_size+2]();
+    return buf; 
 }
 
 
 void CompressionModelFVE::InitBitstream( bitstream *stream,
-    void *buf, unsigned int bytes )
+        void *buf, unsigned int bytes )
 {
     stream->BytePtr  = (unsigned char *) buf;
     stream->BitPos   = 0;
@@ -192,10 +195,10 @@ void CompressionModelFVE::EncodeWord(bitstream *stream, unsigned long int x, uns
     std::pair <bool,unsigned char> result; 
 
 
-   /*Search CAM*/
-     result = CAM_C->Search(x);
-	
-	 LOG_PRINT("%ith word %lu was found in CAM: %i and in place: %i",indx,x,result.first,result.second);
+    /*Search CAM*/
+    result = CAM_C->Search(x);
+
+    LOG_PRINT("%ith word %lu was found in CAM: %i and in place: %i floor %d BitPos %d\n",indx,x,result.first,result.second, floorLog2(_cam_size), stream->BitPos);
 
     if(result.first) // found in FV table
     { 
@@ -206,10 +209,10 @@ void CompressionModelFVE::EncodeWord(bitstream *stream, unsigned long int x, uns
         mask=0x01;
         /*Write the index that was found in FV table in output stream->encoding*/
         for(i=0;i<floorLog2(_cam_size);i++)
-            {
+        {
             bit=(result.second>>i)&mask;
             WriteBit(stream,bit);
-            }
+        }
     } 
 
     else
@@ -221,10 +224,10 @@ void CompressionModelFVE::EncodeWord(bitstream *stream, unsigned long int x, uns
             bit=(x>>i)&mask2;
             WriteBit(stream,bit);
         } 
-        
+
     }
 
-  
+
 
 }
 
@@ -237,25 +240,25 @@ unsigned long int CompressionModelFVE::DecodeWord(bitstream *stream, unsigned in
     unsigned char mask,i,compressed,cam_indx=0;
 
     /*Read from header if this is compressed or not*/
-     mask=0x01<<(indx%8); // div because bits 0->7, for different wordsizes though it responds to different bytes, solved below
-     compressed=stream->BytePtr[indx>>3]&mask;
-    
-	  LOG_PRINT("%ith word recieved for decode is compressed: %i",indx,compressed);
-     
-    
-     if(compressed!=0)
-     {
+    mask=0x01<<(indx%8); // div because bits 0->7, for different wordsizes though it responds to different bytes, solved below
+    compressed=stream->BytePtr[indx>>3]&mask;
+
+    LOG_PRINT("%ith word recieved for decode is compressed: %i",indx,compressed);
+
+
+    if(compressed!=0)
+    {
         /*Read indx*/
         for(i=0;i<floorLog2(_cam_size);i++)
         {
             bit=ReadBit(stream);
-		    bit<<=i;
-		    cam_indx|=(unsigned char)bit;
+            bit<<=i;
+            cam_indx|=(unsigned char)bit;
         }
         x=CAM_D->Read(cam_indx);
         CAM_D->Update_Lru(cam_indx);
-        
-     }
+
+    }
 
     else
     {
@@ -263,56 +266,66 @@ unsigned long int CompressionModelFVE::DecodeWord(bitstream *stream, unsigned in
         for(i=0;i<_wordsize;i++)
         {
             bit=ReadBit(stream);
-		    bit<<=i;
-		    x|=bit;
+            bit<<=i;
+            x|=bit;
         }
         cam_indx=CAM_D->Replace(x);
         CAM_D->Update_Lru(cam_indx);
-        
+
     }
 
     return x;
 }
 
 
-
-unsigned long int CompressionModelFVE::ReadWord(void *ptr, unsigned int idx)	//idx says which word of input ptr to read ( i from main code/decode loop)
+SInt64
+CompressionModelFVE::readWord(void *ptr, UInt32 idx, UInt32 word_size) // idx: which word of input ptr to read 
 {
-    unsigned long int   x;
-
-    /* Read the word as unsigned int or unsigned long int from the stream according to wordsize*/
-    switch (_wordsize)
+    SInt64 word;
+    switch (word_size)
     {
-        case 32:
-        x =(unsigned long int) ((unsigned int *) ptr)[ idx ];
-        break;
-
-        case 64:
-        x = ((unsigned long int*)ptr)[ idx ];
-        break;    
+        case 8:
+            word = ((SInt64 *)ptr)[idx];
+            break;
+        case 4:
+            word = ((SInt32 *)ptr)[idx];
+            break;    
+        case 2:
+            word = ((SInt16 *)ptr)[idx];
+            break;
+        case 1:
+            word = ((SInt8 *)ptr)[idx];
+            break;
+        default:
+            fprintf(stderr,"Unknown Base Size\n");
+            exit(1);
     }
-    return x;
+
+    return word;
 }
 
-
-
-void CompressionModelFVE::WriteWord( void *ptr, unsigned int idx, unsigned long int x )
+void 
+CompressionModelFVE::writeWord(void *ptr, UInt32 idx, SInt64 word, UInt32 word_size)
 {
-    
-    switch(_wordsize)
+    switch(word_size)
     {
-        case 32:   
-        ((unsigned int *) ptr)[ idx ] = (unsigned int)x;
-        break;
-
-        case 64:
-        ((unsigned long int*)ptr)[ idx ] = x;
-        break;
+        case 8:   
+            ((SInt64 *)ptr)[idx] = (SInt64)word;
+            break;          
+        case 4:   
+            ((SInt32 *)ptr)[idx] = (SInt32)word;
+            break;
+        case 2:
+            ((SInt16*)ptr)[idx] = (SInt16)word;
+            break;
+        case 1:
+            ((SInt8*)ptr)[idx] = (SInt8)word;
+            break;
+        default:
+            fprintf(stderr,"Unknown Base Size\n");
+            exit(1);
     }      
 }
-
-
-
 
 
 UInt32 CompressionModelFVE::decompressCacheLine(void *in, void *out)
@@ -330,32 +343,32 @@ UInt32 CompressionModelFVE::decompressCacheLine(void *in, void *out)
     {
         return 0;
     }
-    
+
     /* Initialize input bitsream - compressed buffer*/
     switch(_wordsize)
-	{
-		case 32:
-    	InitBitstream( &stream, in, outsize+2 ); //stream pointer to chr=out,stram bitpos=0 stream bytes=insize+1
-        stream.BitPos=16;
-		break;
+    {
+        case 32:
+            InitBitstream( &stream, in, outsize+2 ); //stream pointer to chr=out,stram bitpos=0 stream bytes=insize+1
+            stream.BitPos=16;
+            break;
 
-		case 64:
-		InitBitstream( &stream, in, outsize+1);
-        stream.BitPos=8;
-		break;
+        case 64:
+            InitBitstream( &stream, in, outsize+1);
+            stream.BitPos=8;
+            break;
 
-		default:
-		return 0;	
-	}
+        default:
+            return 0;	
+    }
 
     /*main decoding loop*/
     for(i=0;i<outcount;i++)
     {
         x=DecodeWord(&stream,i);
-		  LOG_PRINT("%ith decoded word: %lu",i,x);
-        WriteWord(out,i,x);
+        LOG_PRINT("%ith decoded word: %lu",i,x);
+        writeWord(out, i, x, m_word_size);
     } 
-    
+
     return 0;
 
 } 

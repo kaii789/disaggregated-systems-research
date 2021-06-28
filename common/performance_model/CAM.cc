@@ -34,7 +34,7 @@ unsigned char CAM::Replace(unsigned long int x)
         }
 
     }
-        
+
     FV_table[indx]=x;
     LRU[indx]=0x00;
 
@@ -44,7 +44,7 @@ unsigned char CAM::Replace(unsigned long int x)
 void CAM::Update_Lru(unsigned char indx)
 {
     unsigned char i,mask=0x80;
-    
+
     for(i=0;i<_size;i++)
     {
         LRU[i]>>=1;
@@ -65,7 +65,7 @@ std::pair<bool,unsigned char> CAM::Search(unsigned long int x)
         }
     if(!result.first)
         result.second=Replace(x);
-    
+
     Update_Lru(result.second);
 
     return result;
@@ -88,7 +88,7 @@ boost::tuple<bool,unsigned char, char>CAM::Find_min_diff(unsigned long int x, un
     if(hit) Write(indx,x);
     if(!hit)
         indx=Replace(x);
-    
+
     Update_Lru(indx);
     boost::tuple<bool,unsigned char,char> result = boost::make_tuple(hit,indx,diff);
     return result;
