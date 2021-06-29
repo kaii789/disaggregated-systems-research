@@ -28,20 +28,6 @@ typedef double VALUE;
 typedef float VALUE;
 #endif
 
-extern "C"
-{
-__attribute__ ((noinline)) int send_local_addrs(unsigned long int *local, int size, int tid)
-{
-    static int w = 0;
-    w = w+1;
-    w = w+8;
-    printf("[%d] first local address %lu\n", tid, local[1]);
-    printf("[%d] second local address %lu\n", tid, local[0]);
-   
-    return w;
-}
-}
-
 int main(int argc, char *argv[])
 {
 
@@ -120,8 +106,8 @@ int main(int argc, char *argv[])
     SparseMatrix<INDEX, VALUE> *A = (SparseMatrix<INDEX, VALUE> *)mat;
 
     tstart = omp_get_wtime();
-    //SpDMV<INDEX, VALUE> spdmv(A, Tuning::Nnz);
-    SpDMV<INDEX, VALUE> spdmv(A, Tuning::Round);
+    SpDMV<INDEX, VALUE> spdmv(A, Tuning::Nnz);
+    //SpDMV<INDEX, VALUE> spdmv(A, Tuning::Round);
     tstop = omp_get_wtime();
     preproc_time = tstop - tstart;
 

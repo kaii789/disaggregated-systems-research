@@ -236,11 +236,9 @@ void CSRMatrix<IndexT, ValueT>::partition_by_nnz(int nthreads) {
   int split_cnt = 0;
   int i;
   
-  // cgiannoula
   int min_nnz_per_thread = nnz_cnt;
   int max_nnz_per_thread = 0;
   float sum_nnz_per_thread = 0;  
-  // cgiannoula
 
   row_split_[0] = row_start;
   for (i = 0; i < nrows_; i++) {
@@ -248,7 +246,7 @@ void CSRMatrix<IndexT, ValueT>::partition_by_nnz(int nthreads) {
     // The number of rows assigned to each thread has to be a multiple 
     // of cache_line_size / precision (float/double). 
     // Each thread writes/"owns" a multiple of cache lines of the vector y.
-    if ((curr_nnz >= nnz_per_split) && ((i + 1) % (CACHE_LINE / sizeof(ValueT)) == 0)) { // cgiannoula for floats
+    if ((curr_nnz >= nnz_per_split) && ((i + 1) % (CACHE_LINE / sizeof(ValueT)) == 0)) {
     //if ((curr_nnz >= nnz_per_split) && ((i + 1) % BLK_FACTOR == 0)) { // cgiannoula
     //if (curr_nnz >= nnz_per_split) { // default: assuming coherence
       row_start = i + 1;
@@ -256,7 +254,6 @@ void CSRMatrix<IndexT, ValueT>::partition_by_nnz(int nthreads) {
       if (split_cnt <= nthreads)
 	    row_split_[split_cnt] = row_start;
 
-      // cgiannoula
       if (min_nnz_per_thread > curr_nnz)
           min_nnz_per_thread = curr_nnz;
 
@@ -264,7 +261,6 @@ void CSRMatrix<IndexT, ValueT>::partition_by_nnz(int nthreads) {
           max_nnz_per_thread = curr_nnz;
 
       sum_nnz_per_thread += curr_nnz;
-      // cgiannoula
 
       curr_nnz = 0;
     }
@@ -282,36 +278,29 @@ void CSRMatrix<IndexT, ValueT>::partition_by_nnz(int nthreads) {
         max_nnz_per_thread = curr_nnz;
 
     sum_nnz_per_thread += curr_nnz;
-    // cgiannoula
 
   }
 
   // If there are any remaining rows merge them in last partition
   if (split_cnt > nthreads_) {
     row_split_[nthreads_] = nrows_;
-    cout << "IF IF split cnt " << split_cnt << endl;
   }
 
   // If there are remaining threads create empty partitions
   for (int i = split_cnt + 1; i <= nthreads; i++) {
     row_split_[i] = nrows_;
 
-    // cgiannoula
     if (min_nnz_per_thread > 0)
         min_nnz_per_thread = 0;
-    cout << "FOR split cnt " << i << endl;
-    // cgiannoula
   }
 
   part_by_nnz_ = true;
 
 
-  // cgiannoula
   cout << "[min_nnz_per_thread] : " << min_nnz_per_thread << endl;
   cout << "[max_nnz_per_thread] : " << max_nnz_per_thread << endl;
   cout << "[avg_nnz_per_thread] : " << sum_nnz_per_thread / nthreads << endl;
   cout << "[#threads with zero computation] : " << nthreads - split_cnt << endl;
-  // cgiannoula
 
 }
 
