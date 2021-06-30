@@ -15,7 +15,7 @@
 class CompressionModelBDI : public CompressionModel
 {
 public:
-   CompressionModelBDI(String name, UInt32 page_size, UInt32 cache_line_size, int compression_latency_config, int decompression_latency_config);
+   CompressionModelBDI(String name, UInt32 page_size, UInt32 cache_line_size);
    ~CompressionModelBDI();
 
    SubsecondTime compress(IntPtr addr, size_t data_size, core_id_t core_id, UInt32 *compressed_page_size, UInt32 *compressed_cache_lines);
@@ -35,10 +35,12 @@ private:
        UInt32 compressed_size; // In bytes
     } ;
 
-    // Compression latency per cache line - cgiannoula: To be checked
-    UInt32 m_compression_latency = 3; // cgiannoula: Could be given in config file
+    // Compression latency per cache line 
+    UInt32 m_compression_latency = 3; 
     // Decompression latency per cache line
-    UInt32 m_decompression_latency = 3; // cgiannoula: Could be given in config file
+    UInt32 m_decompression_latency = 3; 
+
+    int m_compression_granularity;
 
 
     SInt64 readWord(void*, UInt32, UInt32);

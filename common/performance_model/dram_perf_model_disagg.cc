@@ -164,11 +164,9 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     m_use_compression = Sim()->getCfg()->getBool("perf_model/dram/compression_model/use_compression");
     if (m_use_compression) {
         String compression_scheme = Sim()->getCfg()->getString("perf_model/dram/compression_model/compression_scheme");
-        int compression_latency_config = Sim()->getCfg()->getInt("perf_model/dram/compression_model/compression_latency");
-        int decompression_latency_config = Sim()->getCfg()->getInt("perf_model/dram/compression_model/decompression_latency");
         UInt32 gran_size = m_r_cacheline_gran ? m_cache_line_size : m_page_size;
 
-        m_compression_model = CompressionModel::create("Link Compression Model", gran_size, m_cache_line_size, compression_scheme, compression_latency_config, decompression_latency_config);
+        m_compression_model = CompressionModel::create("Link Compression Model", gran_size, m_cache_line_size, compression_scheme);
         registerStatsMetric("compression", core_id, "bytes-saved", &bytes_saved);
         registerStatsMetric("compression", core_id, "total-compression-latency", &m_total_compression_latency);
         registerStatsMetric("compression", core_id, "total-decompression-latency", &m_total_decompression_latency);
@@ -447,7 +445,11 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     {
         UInt32 compressed_cache_lines;
         SubsecondTime compression_latency = m_compression_model->compress(phys_page, m_cache_line_size, m_core_id, &size, &compressed_cache_lines);
-        bytes_saved += m_cache_line_size - size;
+        if (m_cache_line_size > size)
+            bytes_saved += m_cache_line_size - size;
+        else
+            bytes_saved -= size - m_cache_line_size;
+
         address_to_compressed_size[phys_page] = size;
         address_to_num_cache_lines[phys_page] = compressed_cache_lines;
         m_total_compression_latency += compression_latency;
@@ -532,7 +534,11 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             {
                 UInt32 compressed_cache_lines;
                 SubsecondTime compression_latency = m_compression_model->compress(phys_page, m_page_size, m_core_id, &page_size, &compressed_cache_lines);
-                bytes_saved += m_page_size - page_size;
+                if (m_page_size > page_size)
+                    bytes_saved += m_page_size - page_size;
+                else
+                    bytes_saved -= page_size - m_page_size;
+         
                 address_to_compressed_size[phys_page] = page_size;
                 address_to_num_cache_lines[phys_page] = compressed_cache_lines;
                 m_total_compression_latency += compression_latency;
@@ -549,11 +555,11 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
                 SubsecondTime alternative_page_delay = m_data_movement->computeQueueDelayNoEffect(t_now, m_r_bus_bandwidth.getRoundedLatency(8*page_size), requester);
                 if (alternative_page_delay > datamovement_queue_delay) {
                     m_redundant_moves_type1_time_savings += (alternative_page_delay - datamovement_queue_delay);
-                    LOG_PRINT("partition_queue=1 resulted in savings of APPROX %lu ns in getAccessLatencyRemote", (alternative_page_delay - datamovement_queue_delay).getNS());
+                    // LOG_PRINT("partition_queue=1 resulted in savings of APPROX %lu ns in getAccessLatencyRemote", (alternative_page_delay - datamovement_queue_delay).getNS());
                 } else {
                     m_redundant_moves_type1_time_savings -= (datamovement_queue_delay - alternative_page_delay);
                     ++m_redundant_moves_type1_cache_slower_than_page;
-                    LOG_PRINT("partition_queue=1 resulted in INCREASE of APPROX %lu ns in getAccessLatencyRemote", (datamovement_queue_delay - alternative_page_delay).getNS());
+                    // LOG_PRINT("partition_queue=1 resulted in INCREASE of APPROX %lu ns in getAccessLatencyRemote", (datamovement_queue_delay - alternative_page_delay).getNS());
                 }
             } else {
                 page_datamovement_queue_delay = m_data_movement->computeQueueDelayTrackBytes(t_now, m_r_bus_bandwidth.getRoundedLatency(8*page_size), page_size, requester);
@@ -778,7 +784,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
         SubsecondTime access_latency = t_now - pkt_time;
         m_total_local_access_latency += access_latency;
         m_total_access_latency += access_latency;
-        LOG_PRINT("getAccessLatency branch 1: %lu ns", access_latency.getNS());
+        // LOG_PRINT("getAccessLatency branch 1: %lu ns", access_latency.getNS());
         return access_latency;
     } else {
         // The phys_age is an inflight page and m_r_enable_selective_moves is false
@@ -801,7 +807,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                             ++m_redundant_moves;
                             ++m_redundant_moves_type2;
                             m_inflight_redundant[phys_page] = m_inflight_redundant[phys_page] + 1;
-                            LOG_PRINT("getAccessLatency (local dram) inflight page saving of %lu ns", (access_latency-(datamov_queue_delay + t_now - pkt_time)).getNS());
+                            // LOG_PRINT("getAccessLatency (local dram) inflight page saving of %lu ns", (access_latency-(datamov_queue_delay + t_now - pkt_time)).getNS());
                             m_redundant_moves_type2_time_savings += (access_latency - (datamov_queue_delay + t_now - pkt_time));
                             access_latency = datamov_queue_delay + t_now - pkt_time;
                         }
@@ -812,7 +818,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                         ++m_redundant_moves_type2;
                         m_inflight_redundant[phys_page] = m_inflight_redundant[phys_page] + 1; 
                         if ((datamov_queue_delay + t_now - pkt_time) < access_latency) {
-                            LOG_PRINT("getAccessLatency (local dram) inflight page saving of %lu ns", (access_latency-(datamov_queue_delay + t_now - pkt_time)).getNS());
+                            // LOG_PRINT("getAccessLatency (local dram) inflight page saving of %lu ns", (access_latency-(datamov_queue_delay + t_now - pkt_time)).getNS());
                             m_redundant_moves_type2_time_savings += (access_latency - (datamov_queue_delay + t_now - pkt_time));
                             access_latency = datamov_queue_delay + t_now - pkt_time;
                         }
@@ -825,7 +831,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
         }
         m_total_local_access_latency += access_latency;
         m_total_access_latency += access_latency;
-        LOG_PRINT("getAccessLatency branch 2: %lu ns", access_latency.getNS());
+        // LOG_PRINT("getAccessLatency branch 2: %lu ns", access_latency.getNS());
         return access_latency;  
     }
 }
@@ -946,7 +952,11 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
                 UInt32 gran_size = size;
                 UInt32 compressed_cache_lines;
                 SubsecondTime compression_latency = m_compression_model->compress(phys_page, gran_size, m_core_id, &size, &compressed_cache_lines);
-                bytes_saved += gran_size - size;
+                if (gran_size > size)
+                    bytes_saved += gran_size - size;
+                else
+                    bytes_saved -= size - gran_size;
+ 
                 address_to_compressed_size[phys_page] = size;
                 address_to_num_cache_lines[phys_page] = compressed_cache_lines;
                 evict_compression_latency += compression_latency;
@@ -990,7 +1000,11 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
                 UInt32 gran_size = size;
                 UInt32 compressed_cache_lines;
                 SubsecondTime compression_latency = m_compression_model->compress(phys_page, gran_size, m_core_id, &size, &compressed_cache_lines);
-                bytes_saved += gran_size - size;
+                if (gran_size > size)
+                    bytes_saved += gran_size - size;
+                else
+                    bytes_saved -= size - gran_size;
+ 
                 address_to_compressed_size[phys_page] = size;
                 address_to_num_cache_lines[phys_page] = compressed_cache_lines;
                 evict_compression_latency += compression_latency;

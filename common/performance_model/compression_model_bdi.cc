@@ -1,21 +1,28 @@
 #include "compression_model_bdi.h"
 #include "utils.h"
+#include "config.hpp"
 
-CompressionModelBDI::CompressionModelBDI(String name, UInt32 page_size, UInt32 cache_line_size, int compression_latency_config, int decompression_latency_config)
+CompressionModelBDI::CompressionModelBDI(String name, UInt32 page_size, UInt32 cache_line_size)
     : m_name(name)
     , m_page_size(page_size)
     , m_cache_line_size(cache_line_size)
+    , m_compression_granularity(Sim()->getCfg()->getInt("perf_model/dram/compression_model/bdi/compression_granularity"))
 {
+    // Set compression/decompression cycle latencies if configured
+    if (Sim()->getCfg()->getInt("perf_model/dram/compression_model/bdi/compression_latency") != -1)
+        m_compression_latency = Sim()->getCfg()->getInt("perf_model/dram/compression_model/bdi/compression_latency");
+    if (Sim()->getCfg()->getInt("perf_model/dram/compression_model/bdi/decompression_latency") != -1)
+        m_decompression_latency = Sim()->getCfg()->getInt("perf_model/dram/compression_model/bdi/decompression_latency");
+
+    if (m_compression_granularity != -1) {
+        m_cache_line_size = m_compression_granularity;
+    }
+
     m_cacheline_count = m_page_size / m_cache_line_size;
     m_data_buffer = new char[m_page_size];
     m_compressed_data_buffer = new char[m_page_size + m_cacheline_count];
     m_compressed_cache_line_sizes = new UInt32[m_cacheline_count];
 
-    // Set compression/decompression cycle latencies if configured
-    if (compression_latency_config != -1)
-        m_compression_latency = compression_latency_config;
-    if (decompression_latency_config != -1)
-        m_decompression_latency = decompression_latency_config;
 }
 
 CompressionModelBDI::~CompressionModelBDI()
@@ -58,7 +65,7 @@ CompressionModelBDI::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
     *compressed_page_size = total_bytes;
 
     // Return compression latency
-    ComponentLatency compress_latency(ComponentLatency(core->getDvfsDomain(), total_compressed_cache_lines * m_compression_latency));
+    ComponentLatency compress_latency(ComponentLatency(core->getDvfsDomain(), m_cacheline_count  * m_compression_latency));
     return compress_latency.getLatency();
 
 }
@@ -170,25 +177,6 @@ void
 CompressionModelBDI::repeatedValues(void* in, m_compress_info *res, void* out)
 {
     //  Repeated value compression checks if a cache line has the same 1/2/4/8 byte value repeated. If so, it compresses the cache line to the corresponding value
-    /*
-    //  FIXME cgiannoula - now it only works with 8-byte granularity
-    SInt64 base;
-    UInt32 i;
-    base = ((SInt64*)in)[0];
-    for (i=1; i < (m_cache_line_size / 8); i++) 
-        if ((base - ((SInt64*)in)[i]) !=0)
-            break;
-    
-    if (i == m_cache_line_size) {
-        res->is_compressible = true;
-        res->compressed_size = 8;
-        writeWord(out, 0, base, 8);
-    } else {
-        res->is_compressible = false;
-        res->compressed_size = m_cache_line_size;
-    }
-    */
-
     SInt64 base;
     bool repeated;
     UInt32 i;

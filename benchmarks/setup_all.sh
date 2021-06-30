@@ -27,3 +27,10 @@ echo
 echo "Creating graph input file..."
 cd ../inputs
 ./create_rMat_1000000.sh
+
+# Set up SpMV
+# Compile SpMV
+echo
+echo "Compiling SpMV..."
+cd ../../spmv
+make
