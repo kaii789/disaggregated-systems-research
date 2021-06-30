@@ -55,6 +55,7 @@ QueueModelWindowedMG1Remote::QueueModelWindowedMG1Remote(String name, UInt32 id,
    registerStatsMetric(name, id, "max-effective-bandwidth-bytes", &m_max_effective_bandwidth_bytes);
    registerStatsMetric(name, id, "max-effective-bandwidth-ps", &m_max_effective_bandwidth_ps);
 
+   // Only tracked m_total_requests is incremented and addItems() is called (ie once per actual queue delay request)
    registerStatsMetric(name, id, "num-effective-bandwidth-exceeded-allowable-max", &m_effective_bandwidth_exceeded_allowable_max);
 }
 
@@ -102,8 +103,8 @@ QueueModelWindowedMG1Remote::~QueueModelWindowedMG1Remote()
    // std::cout << "CDF X values (bandwidth), in GB/s:\n" << cdf_buffer.str() << std::endl;
    // std::cout << "CDF Y values (probability):\n" << percentages_buffer.str() << std::endl;
 
-   if (m_effective_bandwidth_exceeded_allowable_max / m_total_requests > 0.01) {
-      std::cout << "Queue " << m_name << " had " << m_effective_bandwidth_exceeded_allowable_max / m_total_requests;
+   if ((double) m_effective_bandwidth_exceeded_allowable_max / m_total_requests > 0.01) {
+      std::cout << "Queue " << m_name << " had " << 100 * (double)m_effective_bandwidth_exceeded_allowable_max / m_total_requests;
       std::cout << "% of windows with effective bandwidth that exceeded the allowable max bandwidth of " << m_specified_bw_GB_per_s * m_max_bandwidth_allowable_excess_ratio << "GB/s" << std::endl;
    }
 }
@@ -116,7 +117,7 @@ QueueModelWindowedMG1Remote::~QueueModelWindowedMG1Remote()
 //    SubsecondTime main = Sim()->getClockSkewMinimizationServer()->getGlobalTime() > m_window_size ? Sim()->getClockSkewMinimizationServer()->getGlobalTime() - m_window_size : SubsecondTime::Zero();
 //    SubsecondTime time_point = SubsecondTime::max(main, backup);
 //    removeItems(time_point);
-//    removeItemsUpdateBytes(time_point, pkt_time);
+//    removeItemsUpdateBytes(time_point, pkt_time, false);
 
 //    // Use queue utilization as measure to determine whether the queue is full
 //    double utilization = (double)m_service_time_sum / m_window_size.getPS();
@@ -131,7 +132,7 @@ double QueueModelWindowedMG1Remote::getQueueUtilizationPercentage(SubsecondTime 
    SubsecondTime main = Sim()->getClockSkewMinimizationServer()->getGlobalTime() > m_window_size ? Sim()->getClockSkewMinimizationServer()->getGlobalTime() - m_window_size : SubsecondTime::Zero();
    SubsecondTime time_point = SubsecondTime::max(main, backup);
    removeItems(time_point);
-   removeItemsUpdateBytes(time_point, pkt_time);
+   removeItemsUpdateBytes(time_point, pkt_time, false);
 
    // Use queue utilization as measure to determine whether the queue is full
    double utilization = (double)m_service_time_sum / m_window_size.getPS();
@@ -214,7 +215,7 @@ QueueModelWindowedMG1Remote::computeQueueDelayNoEffect(SubsecondTime pkt_time, S
    SubsecondTime main = Sim()->getClockSkewMinimizationServer()->getGlobalTime() > m_window_size ? Sim()->getClockSkewMinimizationServer()->getGlobalTime() - m_window_size : SubsecondTime::Zero();
    SubsecondTime time_point = SubsecondTime::max(main, backup);
    removeItems(time_point);
-   removeItemsUpdateBytes(time_point, pkt_time);
+   removeItemsUpdateBytes(time_point, pkt_time, false);
 
    if (m_num_arrivals > 1)
    {
@@ -266,7 +267,7 @@ QueueModelWindowedMG1Remote::computeQueueDelayTrackBytes(SubsecondTime pkt_time,
    // }
    SubsecondTime time_point = SubsecondTime::max(main, backup);
    removeItems(time_point);
-   removeItemsUpdateBytes(time_point, pkt_time);
+   removeItemsUpdateBytes(time_point, pkt_time, true);  // only track effective bandwidth when m_total_requests is incremented and addItems() is called
 
    if (m_name == "dram-datamovement-queue")
       LOG_PRINT("m_num_arrivals=%ld before if statement", m_num_arrivals);
@@ -326,7 +327,7 @@ QueueModelWindowedMG1Remote::addItemUpdateBytes(SubsecondTime pkt_time, UInt64 n
 }
 
 void
-QueueModelWindowedMG1Remote::removeItemsUpdateBytes(SubsecondTime earliest_time, SubsecondTime pkt_time)
+QueueModelWindowedMG1Remote::removeItemsUpdateBytes(SubsecondTime earliest_time, SubsecondTime pkt_time, bool track_effective_bandwidth)
 {
    // Can remove packets that arrived earlier than the current window
    while(!m_packet_bytes.empty() && m_packet_bytes.begin()->first < earliest_time)
@@ -342,20 +343,23 @@ QueueModelWindowedMG1Remote::removeItemsUpdateBytes(SubsecondTime earliest_time,
       bytes_in_window -= bytes_entry->second;
    }
    
-   // Compute the effective current window length, and calculate the current effective bandwidth
-   // Note: bytes_in_window is used instead of m_bytes_tracking
-   UInt64 effective_window_length_ps = (pkt_time - earliest_time).getPS();
-   double cur_effective_bandwidth = (double)bytes_in_window / effective_window_length_ps;  // in bytes/ps
-   if (cur_effective_bandwidth > m_max_effective_bandwidth) {
-      m_max_effective_bandwidth = cur_effective_bandwidth;
-      m_max_effective_bandwidth_bytes = bytes_in_window;
-      m_max_effective_bandwidth_ps = effective_window_length_ps;
+   // Intention: only track effective bandwidth when m_total_requests is incremented and addItems() is called
+   if (track_effective_bandwidth) {
+      // Compute the effective current window length, and calculate the current effective bandwidth
+      // Note: bytes_in_window is used instead of m_bytes_tracking
+      UInt64 effective_window_length_ps = (pkt_time - earliest_time).getPS();
+      double cur_effective_bandwidth = (double)bytes_in_window / effective_window_length_ps;  // in bytes/ps
+      if (cur_effective_bandwidth > m_max_effective_bandwidth) {
+         m_max_effective_bandwidth = cur_effective_bandwidth;
+         m_max_effective_bandwidth_bytes = bytes_in_window;
+         m_max_effective_bandwidth_ps = effective_window_length_ps;
+      }
+      if (cur_effective_bandwidth * 1000 > m_specified_bw_GB_per_s * m_max_bandwidth_allowable_excess_ratio) {  // GB/s used here
+         ++m_effective_bandwidth_exceeded_allowable_max;
+      }
+      
+      // m_effective_bandwidth_tracker.push_back(cur_effective_bandwidth);
    }
-   if (cur_effective_bandwidth * 1000 > m_specified_bw_GB_per_s * m_max_bandwidth_allowable_excess_ratio) {  // GB/s used here
-      ++m_effective_bandwidth_exceeded_allowable_max;
-   }
-   
-   // m_effective_bandwidth_tracker.push_back(cur_effective_bandwidth);
 }
 
 
