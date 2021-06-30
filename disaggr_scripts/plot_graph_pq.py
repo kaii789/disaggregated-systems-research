@@ -218,6 +218,25 @@ def save_graph_pq(
         ]
     elif len(y_values[0]) == 4:  # Older experiment config setup
         x_axis = ["remote mem\ndisabled", "pq0\n0 network\nlatency", "pq0", "pq1"]
+    elif len(y_values[0]) > 7:  # PQ and cacheline combined series
+        x_axis = [
+            "remote mem\ndisabled",
+            "page\nmove\ninstant",
+            "page\nmove\nnet lat\nonly",
+            "page\nmove\nbw\nonly",
+            "pq0",
+            "pq1\ncacheline=0.1",
+            "pq1\ncacheline=0.15",
+            "pq1\ncacheline=0.2",
+            "pq1\ncacheline=0.25",
+            "pq1\ncacheline=0.3",
+            "pq1\ncacheline=0.35",
+            "pq1\ncacheline=0.4",
+            "pq1\ncacheline=0.45",
+            "pq1\ncacheline=0.5",
+            "pq1\ncacheline=0.55",
+            "pq1\ncacheline=0.6",
+        ]
     else:
         raise ValueError("number of experiment runs={}, inaccurate?".format(len(y_values[0])))
 

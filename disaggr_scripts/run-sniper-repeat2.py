@@ -1125,22 +1125,204 @@ if __name__ == "__main__":
         )
         cacheline_queue_ratio_configs.append(config_copy)
 
-    pq_cacheline_combined_configs = []
+    pq_cacheline_combined_remote_init_false_configs = []
+    # Only want runs number 1-5 in partition_queue_series_experiment_run_configs
     for config in (
-        partition_queue_series_experiment_run_configs + cacheline_queue_ratio_configs
+        partition_queue_series_experiment_run_configs[0:5] + cacheline_queue_ratio_configs
     ):
         config_copy = copy.deepcopy(config)
-        config_copy.add_config_entry(
-            ConfigEntry("perf_model/dram/compression_model", "use_compression", "false")
+        config_copy.add_config_entries([
+            ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
+            ConfigEntry("perf_model/dram/compression_model", "remote_init", "false"),
+        ]
         )
-        pq_cacheline_combined_configs.append(config_copy)
+        pq_cacheline_combined_remote_init_false_configs.append(config_copy)
+
+    pq_cacheline_combined_remote_init_true_configs = []
+    # Only want runs number 1-5 in partition_queue_series_experiment_run_configs
+    for config in (
+        partition_queue_series_experiment_run_configs[0:5] + cacheline_queue_ratio_configs
+    ):
+        config_copy = copy.deepcopy(config)
+        config_copy.add_config_entries([
+            ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
+            ConfigEntry("perf_model/dram/compression_model", "remote_init", "true"),
+        ]
+        )
+        pq_cacheline_combined_remote_init_true_configs.append(config_copy)
+
+
+    #################################
 
     experiments = []
 
-    darknet_all_models_cacheline_combined_experiments = []
+    # # Running the whole program
+    # for model_type in ["tiny", "darknet", "resnet50", "darknet19", "vgg-16"]:
+    #     command_str = darknet_base_str_options.format(
+    #         model_type,
+    #         sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={}".format(
+    #             int(16384),
+    #             int(120),
+    #             int(4),
+    #         ),
+    #     )
+
+    #     experiments.append(
+    #         Experiment(
+    #             experiment_name="darknet_{}_memory_usage_test_entire_roi".format(
+    #                 model_type.lower(),
+    #             ),
+    #             command_str=command_str,
+    #             experiment_run_configs=[
+    #                 ExperimentRunConfig(
+    #                     [
+    #                         ConfigEntry(
+    #                             "perf_model/dram", "enable_remote_mem", "false"
+    #                         ),
+    #                     ]
+    #                 )
+    #             ],
+    #             output_root_directory=".",
+    #         )
+    #     )
+
+    # # Running 2 billion instructions
+    # for model_type in ["tiny", "darknet", "resnet50", "darknet19", "vgg-16"]:
+    #     command_str = darknet_base_str_options.format(
+    #         model_type,
+    #         sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+    #             int(16384),
+    #             int(120),
+    #             int(4),
+    #             int(2000 * ONE_MILLION),
+    #         ),
+    #     )
+
+    #     experiments.append(
+    #         Experiment(
+    #             experiment_name="darknet_{}_memory_usage_test_roi_2bil".format(
+    #                 model_type.lower(),
+    #             ),
+    #             command_str=command_str,
+    #             experiment_run_configs=[
+    #                 ExperimentRunConfig(
+    #                     [
+    #                         ConfigEntry(
+    #                             "perf_model/dram", "enable_remote_mem", "false"
+    #                         ),
+    #                     ]
+    #                 )
+    #             ],
+    #             output_root_directory=".",
+    #         )
+    #     )
+
+    # # Running the whole program
+    # application_name = "BFS"
+    # for ligra_input_selection in ["regular_input", "reg_10x", "reg_8x"]:
+    #     command_str = ligra_base_str_options.format(
+    #             application_name,
+    #             ligra_input_to_file[ligra_input_selection],
+    #             sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={}".format(
+    #                 int(16384), int(120), int(4)
+    #             ),
+    #         )
+
+    #     experiments.append(
+    #         Experiment(
+    #             experiment_name="ligra_{}_{}memory_usage_test_entire_roi".format(
+    #                 application_name.lower(),
+    #                 ""
+    #                 if ligra_input_selection == "regular_input"
+    #                 else ligra_input_selection + "_",
+    #             ),
+    #             command_str=command_str,
+    #             experiment_run_configs=[
+    #                 ExperimentRunConfig(
+    #                     [
+    #                         ConfigEntry(
+    #                             "perf_model/dram", "enable_remote_mem", "false"
+    #                         ),
+    #                     ]
+    #                 )
+    #             ],
+    #             output_root_directory=".",
+    #         )
+    #     )
+
+    # # 1 Bil cap
+    # application_name = "PageRank"
+    # for ligra_input_selection in ["regular_input", "reg_8x"]:
+    #     command_str = ligra_base_str_options.format(
+    #         application_name,
+    #         ligra_input_to_file[ligra_input_selection],
+    #         sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+    #             int(16384), int(120), int(4), int(1000 * ONE_MILLION)
+    #         )
+    #     )
+    #     # 1 billion cap
+
+    #     experiments.append(
+    #         Experiment(
+    #             experiment_name="ligra_{}_{}memory_usage_test_roi_1bil".format(
+    #                 application_name.lower(),
+    #                 ""
+    #                 if ligra_input_selection == "regular_input"
+    #                 else ligra_input_selection + "_",
+    #             ),
+    #             command_str=command_str,
+    #             experiment_run_configs=[
+    #                 ExperimentRunConfig(
+    #                     [
+    #                         ConfigEntry(
+    #                             "perf_model/dram", "enable_remote_mem", "false"
+    #                         ),
+    #                     ]
+    #                 )
+    #             ],
+    #             output_root_directory=".",
+    #         )
+    #     )
+
+
+    # BFS, reg_8x, 64 & 32 MB, 2 Billion instructions cap
+    bfs_reg_8x_pq_experiments = []
+    ligra_input_selection = "reg_8x"  # "regular_input" OR "small_input"
+    ligra_input_file = ligra_input_to_file[ligra_input_selection]
+    application_name = "BFS"
+    for num_MB in [64, 32]:
+        localdram_size_str = "{}MB".format(num_MB)
+        command_str = ligra_base_str_options.format(
+            application_name,
+            ligra_input_file,
+            sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+                int(num_MB * ONE_MB_TO_BYTES), int(120), int(4), int(2000 * ONE_MILLION)
+            ),
+        )
+
+        bfs_reg_8x_pq_experiments.append(
+            Experiment(
+                experiment_name="ligra_{}_{}localdram_{}_netlat_120_bw_scalefactor_{}_8x_test".format(
+                    application_name.lower(),
+                    ""
+                    if ligra_input_selection == "regular_input"
+                    else ligra_input_selection + "_",
+                    localdram_size_str,
+                    4,
+                ),
+                command_str=command_str,
+                experiment_run_configs=[pq_cacheline_combined_remote_init_false_configs[4], pq_cacheline_combined_remote_init_false_configs[-3]],  # pq=0 + pq=1 w/ 0.5 cacheline
+                output_root_directory=".",
+            )
+        )
+    # experiments.extend(bfs_reg_8x_pq_experiments)
+    
+
+
+    darknet_all_models_pq_cacheline_combined_experiments = []
     for model_type in ["tiny", "darknet19", "resnet50"]:
-        for num_MB in [4]:
-            for bw_scalefactor in [4]:
+        for num_MB in [2]:
+            for bw_scalefactor in [4, 8, 32]:
                 localdram_size_str = "{}MB".format(num_MB)
                 command_str = darknet_base_str_options.format(
                     model_type,
@@ -1153,16 +1335,148 @@ if __name__ == "__main__":
                 )
                 # 1 billion instructions cap
 
-                darknet_all_models_cacheline_combined_experiments.append(
+                darknet_all_models_pq_cacheline_combined_experiments.append(
                     Experiment(
                         experiment_name="darknet_{}_localdram_{}_netlat_120_bw_scalefactor_{}_pq_cacheline_combined_series".format(
                             model_type.lower(), localdram_size_str, bw_scalefactor
                         ),
                         command_str=command_str,
-                        experiment_run_configs=pq_cacheline_combined_configs,
+                        experiment_run_configs=pq_cacheline_combined_remote_init_false_configs,
                         output_root_directory=".",
                     )
                 )
+                
+    darknet_tiny_4MB_pq_cacheline_combined_experiments = []
+    for model_type in ["tiny"]:
+        for num_MB in [4]:
+            for bw_scalefactor in [4, 8, 32]:
+                localdram_size_str = "{}MB".format(num_MB)
+                command_str = darknet_base_str_options.format(
+                    model_type,
+                    sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+                        int(num_MB * ONE_MB_TO_BYTES),
+                        int(120),
+                        int(bw_scalefactor),
+                        int(1000 * ONE_MILLION),
+                    ),
+                )
+                # 1 billion instructions cap
+
+                darknet_tiny_4MB_pq_cacheline_combined_experiments.append(
+                    Experiment(
+                        experiment_name="darknet_{}_localdram_{}_netlat_120_bw_scalefactor_{}_pq_cacheline_combined_series".format(
+                            model_type.lower(), localdram_size_str, bw_scalefactor
+                        ),
+                        command_str=command_str,
+                        experiment_run_configs=pq_cacheline_combined_remote_init_false_configs,
+                        output_root_directory=".",
+                    )
+                )
+
+    bcsstk32_pq_cacheline_combined_experiments = []
+    for num_B in [131072, 262144]:
+        for bw_scalefactor in [4, 8, 32]:
+            localdram_size_str = "{}B".format(num_B)
+            command_str = command_str2c_base_options.format(
+                sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={}".format(
+                    int(num_B), int(120), int(bw_scalefactor)
+                ),
+            )
+
+            bcsstk32_pq_cacheline_combined_experiments.append(
+                Experiment(
+                    experiment_name="bcsstk32_localdram_{}_bw_scalefactor_{}_pq_cacheline_combined_series".format(
+                        localdram_size_str, bw_scalefactor
+                    ),
+                    command_str=command_str,
+                    experiment_run_configs=pq_cacheline_combined_remote_init_false_configs,
+                    output_root_directory=".",
+                )
+            )
+    bcsstk32_pq_cacheline_combined_remote_init_true_experiments = []
+    for num_B in [131072, 262144]:
+        for bw_scalefactor in [4, 8, 32]:
+            localdram_size_str = "{}B".format(num_B)
+            command_str = command_str2c_base_options.format(
+                sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={}".format(
+                    int(num_B), int(120), int(bw_scalefactor)
+                ),
+            )
+
+            bcsstk32_pq_cacheline_combined_remote_init_true_experiments.append(
+                Experiment(
+                    experiment_name="bcsstk32_localdram_{}_bw_scalefactor_{}_remoteinit_{}_pq_cacheline_combined_series".format(
+                        localdram_size_str, bw_scalefactor, "true"
+                    ),
+                    command_str=command_str,
+                    experiment_run_configs=pq_cacheline_combined_remote_init_true_configs,
+                    output_root_directory=".",
+                )
+            )
+
+    # BFS, 8 MB
+    bfs_pq_cacheline_combined_experiments = []
+    ligra_input_selection = "regular_input"  # "regular_input" OR "small_input"
+    ligra_input_file = ligra_input_to_file[ligra_input_selection]
+    application_name = "BFS"
+    for num_MB in [8]:  # 16
+        for bw_scalefactor in [4, 8, 32]:
+            localdram_size_str = "{}MB".format(num_MB)
+            command_str = ligra_base_str_options.format(
+                application_name,
+                ligra_input_file,
+                sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={}".format(
+                    int(num_MB * ONE_MB_TO_BYTES), int(120), int(bw_scalefactor)
+                ),
+            )
+
+            bfs_pq_cacheline_combined_experiments.append(
+                Experiment(
+                    experiment_name="ligra_{}_{}localdram_{}_netlat_120_bw_scalefactor_{}_pq_cacheline_combined_series".format(
+                        application_name.lower(),
+                        ""
+                        if ligra_input_selection == "regular_input"
+                        else ligra_input_selection + "_",
+                        localdram_size_str,
+                        bw_scalefactor,
+                    ),
+                    command_str=command_str,
+                    experiment_run_configs=pq_cacheline_combined_remote_init_false_configs,
+                    output_root_directory=".",
+                )
+            )
+
+    bfs_pq_cacheline_combined_remote_init_true_experiments = []
+    ligra_input_selection = "regular_input"  # "regular_input" OR "small_input"
+    ligra_input_file = ligra_input_to_file[ligra_input_selection]
+    application_name = "BFS"
+    for num_MB in [8]:  # 16
+        for bw_scalefactor in [4, 8, 32]:
+            localdram_size_str = "{}MB".format(num_MB)
+            command_str = ligra_base_str_options.format(
+                application_name,
+                ligra_input_file,
+                sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={}".format(
+                    int(num_MB * ONE_MB_TO_BYTES), int(120), int(bw_scalefactor)
+                ),
+            )
+
+            bfs_pq_cacheline_combined_remote_init_true_experiments.append(
+                Experiment(
+                    experiment_name="ligra_{}_{}localdram_{}_netlat_120_bw_scalefactor_{}_remoteinit_{}_pq_cacheline_combined_series".format(
+                        application_name.lower(),
+                        ""
+                        if ligra_input_selection == "regular_input"
+                        else ligra_input_selection + "_",
+                        localdram_size_str,
+                        bw_scalefactor,
+                        "true"
+                    ),
+                    command_str=command_str,
+                    experiment_run_configs=pq_cacheline_combined_remote_init_true_configs,
+                    output_root_directory=".",
+                )
+            )
 
     darknet_tiny_pq_experiments_noicountstop = []
     model_type = "tiny"
@@ -1267,6 +1581,14 @@ if __name__ == "__main__":
 
     # experiments.extend(bcsstk32_bw_verification_experiments)
     # experiments.extend(bfs_bw_verification_experiments)
+
+    experiments.extend(bcsstk32_pq_cacheline_combined_experiments)
+    # experiments.extend(darknet_tiny_4MB_pq_cacheline_combined_experiments)
+    # experiments.extend(darknet_all_models_pq_cacheline_combined_experiments)
+    experiments.extend(bfs_pq_cacheline_combined_experiments)
+    
+    experiments.extend(bcsstk32_pq_cacheline_combined_remote_init_true_experiments)
+    experiments.extend(bfs_pq_cacheline_combined_remote_init_true_experiments)
 
     # Find log filename, to not overwrite previous logs
     log_filename = "run-sniper-repeat2_1.log"
