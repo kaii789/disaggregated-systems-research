@@ -7,6 +7,8 @@
 #include "address_home_lookup.h"
 #include "utils.h"
 
+#include <algorithm>
+
 DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_size, AddressHomeLookup* address_home_lookup)
     : DramPerfModel(core_id, cache_block_size)
     , m_core_id(core_id)
@@ -255,6 +257,104 @@ DramPerfModelDisagg::~DramPerfModelDisagg()
     if(m_r_partition_queues == 1) {
         delete m_data_movement_2;
     }
+
+    // Add values in the map at the end of program execution to throttled_pages_tracker_values
+    for (std::map<UInt64, std::pair<SubsecondTime, UInt32>>::iterator it = throttled_pages_tracker.begin(); it != throttled_pages_tracker.end(); ++it) {
+        // if ((it->second).second > 0)
+        throttled_pages_tracker_values.push_back(std::pair<UInt64, UInt32>(it->first, (it->second).second));
+    }
+    if (throttled_pages_tracker_values.size() < 1) {
+        return;
+    }
+
+    // Build vectors of the stats we want
+    std::cout << "dram_perf_model_disagg.cc:" << std::endl;
+    std::vector<UInt32> throttled_pages_tracker_individual_counts;  // counts for the same phys_page are separate values
+    std::map<UInt64, UInt32> throttled_pages_tracker_page_aggregated_counts_map;  // temporary variable
+    std::vector<UInt32> throttled_pages_tracker_page_aggregated_counts;  // aggregate all numbers for a particular phys_page together
+    for (std::vector<std::pair<UInt64, UInt32>>::iterator it = throttled_pages_tracker_values.begin(); it != throttled_pages_tracker_values.end(); ++it) {
+        UInt64 phys_page = it->first;
+        UInt32 count = it->second;
+
+        throttled_pages_tracker_individual_counts.push_back(count);  // update individual counts
+
+        if (!throttled_pages_tracker_page_aggregated_counts_map.count(phys_page)) {  // update aggregated counts map
+            throttled_pages_tracker_page_aggregated_counts_map[phys_page] = 0;
+        }
+        throttled_pages_tracker_page_aggregated_counts_map[phys_page] += count;
+    }
+    // Generate aggregated counts vector
+    for (std::map<UInt64, UInt32>::iterator it = throttled_pages_tracker_page_aggregated_counts_map.begin(); it != throttled_pages_tracker_page_aggregated_counts_map.end(); ++it) {
+        throttled_pages_tracker_page_aggregated_counts.push_back(it->second);
+    }
+    std::sort(throttled_pages_tracker_individual_counts.begin(), throttled_pages_tracker_individual_counts.end());
+    std::sort(throttled_pages_tracker_page_aggregated_counts.begin(), throttled_pages_tracker_page_aggregated_counts.end());
+
+    UInt64 index;
+    UInt32 percentile;
+    double percentage;
+    
+    // Compute individual_counts percentiles for output
+    std::cout << "Throttled pages tracker individual counts:" << std::endl;
+    UInt32 num_bins = 40;  // the total number of points is 1 more than num_bins, since it includes the endpoints
+    std::map<double, UInt32> individual_counts_percentiles;
+    for (UInt32 bin = 0; bin < num_bins; ++bin) {
+       percentage = (double)bin / num_bins;
+       index = (UInt64)(percentage * (throttled_pages_tracker_individual_counts.size() - 1));  // -1 so array indices don't go out of bounds
+       percentile = throttled_pages_tracker_individual_counts[index];
+       std::cout << "percentage: " << percentage << ", vector index: " << index << ", percentile: " << percentile << std::endl;
+       individual_counts_percentiles.insert(std::pair<double, UInt32>(percentage, percentile));
+    }
+    // Add the maximum
+    percentage = 1.0;
+    percentile = throttled_pages_tracker_individual_counts[throttled_pages_tracker_individual_counts.size() - 1];
+    std::cout << "percentage: " << percentage << ", vector index: " << throttled_pages_tracker_individual_counts.size() - 1 << ", percentile: " << percentile << std::endl;
+    individual_counts_percentiles.insert(std::pair<double, UInt32>(percentage, percentile));
+    // Print output in format that can easily be graphed in Python
+    std::ostringstream percentages_buffer;
+    std::ostringstream cdf_buffer_individual_counts;
+    percentages_buffer << "[";
+    cdf_buffer_individual_counts << "[";
+    for (std::map<double, UInt32>::iterator it = individual_counts_percentiles.begin(); it != individual_counts_percentiles.end(); ++it) {
+       percentages_buffer << it->first << ", ";
+       cdf_buffer_individual_counts << it->second << ", ";
+    }
+    percentages_buffer << "]";
+    cdf_buffer_individual_counts << "]";
+
+    std::cout << "CDF X values (throttled page accesses within time frame):\n" << cdf_buffer_individual_counts.str() << std::endl;
+    std::cout << "CDF Y values (probability):\n" << percentages_buffer.str() << std::endl;
+
+    // Compute aggregated_counts percentiles for output
+    std::cout << "Throttled pages tracker page aggregated counts:" << std::endl;
+    num_bins = 40;  // the total number of points is 1 more than num_bins, since it includes the endpoints
+    std::map<double, UInt32> page_aggregated_counts_percentiles;
+    for (UInt32 bin = 0; bin < num_bins; ++bin) {
+       percentage = (double)bin / num_bins;
+       index = (UInt64)(percentage * (throttled_pages_tracker_page_aggregated_counts.size() - 1));  // -1 so array indices don't go out of bounds
+       percentile = throttled_pages_tracker_page_aggregated_counts[index];
+       std::cout << "percentage: " << percentage << ", vector index: " << index << ", percentile: " << percentile << std::endl;
+       page_aggregated_counts_percentiles.insert(std::pair<double, UInt32>(percentage, percentile));
+    }
+    // Add the maximum
+    percentage = 1.0;
+    percentile = throttled_pages_tracker_page_aggregated_counts[throttled_pages_tracker_page_aggregated_counts.size() - 1];
+    std::cout << "percentage: " << percentage << ", vector index: " << throttled_pages_tracker_page_aggregated_counts.size() - 1 << ", percentile: " << percentile << std::endl;
+    page_aggregated_counts_percentiles.insert(std::pair<double, UInt32>(percentage, percentile));
+    // Print output in format that can easily be graphed in Python
+    std::ostringstream percentages_buffer_2;
+    std::ostringstream cdf_buffer_page_aggregated_counts;
+    percentages_buffer_2 << "[";
+    cdf_buffer_page_aggregated_counts << "[";
+    for (std::map<double, UInt32>::iterator it = page_aggregated_counts_percentiles.begin(); it != page_aggregated_counts_percentiles.end(); ++it) {
+       percentages_buffer_2 << it->first << ", ";
+       cdf_buffer_page_aggregated_counts << it->second << ", ";
+    }
+    percentages_buffer_2 << "]";
+    cdf_buffer_page_aggregated_counts << "]";
+
+    std::cout << "CDF X values (throttled page accesses aggregated by phys_page):\n" << cdf_buffer_page_aggregated_counts.str() << std::endl;
+    std::cout << "CDF Y values (probability):\n" << percentages_buffer_2.str() << std::endl;
 }
 
 UInt64
@@ -510,7 +610,29 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     if(move_page && m_data_movement->getQueueUtilizationPercentage(t_now) > m_r_page_queue_utilization_threshold) {  // save 5% for evicted pages?
         move_page = false;
         ++m_move_page_cancelled_datamovement_queue_full;
-    } 
+
+        // Track future accesses to throttled page
+        auto it = throttled_pages_tracker.find(phys_page);
+        if (it != throttled_pages_tracker.end() && t_now <= 100000 * SubsecondTime::NS() + throttled_pages_tracker[phys_page].first) {
+            // found it, and last throttle of this page was within 10^5 ns
+            throttled_pages_tracker[phys_page].first = t_now;
+            throttled_pages_tracker[phys_page].second += 1;
+        } else {
+            if (it != throttled_pages_tracker.end()) {  // there was previously a value in the map
+                // printf("disagg.cc: throttled_pages_tracker[%lu] max was %u\n", phys_page, throttled_pages_tracker[phys_page].second);
+                throttled_pages_tracker_values.push_back(std::pair<UInt64, UInt32>(phys_page, throttled_pages_tracker[phys_page].second));
+            }
+            throttled_pages_tracker[phys_page] = std::pair<SubsecondTime, UInt32>(t_now, 0);
+        }
+    } else {
+        // Page was not throttled
+        auto it = throttled_pages_tracker.find(phys_page);
+        if (it != throttled_pages_tracker.end()) {  // there was previously a value in the map
+            // printf("disagg.cc: throttled_pages_tracker[%lu] max was %u\n", phys_page, throttled_pages_tracker[phys_page].second);
+            throttled_pages_tracker_values.push_back(std::pair<UInt64, UInt32>(phys_page, throttled_pages_tracker[phys_page].second));
+            throttled_pages_tracker.erase(phys_page);  // page was moved, clear
+        }
+    }
 
     if(m_r_mode != 4 && !m_r_enable_selective_moves) {
         t_now += datamovement_queue_delay;

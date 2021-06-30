@@ -114,6 +114,9 @@ class DramPerfModelDisagg : public DramPerfModel
         std::map<UInt64, UInt32> m_inflight_redundant; 
         std::map<UInt64, SubsecondTime> m_inflightevicted_pages; // Inflight pages that are being transferred from local memory to remote memory
 
+        std::map<UInt64, std::pair<SubsecondTime, UInt32>> throttled_pages_tracker;  // keep track of pages that were throttled. The value is a (time, count) pair of the last time the page was throttled and the number of times the page was requested within the same 10^6 ns
+        std::vector<std::pair<UInt64, UInt32>> throttled_pages_tracker_values;
+
         // TODO: Compression
         bool m_use_compression;
         CompressionModel *m_compression_model;
