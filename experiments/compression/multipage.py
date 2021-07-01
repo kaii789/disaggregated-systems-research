@@ -28,13 +28,14 @@ if __name__ == "__main__":
     x_axis_config_param = "perf_model/dram/multipage/page_buffer_capacity"
     program_info = [
         ("sssp", "../../../test/crono/apps/sssp/sssp ../../../test/crono/inputs/bcsstk05.mtx 1", None),
+        # ("stream-scale", "../../../benchmarks/stream/stream_sniper 1", None),
         # ("ligra-bfs", "../../../benchmarks/ligra/apps/BFS -s -rounds 1 ../../../benchmarks/ligra/inputs/rMat_1000000", None),
         # ("ligra-pagerank", "../../../benchmarks/ligra/apps/PageRank -s -rounds 1 ../../../benchmarks/ligra/inputs/rMat_1000000", None),
         # ("tinynet", "./darknet classifier predict cfg/imagenet1k.data cfg/darknet19.cfg tiny.weights data/dog.jpg", "../../benchmarks/darknet")
     ]
 
     # For each benchmark, launch sweep w/ lz4
-    num_pages = [1, 5, 10, 20]
+    num_pages = [1, 5, 10, 20, 30]
     result_name = "lz4_ipc_vs_page_buffer_size"
     compression_name = "lz4"
     for benchmark_name, program_command, cwd in program_info:
