@@ -16,6 +16,7 @@ stream_c.exe: stream.c
 
 stream_sniper: stream_sniper.c
 	$(CC) $(CFLAGS) stream_sniper.c -o stream_sniper
+	##$(CC) $(CFLAGS) -fopenmp stream_sniper.c -o stream_sniper
 
 clean:
 	rm -f stream_f.exe stream_c.exe stream_sniper *.o
