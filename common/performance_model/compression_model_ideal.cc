@@ -3,7 +3,7 @@
 #include "config.h"
 #include "config.hpp"
 
-CompressionModelIdeal::CompressionModelIdeal(String name, UInt32 page_size, UInt32 cache_line_size, int compression_latency_config, int decompression_latency_config)
+CompressionModelIdeal::CompressionModelIdeal(String name, UInt32 page_size, UInt32 cache_line_size)
     : m_name(name)
     , m_page_size(page_size)
     , m_cache_line_size(cache_line_size)
@@ -12,10 +12,10 @@ CompressionModelIdeal::CompressionModelIdeal(String name, UInt32 page_size, UInt
     m_cacheline_count = m_page_size / m_cache_line_size;
 
     // Set compression/decompression cycle latencies if configured
-    if (compression_latency_config != -1)
-        m_compression_latency = compression_latency_config;
-    if (decompression_latency_config != -1)
-        m_decompression_latency = decompression_latency_config;
+    if (Sim()->getCfg()->getInt("perf_model/dram/compression_model/ideal/compression_latency") != -1)
+        m_compression_latency = Sim()->getCfg()->getInt("perf_model/dram/compression_model/ideal/compression_latency");
+    if (Sim()->getCfg()->getInt("perf_model/dram/compression_model/ideal/decompression_latency") != -1)
+        m_decompression_latency = Sim()->getCfg()->getInt("perf_model/dram/compression_model/ideal/decompression_latency");
 }
 
 CompressionModelIdeal::~CompressionModelIdeal()

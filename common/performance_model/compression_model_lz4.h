@@ -6,7 +6,7 @@
 class CompressionModelLZ4 : public CompressionModel
 {
 public:
-   CompressionModelLZ4(String name, UInt32 page_size, UInt32 cache_line_size, int compression_latency_config, int decompression_latency_config);
+   CompressionModelLZ4(String name, UInt32 page_size, UInt32 cache_line_size);
    ~CompressionModelLZ4();
 
    SubsecondTime compress(IntPtr addr, size_t data_size, core_id_t core_id, UInt32 *compressed_page_size, UInt32 *compressed_cache_lines);
@@ -30,7 +30,7 @@ private:
     UInt32 m_decompression_latency = 5;
 
     double m_freq_norm;
-    int m_compression_granularity;
+    UInt32 m_compression_granularity; 
 
     char *multipage_data_buffer;
     char *multipage_compressed_buffer;
