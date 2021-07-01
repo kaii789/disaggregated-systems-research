@@ -27,15 +27,22 @@ if __name__ == "__main__":
     x_axis_label = "Page Buffer Size"
     x_axis_config_param = "perf_model/dram/multipage/page_buffer_capacity"
     program_info = [
-        ("sssp", "../../../test/crono/apps/sssp/sssp ../../../test/crono/inputs/bcsstk05.mtx 1", None),
+        ("sssp-bcsstk05", "../../../test/crono/apps/sssp/sssp ../../../test/crono/inputs/bcsstk05.mtx 1", None),
+        # ("sssp-bcsstk25", "../../../test/crono/apps/sssp/sssp ../../../test/crono/inputs/bcsstk25.mtx 1", None),
+        # ("sssp-roadNet-PA", "../../../test/crono/apps/sssp/sssp ../../../test/crono/inputs/roadNet-PA.mtx 1", None),
+        # ("spdmv-bcsstk25", "../../../benchmarks/spmv/bench_spdmv  ../../../test/crono/inputs/bcsstk25.mtx 1 1", None),
+        # ("spdmv-roadNet-PA", "../../../benchmarks/spmv/bench_spdmv  ../../../test/crono/inputs/roadNet-PA.mtx 1 1", None),
+        # ("stream-copy", "../../../benchmarks/stream/stream_sniper 0", None),
         # ("stream-scale", "../../../benchmarks/stream/stream_sniper 1", None),
+        # ("stream-add", "../../../benchmarks/stream/stream_sniper 2", None),
+        # ("stream-triad", "../../../benchmarks/stream/stream_sniper 3", None),
         # ("ligra-bfs", "../../../benchmarks/ligra/apps/BFS -s -rounds 1 ../../../benchmarks/ligra/inputs/rMat_1000000", None),
         # ("ligra-pagerank", "../../../benchmarks/ligra/apps/PageRank -s -rounds 1 ../../../benchmarks/ligra/inputs/rMat_1000000", None),
         # ("tinynet", "./darknet classifier predict cfg/imagenet1k.data cfg/darknet19.cfg tiny.weights data/dog.jpg", "../../benchmarks/darknet")
     ]
 
     # For each benchmark, launch sweep w/ lz4
-    num_pages = [1, 5, 10, 20, 30]
+    num_pages = [1, 5, 10, 20]
     result_name = "lz4_ipc_vs_page_buffer_size"
     compression_name = "lz4"
     for benchmark_name, program_command, cwd in program_info:
