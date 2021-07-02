@@ -28,7 +28,7 @@ def run_gran(compression_name, benchmark_name, x_axis, x_axis_label, x_axis_conf
     df = pd.DataFrame(data)
     graph = df.plot(x=x_axis_label, y=["C: Off", "C: On, CL: Off", "C: On, CL: On"], kind="bar")
     fig = graph.get_figure()
-    fig.savefig(result_name)
+    fig.savefig("{}-{}".format(benchmark_name, result_name))
 
 if __name__ == "__main__":
     # IPC vs Compression Gran
