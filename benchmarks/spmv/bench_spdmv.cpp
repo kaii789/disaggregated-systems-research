@@ -119,19 +119,19 @@ int main(int argc, char *argv[])
     // Benchmark run
     tstart = omp_get_wtime();
 
-	SimRoiStart();
+    SimRoiStart();
  
     for (size_t i = 0; i < loops; i++) {
         spdmv(y, nrows, x, ncols);
     }
 
-	if (SimInSimulator()) {
-	    cout << "API Test: Running in the simulator" << endl;
-	} else {
-	    cout << "API Test: Not Running in the simulator" << endl;
-	}
+    if (SimInSimulator()) {
+        cout << "API Test: Running in the simulator" << endl;
+    } else {
+        cout << "API Test: Not Running in the simulator" << endl;
+    }
 
-	SimRoiEnd();
+    SimRoiEnd();
 
 
     tstop = omp_get_wtime();

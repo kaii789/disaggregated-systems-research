@@ -34,3 +34,10 @@ echo
 echo "Compiling SpMV..."
 cd ../../spmv
 make
+
+# Set up STREAM
+# Compile STREAM
+echo
+echo "Compiling STREAM..."
+cd ../stream
+make
