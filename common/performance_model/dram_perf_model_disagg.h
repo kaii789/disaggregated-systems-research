@@ -82,6 +82,7 @@ class DramPerfModelDisagg : public DramPerfModel
         const bool m_r_throttle_redundant_moves;
         const bool m_r_use_separate_queue_model;  // Whether to use the separate remote queue model
         double m_r_page_queue_utilization_threshold;  // When the datamovement queue for pages has percentage utilization above this, remote pages aren't moved to local
+        double m_r_mode_5_limit_moves_threshold;  // When m_r_mode == 5, operate according to m_r_mode 2 when the page queue utilization is >= this value, otherwise operate according to m_r_mode 1
 
         // Local Memory
         std::vector<QueueModel*> m_queue_model;
@@ -105,7 +106,8 @@ class DramPerfModelDisagg : public DramPerfModel
 
         std::vector<BankInfo> m_r_banks;
 
-        std::map<UInt64, UInt32> m_remote_access_tracker; 
+        std::map<UInt64, UInt32> m_remote_access_tracker;  // Track remote page accesses
+        std::multimap<SubsecondTime, UInt64> m_recent_remote_accesses;  // Track remote page access that are recent
         std::list<UInt64> m_local_pages; // Pages of local memory
         std::map<UInt64, char> m_local_pages_remote_origin;  // Pages of local memory that were originally in remote
         std::list<UInt64> m_remote_pages; // Pages of remote memory
@@ -114,8 +116,8 @@ class DramPerfModelDisagg : public DramPerfModel
         std::map<UInt64, UInt32> m_inflight_redundant; 
         std::map<UInt64, SubsecondTime> m_inflightevicted_pages; // Inflight pages that are being transferred from local memory to remote memory
 
-        std::map<UInt64, std::pair<SubsecondTime, UInt32>> throttled_pages_tracker;  // keep track of pages that were throttled. The value is a (time, count) pair of the last time the page was throttled and the number of times the page was requested within the same 10^6 ns
-        std::vector<std::pair<UInt64, UInt32>> throttled_pages_tracker_values;
+        std::map<UInt64, std::pair<SubsecondTime, UInt32>> m_throttled_pages_tracker;  // keep track of pages that were throttled. The value is a (time, count) pair of the last time the page was throttled and the number of times the page was requested within the same 10^6 ns
+        std::vector<std::pair<UInt64, UInt32>> m_throttled_pages_tracker_values;       // values to keep track of for stats
 
         // TODO: Compression
         bool m_use_compression;
@@ -149,6 +151,7 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_max_bufferspace;                   // the maximum number of localdram pages actually used to back inflight and inflight_evicted pages 
         UInt64 m_move_page_cancelled_bufferspace_full;         // the number of times moving a remote page to local was cancelled due to localdram bufferspace being full
         UInt64 m_move_page_cancelled_datamovement_queue_full;  // the number of times moving a remote page to local was cancelled due to the queue for pages being full
+        UInt64 m_move_page_cancelled_rmode5;                   // the number of times a remote page was not moved to local due to rmode5
         std::map<UInt64, UInt32> m_page_usage_map;  // track number of times each phys page is accessed
         UInt64 m_unique_pages_accessed;             // track number of unique pages accessed
         SubsecondTime m_redundant_moves_type1_time_savings;

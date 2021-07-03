@@ -206,6 +206,7 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     ('  max simultaneous # inflight pages (bufferspace)', 'dram.max-bufferspace', str),
     ('  remote page move cancelled due to full bufferspace', 'dram.bufferspace-full-move-page-cancelled', str),
     ('  remote page move cancelled due to full queue', 'dram.queue-full-move-page-cancelled', str),
+    ('  remote page move cancelled due to rmode5', 'dram.rmode5-move-page-cancelled', str),
   ]
 
   # Compression

@@ -100,6 +100,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_max_bufferspace     (0)
     , m_move_page_cancelled_bufferspace_full(0)
     , m_move_page_cancelled_datamovement_queue_full(0)
+    , m_move_page_cancelled_rmode5(0)
     , m_unique_pages_accessed      (0)
     , m_redundant_moves_type1_time_savings(SubsecondTime::Zero())
     , m_redundant_moves_type2_time_savings(SubsecondTime::Zero())
@@ -160,6 +161,11 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
         m_r_bank_group_avail.push_back(QueueModel::create(
                     name + "-remote-bank-group-" + itostr(group), core_id, "history_list",
                     m_intercommand_delay_long));
+    }
+
+    if (m_r_mode == 5) {
+        m_r_mode_5_limit_moves_threshold = Sim()->getCfg()->getFloat("perf_model/dram/r_mode_5_page_queue_utilization_mode_switch_threshold");
+        registerStatsMetric("dram", core_id, "rmode5-move-page-cancelled", &m_move_page_cancelled_rmode5);
     }
 
     // Compression
@@ -258,12 +264,12 @@ DramPerfModelDisagg::~DramPerfModelDisagg()
         delete m_data_movement_2;
     }
 
-    // Add values in the map at the end of program execution to throttled_pages_tracker_values
-    for (std::map<UInt64, std::pair<SubsecondTime, UInt32>>::iterator it = throttled_pages_tracker.begin(); it != throttled_pages_tracker.end(); ++it) {
+    // Add values in the map at the end of program execution to m_throttled_pages_tracker_values
+    for (std::map<UInt64, std::pair<SubsecondTime, UInt32>>::iterator it = m_throttled_pages_tracker.begin(); it != m_throttled_pages_tracker.end(); ++it) {
         // if ((it->second).second > 0)
-        throttled_pages_tracker_values.push_back(std::pair<UInt64, UInt32>(it->first, (it->second).second));
+        m_throttled_pages_tracker_values.push_back(std::pair<UInt64, UInt32>(it->first, (it->second).second));
     }
-    if (throttled_pages_tracker_values.size() < 1) {
+    if (m_throttled_pages_tracker_values.size() < 1) {
         return;
     }
 
@@ -272,7 +278,7 @@ DramPerfModelDisagg::~DramPerfModelDisagg()
     std::vector<UInt32> throttled_pages_tracker_individual_counts;  // counts for the same phys_page are separate values
     std::map<UInt64, UInt32> throttled_pages_tracker_page_aggregated_counts_map;  // temporary variable
     std::vector<UInt32> throttled_pages_tracker_page_aggregated_counts;  // aggregate all numbers for a particular phys_page together
-    for (std::vector<std::pair<UInt64, UInt32>>::iterator it = throttled_pages_tracker_values.begin(); it != throttled_pages_tracker_values.end(); ++it) {
+    for (std::vector<std::pair<UInt64, UInt32>>::iterator it = m_throttled_pages_tracker_values.begin(); it != m_throttled_pages_tracker_values.end(); ++it) {
         UInt64 phys_page = it->first;
         UInt32 count = it->second;
 
@@ -575,31 +581,49 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     // LOG_PRINT("Packet size: %ld; Cacheline processing time: %ld; ddr_processing_time: %ld",
     //           pkt_size, m_r_bus_bandwidth.getRoundedLatency(8*pkt_size).getNS(), ddr_processing_time.getNS());
 
-
     t_now += ddr_processing_time;
-    // LOG_PRINT("Processing time before remote added latency: %ld ns; datamovement_queue_delay: %ld ns",
-    //           (t_now - pkt_time).getNS(), datamovement_queue_delay.getNS());
-    // LOG_PRINT("m_r_bus_bandwidth getRoundedLatency=%ld ns; getLatency=%ld ns", m_r_bus_bandwidth.getRoundedLatency(8*pkt_size).getNS(), m_r_bus_bandwidth.getLatency(8*pkt_size).getNS());
-    
-    if (!m_r_use_separate_queue_model) {  // when a separate remote QueueModel is used, the network latency is added there
-        t_now += m_r_added_latency;
-    }
 
     // Track access to page
     if(m_r_cacheline_gran) 
         phys_page =  address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1); // Was << 6
-    bool move_page = false; 
-    if(m_r_mode == 2) { //Only move pages when the page has been accessed remotely m_r_datamov_threshold times
+    bool move_page = false;
+    if (m_r_mode == 2 || m_r_mode == 5) {  // Update m_remote_access_tracker
         auto it = m_remote_access_tracker.find(phys_page);
-        if (it != m_remote_access_tracker.end())
-            m_remote_access_tracker[phys_page]++; 
-        else
+        if (it != m_remote_access_tracker.end()) {
+            m_remote_access_tracker[phys_page] += 1; 
+        }
+        else {
             m_remote_access_tracker[phys_page] = 1;
-        if (m_remote_access_tracker[phys_page] > m_r_datamov_threshold)
-            move_page = true;
+        }
+        m_recent_remote_accesses.insert(std::pair<SubsecondTime, UInt64>(t_now, phys_page));
+    }
+    if (m_r_mode == 2 && m_remote_access_tracker[phys_page] > m_r_datamov_threshold) {
+        // Only move pages when the page has been accessed remotely m_r_datamov_threshold times
+        move_page = true;
     } 
-    if(m_r_mode == 1 || m_r_mode == 3) {
+    if (m_r_mode == 1 || m_r_mode == 3) {
         move_page = true; 
+    }
+    if (m_r_mode == 5) {
+        // Use m_recent_remote_accesses to update m_remote_access_tracker so that it only keeps recent (10^5 ns) remote accesses
+        while (!m_recent_remote_accesses.empty() && m_recent_remote_accesses.begin()->first + 100000 * SubsecondTime::NS() < t_now) {
+            auto entry = m_recent_remote_accesses.begin();
+            m_remote_access_tracker[entry->second] -= 1;
+            m_recent_remote_accesses.erase(entry);
+        }
+
+        double page_queue_utilization = m_data_movement->getQueueUtilizationPercentage(t_now);
+        if (page_queue_utilization < m_r_mode_5_limit_moves_threshold) {
+            // If queue utilization percentage is less than threshold, always move.
+            move_page = true;
+        } else {
+            if (m_remote_access_tracker[phys_page] > m_r_datamov_threshold) {
+                // Otherwise, only move if the page has been accessed a threshold number of times.
+                move_page = true;
+            } else {
+                ++m_move_page_cancelled_rmode5;  // we chose not to move the page
+            }
+        }
     }
     // Cancel moving the page if the amount of reserved bufferspace in localdram for inflight + inflight_evicted pages is not enough to support an additional move
     if(move_page && m_r_reserved_bufferspace > 0 && ((m_inflight_pages.size() + m_inflightevicted_pages.size())  >= ((double)m_r_reserved_bufferspace/100)*(m_localdram_size/m_page_size))) {
@@ -612,28 +636,35 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         ++m_move_page_cancelled_datamovement_queue_full;
 
         // Track future accesses to throttled page
-        auto it = throttled_pages_tracker.find(phys_page);
-        if (it != throttled_pages_tracker.end() && t_now <= 100000 * SubsecondTime::NS() + throttled_pages_tracker[phys_page].first) {
+        auto it = m_throttled_pages_tracker.find(phys_page);
+        if (it != m_throttled_pages_tracker.end() && t_now <= 100000 * SubsecondTime::NS() + m_throttled_pages_tracker[phys_page].first) {
             // found it, and last throttle of this page was within 10^5 ns
-            throttled_pages_tracker[phys_page].first = t_now;
-            throttled_pages_tracker[phys_page].second += 1;
+            m_throttled_pages_tracker[phys_page].first = t_now;
+            m_throttled_pages_tracker[phys_page].second += 1;
         } else {
-            if (it != throttled_pages_tracker.end()) {  // there was previously a value in the map
-                // printf("disagg.cc: throttled_pages_tracker[%lu] max was %u\n", phys_page, throttled_pages_tracker[phys_page].second);
-                throttled_pages_tracker_values.push_back(std::pair<UInt64, UInt32>(phys_page, throttled_pages_tracker[phys_page].second));
+            if (it != m_throttled_pages_tracker.end()) {  // there was previously a value in the map
+                // printf("disagg.cc: m_throttled_pages_tracker[%lu] max was %u\n", phys_page, m_throttled_pages_tracker[phys_page].second);
+                m_throttled_pages_tracker_values.push_back(std::pair<UInt64, UInt32>(phys_page, m_throttled_pages_tracker[phys_page].second));
             }
-            throttled_pages_tracker[phys_page] = std::pair<SubsecondTime, UInt32>(t_now, 0);
+            m_throttled_pages_tracker[phys_page] = std::pair<SubsecondTime, UInt32>(t_now, 0);
         }
     } else {
         // Page was not throttled
-        auto it = throttled_pages_tracker.find(phys_page);
-        if (it != throttled_pages_tracker.end()) {  // there was previously a value in the map
-            // printf("disagg.cc: throttled_pages_tracker[%lu] max was %u\n", phys_page, throttled_pages_tracker[phys_page].second);
-            throttled_pages_tracker_values.push_back(std::pair<UInt64, UInt32>(phys_page, throttled_pages_tracker[phys_page].second));
-            throttled_pages_tracker.erase(phys_page);  // page was moved, clear
+        auto it = m_throttled_pages_tracker.find(phys_page);
+        if (it != m_throttled_pages_tracker.end()) {  // there was previously a value in the map
+            // printf("disagg.cc: m_throttled_pages_tracker[%lu] max was %u\n", phys_page, m_throttled_pages_tracker[phys_page].second);
+            m_throttled_pages_tracker_values.push_back(std::pair<UInt64, UInt32>(phys_page, m_throttled_pages_tracker[phys_page].second));
+            m_throttled_pages_tracker.erase(phys_page);  // page was moved, clear
         }
     }
 
+    // LOG_PRINT("Processing time before remote added latency: %ld ns; datamovement_queue_delay: %ld ns",
+    //           (t_now - pkt_time).getNS(), datamovement_queue_delay.getNS());
+    // LOG_PRINT("m_r_bus_bandwidth getRoundedLatency=%ld ns; getLatency=%ld ns", m_r_bus_bandwidth.getRoundedLatency(8*pkt_size).getNS(), m_r_bus_bandwidth.getLatency(8*pkt_size).getNS());
+    
+    if (!m_r_use_separate_queue_model) {  // when a separate remote QueueModel is used, the network latency is added there
+        t_now += m_r_added_latency;
+    }
     if(m_r_mode != 4 && !m_r_enable_selective_moves) {
         t_now += datamovement_queue_delay;
     } 
@@ -984,7 +1015,7 @@ DramPerfModelDisagg::isRemoteAccess(IntPtr address, core_id_t requester, DramCnt
             return true; 
         }
     }
-    else if(m_r_mode == 1 || m_r_mode == 2 || m_r_mode == 3) {  // local DRAM as a cache 
+    else if(m_r_mode == 1 || m_r_mode == 2 || m_r_mode == 3 || m_r_mode == 5) {  // local DRAM as a cache 
         if (std::find(m_local_pages.begin(), m_local_pages.end(), phys_page) != m_local_pages.end()) { // Is it in local DRAM?
             m_local_pages.remove(phys_page); // LRU
             m_local_pages.push_back(phys_page);
