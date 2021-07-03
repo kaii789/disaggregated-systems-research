@@ -1650,7 +1650,7 @@ if __name__ == "__main__":
 
                             darknet_tiny_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds.append(
                                 Experiment(
-                                    experiment_name="darknet_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_rmode5_threshold_{}_{}__pq_cacheline_combined_series".format(
+                                    experiment_name="darknet_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_rmode5_threshold_{}_{}_pq_cacheline_combined_series".format(
                                         model_type.lower(),
                                         localdram_size_str,
                                         net_lat,
@@ -1689,7 +1689,7 @@ if __name__ == "__main__":
 
                             darknet_tiny_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds.append(
                                 Experiment(
-                                    experiment_name="darknet_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_rmode5_threshold_{}_{}__pq_cacheline_combined_series".format(
+                                    experiment_name="darknet_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_rmode5_threshold_{}_{}_pq_cacheline_combined_series".format(
                                         model_type.lower(),
                                         localdram_size_str,
                                         net_lat,

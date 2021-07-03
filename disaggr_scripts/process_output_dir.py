@@ -162,7 +162,7 @@ def extract_effective_bandwidth(log_file: TextIO):
     return experiment_run_info
 
 
-def plot_grouped_bar_chart(output_directory_path: PathLike, bw_info: Dict[int, BandwidthInfo]):
+def plot_effective_bandwidth_grouped_bar_chart(output_directory_path: PathLike, bw_info: Dict[int, BandwidthInfo]):
     plt.clf()
     plt.close("all")
 
@@ -177,8 +177,8 @@ def plot_grouped_bar_chart(output_directory_path: PathLike, bw_info: Dict[int, B
               "pq=0\n10^4\n10^7", "pq=1\n10^4\n10^7",
               "pq=0\n10^5\n10^6", "pq=1\n10^5\n10^6",
               "pq=0\n10^5\n10^7", "pq=1\n10^5\n10^7",]
-    # percentages = ["0.975", "0.95"]
-    percentages = []
+    # percentages = ["0.975", "0.95"]  # for the test-partition-queues branch
+    percentages = []  # effective bandwidth percentiles were commented out in other branches
 
     page_queue_bws = {}
     page_queue_bws["  100"] = []
@@ -235,7 +235,7 @@ def plot_grouped_bar_chart(output_directory_path: PathLike, bw_info: Dict[int, B
                     print("Experiment run {} page queue had p{} bw of {} > {} ({:.3f}x)".format(i + 1, percentage[2:], page_queue_bws[percentage][i], correct_half_bw, page_queue_bws[percentage][i] / correct_half_bw))
     print()
 
-    # Debug output
+    # # Debug output
     # print(bw_info)
     # for percentage in percentages:
     #     print(page_queue_bws[percentage])
@@ -298,7 +298,7 @@ def plot_grouped_bar_chart(output_directory_path: PathLike, bw_info: Dict[int, B
     # Lines for bandwidth_verification experiments with 4 runs
     # ax.axhline(y=correct_combined_bw, xmin=0, xmax=0.5, color="black")
     # ax.axhline(y=correct_half_bw, xmin=0.5, xmax=1, color="black")
-    # Lines for bandwidth_verification experiments with 4 runs
+    # Lines for bandwidth_verification experiments with num_runs runs
     num_runs = len(labels)
     line_len = 1 / (num_runs + 2)
     for i in range(num_runs):
@@ -344,7 +344,7 @@ def process_bandwidth_verification_series_directory(directory_path):
                 # ) as record_file:
                 #     print(bw_info, file=record_file)
 
-                plot_grouped_bar_chart(directory_path, bw_info)
+                plot_effective_bandwidth_grouped_bar_chart(directory_path, bw_info)
             break  # we got the file
 
     # Do IPC graph? by going through the .out files
@@ -476,116 +476,8 @@ def get_and_print_stats(
         print_to_terminal
     )
 
-def process_and_graph_pq_and_cacheline_series(output_directory_path: PathLike):
-    with open(os.path.join(output_directory_path, "Stats.txt"), "w") as log_file:
-        passed_over_directories = []
-        for filename in natsort.os_sorted(os.listdir(output_directory_path)):
-            filename_path = os.path.join(output_directory_path, filename)
-            if os.path.isdir(filename_path) and "output_files" in filename:
-                # Record some stats
-                # print(filename)
-                print(filename, file=log_file)
-                get_and_print_stats(
-                    filename_path,
-                    print_to_terminal=False,
-                    log_file=log_file,
-                    stat_settings=[
-                        StatSetting("IPC", float),
-                        StatSetting(
-                            "remote dram avg access latency",
-                            float,
-                            name_for_legend="remote dram avg access latency (ns)",
-                        ),
-                        StatSetting(
-                            "remote datamovement queue model avg access latency",
-                            float,
-                            name_for_legend="  page queue avg access latency (ns)",
-                        ),
-                        StatSetting(
-                            "remote datamovement2 queue model avg access latency",
-                            float,
-                            name_for_legend="  cacheline queue avg access latency (ns)",
-                        ),
-                        StatSetting(
-                            "local dram avg access latency",
-                            float,
-                            name_for_legend="local dram avg access latency (ns)",
-                        ),
-                        StatSetting(
-                            "average dram access latency",
-                            float,
-                            name_for_legend="avg dram access latency (ns)",
-                        ),
-                        StatSetting(
-                            "remote datamovement % capped by window size",
-                            float,
-                            name_for_legend="datamovement capped by window size (%)",
-                        ),
-                        StatSetting(
-                            "remote datamovement % queue utilization full",
-                            float,
-                            name_for_legend="datamovement utilization full (%)",
-                        ),
-                        StatSetting(
-                            "remote datamovement % queue capped by custom cap",
-                            float,
-                            name_for_legend="datamovement capped by custom cap (%)",
-                        ),
-                        StatSetting(
-                            "remote datamovement2 % capped by window size",
-                            float,
-                            name_for_legend="datamovement2 capped by window size (%)",
-                        ),
-                        StatSetting(
-                            "remote datamovement2 % queue utilization full",
-                            float,
-                            name_for_legend="datamovement2 utilization full (%)",
-                        ),
-                        StatSetting(
-                            "remote datamovement2 % queue capped by custom cap",
-                            float,
-                            name_for_legend="datamovement2 capped by custom cap (%)",
-                        ),
-                        StatSetting(
-                            "remote page move cancelled due to full queue",
-                            int,
-                            name_for_legend="remote page moves cancelled due to full queue",
-                        ),
-                    ],
-                )
-                # print()
-                print(file=log_file)
 
-                for sub_filename in natsort.os_sorted(os.listdir(filename_path)):
-                    sub_filename_path = os.path.join(filename_path, sub_filename)
-                    if (
-                        os.path.isdir(sub_filename_path)
-                        and sub_filename.startswith("run_")
-                        and "temp" in sub_filename
-                    ):
-                        run_no = int(sub_filename[4:sub_filename.find("_", 4)])  # 4 is len("run_")
-                        for file_to_save in ["sim.cfg", "sim.out", "sim.stats.sqlite3"]:
-                            src_path = os.path.join(sub_filename_path, file_to_save)
-                            dst_path = os.path.join(filename_path, "{}_".format(run_no) + file_to_save)
-                            shutil.copy2(src_path, dst_path)
-
-                # Generate graph
-                if "partition_queue" in filename_path:
-                    # Partition queue series
-                    plot_graph_pq.run_from_cmdline(filename_path)
-                else:
-                    # Cacheline ratio series
-                    plot_graph.run_from_cmdline(filename_path, "perf_model/dram", "remote_cacheline_queue_fraction")
-
-            elif os.path.isdir(filename_path):
-                passed_over_directories.append(filename)
-        if len(passed_over_directories) > 0:
-            print("\nPassed over {} directories:".format(len(passed_over_directories)))
-            for dirname in passed_over_directories:
-                print("  {}".format(dirname))
-
-
-def combine_and_graph_pq_and_cacheline_series(output_directory_path: PathLike, get_output_from_temp_folders = True):
+def process_and_graph_pq_and_cacheline_series(output_directory_path: PathLike, get_output_from_temp_folders = True):
     with open(os.path.join(output_directory_path, "Stats.txt"), "w") as log_file:
         passed_over_directories = []
         for filename in natsort.os_sorted(os.listdir(output_directory_path)):
@@ -686,9 +578,12 @@ def combine_and_graph_pq_and_cacheline_series(output_directory_path: PathLike, g
                 elif "pq_cacheline_combined" in filename_path:
                     # PQ + cacheline combined series
                     plot_graph_pq.run_from_cmdline(filename_path)
-                # else:
+                # elif "cacheline_ratio_series" in filename_path:
                 #     # Cacheline ratio series
                 #     plot_graph.run_from_cmdline(filename_path, "perf_model/dram", "remote_cacheline_queue_fraction")
+                else:
+                    # Unknown series type
+                    print("\n\nUnknown series type for {}, cannot graph\n".format(filename))
 
             elif os.path.isdir(filename_path):
                 passed_over_directories.append(filename)
@@ -737,12 +632,11 @@ if __name__ == "__main__":
     #     print(num_strs)
 
     output_directory_path = "."
-    # process_and_graph_pq_and_cacheline_series(output_directory_path)
 
-    # combine_and_graph_pq_and_cacheline_series(output_directory_path, get_output_from_temp_folders=True)
+    # process_and_graph_pq_and_cacheline_series(output_directory_path, get_output_from_temp_folders=True)
     
     # delete_experiment_run_temp_folders(output_directory_path)
 
-    combine_and_graph_pq_and_cacheline_series(output_directory_path, get_output_from_temp_folders=False)
+    process_and_graph_pq_and_cacheline_series(output_directory_path, get_output_from_temp_folders=False)
 
     
