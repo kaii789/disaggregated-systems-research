@@ -180,9 +180,11 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     ('  num dram accesses', 'dram.accesses', str),
     ('    num dram reads', 'dram.reads', str),
     ('      num local reads', 'dram.local-reads', str),
+    ('        num local reads remote origin', 'dram.local-reads-remote-origin', str),  
     ('      num remote reads', 'dram.remote-reads', str),
     ('    num dram writes', 'dram.writes', str),
     ('      num local writes', 'dram.local-writes', str),
+    ('        num local writes remote origin', 'dram.local-writes-remote-origin', str),  
     ('      num remote writes', 'dram.remote-writes', str),
     # ('    num dram reads', 'dram.readwrite-reads', str),
     # ('    num dram writes', 'dram.readwrite-writes', str),
@@ -204,6 +206,8 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     ('  max simultaneous # inflight pages (bufferspace)', 'dram.max-bufferspace', str),
     ('  remote page move cancelled due to full bufferspace', 'dram.bufferspace-full-move-page-cancelled', str),
     ('  remote page move cancelled due to full queue', 'dram.queue-full-move-page-cancelled', str),
+    ('  remote page move cancelled due to rmode5', 'dram.rmode5-move-page-cancelled', str),
+    ('  remote page moved due to exceeding threshold in rmode5', 'dram.rmode5-page-moved-due-to-threshold', str),
   ]
 
   # Compression
@@ -232,11 +236,11 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
   if 'dram-datamovement-queue-2.max-effective-bandwidth-ps' in results and sum(results['dram-datamovement-queue-2.max-effective-bandwidth-ps']) > 0:
     results['dram.remotequeuemodel_datamovement2_max_effective_bandwidth'] = map(lambda (a,b): 1000*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue-2.max-effective-bandwidth-bytes'], results['dram-datamovement-queue-2.max-effective-bandwidth-ps']))
 
-  if 'dram-datamovement-queue.num-requests' in results and sum(results['dram-datamovement-queue.num-requests']) > 0:
+  if 'dram-datamovement-queue.num-requests-capped-by-window-size' in results and sum(results['dram-datamovement-queue.num-requests']) > 0:
     results['dram.remotequeuemodel_datamovement_percent_capped_by_window_size'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue.num-requests-capped-by-window-size'], results['dram-datamovement-queue.num-requests']))
     results['dram.remotequeuemodel_datamovement_percent_queue_full'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue.num-requests-queue-full'], results['dram-datamovement-queue.num-requests']))
     results['dram.remotequeuemodel_datamovement_percent_capped_by_custom_cap'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue.num-requests-capped-by-custom-cap'], results['dram-datamovement-queue.num-requests']))
-  if 'dram-datamovement-queue-2.num-requests' in results and sum(results['dram-datamovement-queue-2.num-requests']) > 0:
+  if 'dram-datamovement-queue-2.num-requests-capped-by-window-size' in results and sum(results['dram-datamovement-queue-2.num-requests']) > 0:
     results['dram.remotequeuemodel_datamovement2_percent_capped_by_window_size'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue-2.num-requests-capped-by-window-size'], results['dram-datamovement-queue-2.num-requests']))
     results['dram.remotequeuemodel_datamovement2_percent_queue_full'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue-2.num-requests-queue-full'], results['dram-datamovement-queue-2.num-requests']))
     results['dram.remotequeuemodel_datamovement2_percent_capped_by_custom_cap'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue-2.num-requests-capped-by-custom-cap'], results['dram-datamovement-queue-2.num-requests']))
