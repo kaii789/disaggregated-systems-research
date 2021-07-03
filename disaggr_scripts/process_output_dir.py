@@ -430,6 +430,11 @@ def get_stats_from_files(
     return y_values, stat_settings
 
 
+def get_list_padded_str(l: List[Any]):
+    elements = ['{:>7}'.format(val) for val in l]
+    return "[" + ", ".join(elements) + "]"
+
+
 def print_stats(
     output_directory_path: PathLike,
     y_values: List[List[Any]],
@@ -440,13 +445,13 @@ def print_stats(
     if print_to_terminal:
         print("Y values:")
         for i, y_value_list in enumerate(y_values):
-            print("{:45}: {}".format(stat_settings[i].name_for_legend, y_value_list))
+            print("{:45}: {}".format(stat_settings[i].name_for_legend, get_list_padded_str(y_value_list)))
 
     if log_file:  # Also print to log file
         print("Y values:", file=log_file)
         for i, y_value_list in enumerate(y_values):
             print(
-                "{:45}: {}".format(stat_settings[i].name_for_legend, y_value_list),
+                "{:45}: {}".format(stat_settings[i].name_for_legend, get_list_padded_str(y_value_list)),
                 file=log_file,
             )
 
@@ -580,103 +585,107 @@ def process_and_graph_pq_and_cacheline_series(output_directory_path: PathLike):
                 print("  {}".format(dirname))
 
 
-def combine_and_graph_pq_and_cacheline_series(output_directory_path: PathLike):
+def combine_and_graph_pq_and_cacheline_series(output_directory_path: PathLike, get_output_from_temp_folders = True):
     with open(os.path.join(output_directory_path, "Stats.txt"), "w") as log_file:
         passed_over_directories = []
         for filename in natsort.os_sorted(os.listdir(output_directory_path)):
             filename_path = os.path.join(output_directory_path, filename)
             if os.path.isdir(filename_path) and "output_files" in filename:
-                # # Record some stats
-                # # print(filename)
-                # print(filename, file=log_file)
-                # get_and_print_stats(
-                #     filename_path,
-                #     print_to_terminal=False,
-                #     log_file=log_file,
-                #     stat_settings=[
-                #         StatSetting("IPC", float),
-                #         StatSetting(
-                #             "remote dram avg access latency",
-                #             float,
-                #             name_for_legend="remote dram avg access latency (ns)",
-                #         ),
-                #         StatSetting(
-                #             "remote datamovement queue model avg access latency",
-                #             float,
-                #             name_for_legend="  page queue avg access latency (ns)",
-                #         ),
-                #         StatSetting(
-                #             "remote datamovement2 queue model avg access latency",
-                #             float,
-                #             name_for_legend="  cacheline queue avg access latency (ns)",
-                #         ),
-                #         StatSetting(
-                #             "local dram avg access latency",
-                #             float,
-                #             name_for_legend="local dram avg access latency (ns)",
-                #         ),
-                #         StatSetting(
-                #             "average dram access latency",
-                #             float,
-                #             name_for_legend="avg dram access latency (ns)",
-                #         ),
-                #         StatSetting(
-                #             "remote datamovement % capped by window size",
-                #             float,
-                #             name_for_legend="datamovement capped by window size (%)",
-                #         ),
-                #         StatSetting(
-                #             "remote datamovement % queue utilization full",
-                #             float,
-                #             name_for_legend="datamovement utilization full (%)",
-                #         ),
-                #         StatSetting(
-                #             "remote datamovement % queue capped by custom cap",
-                #             float,
-                #             name_for_legend="datamovement capped by custom cap (%)",
-                #         ),
-                #         StatSetting(
-                #             "remote datamovement2 % capped by window size",
-                #             float,
-                #             name_for_legend="datamovement2 capped by window size (%)",
-                #         ),
-                #         StatSetting(
-                #             "remote datamovement2 % queue utilization full",
-                #             float,
-                #             name_for_legend="datamovement2 utilization full (%)",
-                #         ),
-                #         StatSetting(
-                #             "remote datamovement2 % queue capped by custom cap",
-                #             float,
-                #             name_for_legend="datamovement2 capped by custom cap (%)",
-                #         ),
-                #         StatSetting(
-                #             "remote page move cancelled due to full queue",
-                #             int,
-                #             name_for_legend="remote page moves cancelled due to full queue",
-                #         ),
-                #     ],
-                # )
-                # # print()
-                # print(file=log_file)
+                # Record some stats
+                # print(filename)
+                print(filename, file=log_file)
+                get_and_print_stats(
+                    filename_path,
+                    print_to_terminal=False,
+                    log_file=log_file,
+                    stat_settings=[
+                        StatSetting("IPC", float),
+                        StatSetting(
+                            "remote dram avg access latency",
+                            float,
+                            name_for_legend="remote dram avg access latency (ns)",
+                        ),
+                        StatSetting(
+                            "remote datamovement queue model avg access latency",
+                            float,
+                            name_for_legend="  page queue avg access latency (ns)",
+                        ),
+                        StatSetting(
+                            "remote datamovement2 queue model avg access latency",
+                            float,
+                            name_for_legend="  cacheline queue avg access latency (ns)",
+                        ),
+                        StatSetting(
+                            "local dram avg access latency",
+                            float,
+                            name_for_legend="local dram avg access latency (ns)",
+                        ),
+                        StatSetting(
+                            "average dram access latency",
+                            float,
+                            name_for_legend="avg dram access latency (ns)",
+                        ),
+                        StatSetting(
+                            "remote datamovement % capped by window size",
+                            float,
+                            name_for_legend="datamovement capped by window size (%)",
+                        ),
+                        StatSetting(
+                            "remote datamovement % queue utilization full",
+                            float,
+                            name_for_legend="datamovement utilization full (%)",
+                        ),
+                        # StatSetting(
+                        #     "remote datamovement % queue capped by custom cap",
+                        #     float,
+                        #     name_for_legend="datamovement capped by custom cap (%)",
+                        # ),
+                        StatSetting(
+                            "remote datamovement2 % capped by window size",
+                            float,
+                            name_for_legend="datamovement2 capped by window size (%)",
+                        ),
+                        StatSetting(
+                            "remote datamovement2 % queue utilization full",
+                            float,
+                            name_for_legend="datamovement2 utilization full (%)",
+                        ),
+                        # StatSetting(
+                        #     "remote datamovement2 % queue capped by custom cap",
+                        #     float,
+                        #     name_for_legend="datamovement2 capped by custom cap (%)",
+                        # ),
+                        StatSetting(
+                            "remote page move cancelled due to full queue",
+                            int,
+                            name_for_legend="remote page moves cancelled due to full queue",
+                        ),
+                    ],
+                )
+                # print()
+                print(file=log_file)
 
-                # for sub_filename in natsort.os_sorted(os.listdir(filename_path)):
-                #     sub_filename_path = os.path.join(filename_path, sub_filename)
-                #     if (
-                #         os.path.isdir(sub_filename_path)
-                #         and sub_filename.startswith("run_")
-                #         and "temp" in sub_filename
-                #     ):
-                #         run_no = int(sub_filename[4:sub_filename.find("_", 4)])  # 4 is len("run_")
-                #         for file_to_save in ["sim.cfg", "sim.out", "sim.stats.sqlite3"]:
-                #             src_path = os.path.join(sub_filename_path, file_to_save)
-                #             dst_path = os.path.join(filename_path, "{}_".format(run_no) + file_to_save)
-                #             shutil.copy2(src_path, dst_path)
+                if get_output_from_temp_folders:
+                    for sub_filename in natsort.os_sorted(os.listdir(filename_path)):
+                        sub_filename_path = os.path.join(filename_path, sub_filename)
+                        if (
+                            os.path.isdir(sub_filename_path)
+                            and sub_filename.startswith("run_")
+                            and "temp" in sub_filename
+                        ):
+                            run_no = int(sub_filename[4:sub_filename.find("_", 4)])  # 4 is len("run_")
+                            for file_to_save in ["sim.cfg", "sim.out", "sim.stats.sqlite3"]:
+                                src_path = os.path.join(sub_filename_path, file_to_save)
+                                dst_path = os.path.join(filename_path, "{}_".format(run_no) + file_to_save)
+                                shutil.copy2(src_path, dst_path)
 
-                # # Generate graph
-                # if "partition_queue" in filename_path:
-                #     # Partition queue series
-                #     plot_graph_pq.run_from_cmdline(filename_path)
+                # Generate graph
+                if "partition_queue" in filename_path:
+                    # Partition queue series
+                    plot_graph_pq.run_from_cmdline(filename_path)
+                elif "pq_cacheline_combined" in filename_path:
+                    # PQ + cacheline combined series
+                    plot_graph_pq.run_from_cmdline(filename_path)
                 # else:
                 #     # Cacheline ratio series
                 #     plot_graph.run_from_cmdline(filename_path, "perf_model/dram", "remote_cacheline_queue_fraction")
@@ -687,6 +696,35 @@ def combine_and_graph_pq_and_cacheline_series(output_directory_path: PathLike):
             print("\nPassed over {} directories:".format(len(passed_over_directories)))
             for dirname in passed_over_directories:
                 print("  {}".format(dirname))
+
+
+def delete_experiment_run_temp_folders(output_directory_path: PathLike):
+    passed_over_directories = []
+    for filename in natsort.os_sorted(os.listdir(output_directory_path)):
+        filename_path = os.path.join(output_directory_path, filename)
+        if os.path.isdir(filename_path) and "output_files" in filename:
+            # Now in an experiment output folder
+            deleted_temp_folders = 0
+
+            for sub_filename in natsort.os_sorted(os.listdir(filename_path)):
+                sub_filename_path = os.path.join(filename_path, sub_filename)
+                if (
+                    os.path.isdir(sub_filename_path)
+                    and sub_filename.startswith("run_")
+                    and "temp" in sub_filename
+                ):
+                    # Delete folder and all its contents
+                    shutil.rmtree(sub_filename_path)
+                    deleted_temp_folders += 1
+            print("{}: deleted {} temp folders".format(filename, deleted_temp_folders))
+
+        elif os.path.isdir(filename_path):
+            passed_over_directories.append(filename)
+    if len(passed_over_directories) > 0:
+        print("\nPassed over {} directories:".format(len(passed_over_directories)))
+        for dirname in passed_over_directories:
+            print("  {}".format(dirname))
+
 
 if __name__ == "__main__":
     # with open("/home/jonathan/Desktop/percentages.txt", "r") as file:
@@ -700,5 +738,11 @@ if __name__ == "__main__":
 
     output_directory_path = "."
     # process_and_graph_pq_and_cacheline_series(output_directory_path)
-    combine_and_graph_pq_and_cacheline_series(output_directory_path)
+
+    # combine_and_graph_pq_and_cacheline_series(output_directory_path, get_output_from_temp_folders=True)
+    
+    # delete_experiment_run_temp_folders(output_directory_path)
+
+    combine_and_graph_pq_and_cacheline_series(output_directory_path, get_output_from_temp_folders=False)
+
     
