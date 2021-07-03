@@ -101,6 +101,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_move_page_cancelled_bufferspace_full(0)
     , m_move_page_cancelled_datamovement_queue_full(0)
     , m_move_page_cancelled_rmode5(0)
+    , m_rmode5_page_moved_due_to_threshold(0)
     , m_unique_pages_accessed      (0)
     , m_redundant_moves_type1_time_savings(SubsecondTime::Zero())
     , m_redundant_moves_type2_time_savings(SubsecondTime::Zero())
@@ -167,6 +168,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
         m_r_mode_5_limit_moves_threshold = Sim()->getCfg()->getFloat("perf_model/dram/r_mode_5_page_queue_utilization_mode_switch_threshold");
         m_r_mode_5_remote_access_history_window_size = SubsecondTime::NS(Sim()->getCfg()->getInt("perf_model/dram/r_mode_5_remote_access_history_window_size"));
         registerStatsMetric("dram", core_id, "rmode5-move-page-cancelled", &m_move_page_cancelled_rmode5);
+        registerStatsMetric("dram", core_id, "rmode5-page-moved-due-to-threshold", &m_rmode5_page_moved_due_to_threshold);
     }
 
     // Compression
@@ -607,7 +609,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     }
     if (m_r_mode == 5) {
         // Use m_recent_remote_accesses to update m_remote_access_tracker so that it only keeps recent (10^5 ns) remote accesses
-        while (!m_recent_remote_accesses.empty() && m_recent_remote_accesses.begin()->first + 100000 * SubsecondTime::NS() < t_now) {
+        while (!m_recent_remote_accesses.empty() && m_recent_remote_accesses.begin()->first + m_r_mode_5_remote_access_history_window_size < t_now) {
             auto entry = m_recent_remote_accesses.begin();
             m_remote_access_tracker[entry->second] -= 1;
             m_recent_remote_accesses.erase(entry);
@@ -621,6 +623,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             if (m_remote_access_tracker[phys_page] > m_r_datamov_threshold) {
                 // Otherwise, only move if the page has been accessed a threshold number of times.
                 move_page = true;
+                ++m_rmode5_page_moved_due_to_threshold;
             } else {
                 ++m_move_page_cancelled_rmode5;  // we chose not to move the page
             }

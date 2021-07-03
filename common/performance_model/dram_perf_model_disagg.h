@@ -153,6 +153,7 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_move_page_cancelled_bufferspace_full;         // the number of times moving a remote page to local was cancelled due to localdram bufferspace being full
         UInt64 m_move_page_cancelled_datamovement_queue_full;  // the number of times moving a remote page to local was cancelled due to the queue for pages being full
         UInt64 m_move_page_cancelled_rmode5;                   // the number of times a remote page was not moved to local due to rmode5
+        UInt64 m_rmode5_page_moved_due_to_threshold;           // the number of time when in rmode5 and acting according to rmode2, a page was moved because the threshold number of accesses was reached
         std::map<UInt64, UInt32> m_page_usage_map;  // track number of times each phys page is accessed
         UInt64 m_unique_pages_accessed;             // track number of unique pages accessed
         SubsecondTime m_redundant_moves_type1_time_savings;
