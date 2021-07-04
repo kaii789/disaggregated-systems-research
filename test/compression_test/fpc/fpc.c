@@ -26,6 +26,7 @@
 
    11. Even if advised of the possibility of damages, under no circumstances shall CRF or Cornell University individually or jointly be liable to LICENSEE or any third party for damages of any character, including, without limitation, direct, indirect, incidental, consequential or special damages, loss of profits, loss of use, loss of goodwill, computer failure or malfunction.  LICENSEE agrees to indemnify and hold harmless CRF and Cornell University for any and all liability CRF or Cornell University may incur as a result of use of SOFTWARE by LICENSEE.
 
+   Taken from: https://userweb.cs.txstate.edu/~burtscher/research/FPC/fpc.c
 */
 
 
