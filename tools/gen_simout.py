@@ -259,6 +259,9 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
       ('  remote datamovement2 % capped by window size', 'dram.remotequeuemodel_datamovement2_percent_capped_by_window_size', format_float(2)),
       ('  remote datamovement2 % queue utilization full', 'dram.remotequeuemodel_datamovement2_percent_queue_full', format_float(2)),
       ('  remote datamovement2 % queue capped by custom cap', 'dram.remotequeuemodel_datamovement2_percent_capped_by_custom_cap', format_float(2)),
+      ('  ideal page throttling: num swaps inflight', 'dram.ideal-page-throttling-num-swaps-inflight', str),
+      ('  ideal page throttling: num swaps non-inflight', 'dram.ideal-page-throttling-num-swaps-non-inflight', str),
+      ('  ideal page throttling: num swaps unavailable', 'dram.ideal-page-throttling-num-swap-unavailable', str),
   ])
 
   if 'ddr.page-hits' in results:

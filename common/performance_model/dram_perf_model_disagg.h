@@ -121,6 +121,7 @@ class DramPerfModelDisagg : public DramPerfModel
 
         std::map<UInt64, std::pair<SubsecondTime, UInt32>> m_throttled_pages_tracker;  // keep track of pages that were throttled. The value is a (time, count) pair of the last time the page was throttled and the number of times the page was requested within the same 10^6 ns
         std::vector<std::pair<UInt64, UInt32>> m_throttled_pages_tracker_values;       // values to keep track of for stats
+        std::list<UInt64> m_moved_pages_no_access_yet;                                 // Pages moved from remote to local, but haven't been accessed yet
 
         // TODO: Compression
         bool m_use_compression;
@@ -157,6 +158,9 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_move_page_cancelled_rmode5;                   // the number of times a remote page was not moved to local due to rmode5
         UInt64 m_rmode5_page_moved_due_to_threshold;           // the number of time when in rmode5 and acting according to rmode2, a page was moved because the threshold number of accesses was reached
         UInt64 m_unique_pages_accessed;             // track number of unique pages accessed
+        UInt64 m_ideal_page_throttling_swaps_inflight;         // number of times the ideal page throttling algorithm swaps a throttled page with a previously moved page that was inflight
+        UInt64 m_ideal_page_throttling_swaps_non_inflight;     // number of times the ideal page throttling algorithm swaps a throttled page with a previously moved page that was not inflight
+        UInt64 m_ideal_page_throttling_swap_unavailable;       // number of times in the ideal page throttling algorithm a subsequent access to a throttled page could not be swapped with a previously moved page
         SubsecondTime m_redundant_moves_type1_time_savings;
         SubsecondTime m_redundant_moves_type2_time_savings;
 

@@ -103,6 +103,9 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_move_page_cancelled_rmode5(0)
     , m_rmode5_page_moved_due_to_threshold(0)
     , m_unique_pages_accessed      (0)
+    , m_ideal_page_throttling_swaps_inflight(0)
+    , m_ideal_page_throttling_swaps_non_inflight(0)
+    , m_ideal_page_throttling_swap_unavailable(0)
     , m_redundant_moves_type1_time_savings(SubsecondTime::Zero())
     , m_redundant_moves_type2_time_savings(SubsecondTime::Zero())
     , m_total_queueing_delay(SubsecondTime::Zero())
@@ -222,6 +225,11 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
         registerStatsMetric("dram", core_id, "redundant-moves-type1-time-savings", &m_redundant_moves_type1_time_savings);
         registerStatsMetric("dram", core_id, "redundant-moves-type2-time-savings", &m_redundant_moves_type2_time_savings);
     }
+
+    // Stats for ideal page throttling algorithm
+    registerStatsMetric("dram", core_id, "ideal-page-throttling-num-swaps-inflight", &m_ideal_page_throttling_swaps_inflight);
+    registerStatsMetric("dram", core_id, "ideal-page-throttling-num-swaps-non-inflight", &m_ideal_page_throttling_swaps_non_inflight);
+    registerStatsMetric("dram", core_id, "ideal-page-throttling-num-swap-unavailable", &m_ideal_page_throttling_swap_unavailable);
 }
 
 DramPerfModelDisagg::~DramPerfModelDisagg()
@@ -742,6 +750,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         m_local_pages_remote_origin[phys_page] = 1;
         if(m_r_exclusive_cache)
             m_remote_pages.remove(phys_page);
+        m_moved_pages_no_access_yet.push_back(phys_page);
 
         m_inflight_pages.erase(phys_page);
         m_inflight_pages[phys_page] = SubsecondTime::max(Sim()->getClockSkewMinimizationServer()->getGlobalTime() + page_datamovement_queue_delay, t_now + page_datamovement_queue_delay);
@@ -833,6 +842,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
             ++m_local_writes_remote_origin;
         }
     }
+    m_moved_pages_no_access_yet.remove(phys_page);  // there has been a local access to phys_page
 
     // pkt_size is in 'Bytes'
     // m_dram_bandwidth is in 'Bits per clock cycle'
@@ -1030,7 +1040,44 @@ DramPerfModelDisagg::isRemoteAccess(IntPtr address, core_id_t requester, DramCnt
             return false;
         } 
         else if (std::find(m_remote_pages.begin(), m_remote_pages.end(), phys_page) != m_remote_pages.end()) {	
-            // printf("Remote page found: %lx\n", phys_page); 
+            // printf("Remote page found: %lx\n", phys_page);
+            if (m_throttled_pages_tracker.count(phys_page)) {
+                // This is a previously throttled page
+                if (m_moved_pages_no_access_yet.size() > 0) {
+                    UInt64 other_page = m_moved_pages_no_access_yet.front();  // for simplicity, choose first element
+                    m_moved_pages_no_access_yet.pop_front();
+                    // Do swap: mimic procedure for evicting other_page and replacing it with phys_page
+                    // other_page hasn't been accessed yet so no need to check if it's dirty
+                    m_local_pages.remove(other_page);
+                    m_local_pages_remote_origin.erase(other_page);
+                    if (std::find(m_remote_pages.begin(), m_remote_pages.end(), other_page) == m_remote_pages.end()) {
+                        m_remote_pages.push_back(other_page);  // other_page is not in remote_pages, add it back
+                    }
+
+                    m_local_pages.push_back(phys_page);
+                    m_local_pages_remote_origin[phys_page] = 1;
+                    if (m_r_exclusive_cache) {
+                        m_remote_pages.remove(phys_page);
+                    }
+                    
+                    auto it = m_inflight_pages.find(other_page);
+                    if (it != m_inflight_pages.end()) {  // the other page was an inflight page
+                        m_inflight_pages.erase(phys_page);
+                        m_inflight_pages[phys_page] = it->second;  // use the other page's arrival time
+                        m_inflight_redundant[phys_page] = 0;
+
+                        m_inflight_pages.erase(other_page);
+                        m_inflight_redundant.erase(other_page);
+                        ++m_ideal_page_throttling_swaps_inflight;
+                    } else {
+                        // For now, don't need to add this page to inflight pages
+                        ++m_ideal_page_throttling_swaps_non_inflight;
+                    }
+                    return false;  // After swap, this is now a local access
+                } else {
+                    ++m_ideal_page_throttling_swap_unavailable;
+                }
+            }
             return true;
         }
         else {
