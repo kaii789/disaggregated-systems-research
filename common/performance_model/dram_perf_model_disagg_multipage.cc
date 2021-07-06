@@ -508,10 +508,10 @@ DramPerfModelDisaggMultipage::getAccessLatencyRemote(SubsecondTime pkt_time, UIn
         ++m_move_page_cancelled_bufferspace_full;
     }
     // Cancel moving the page if the queue used to move the page is already full
-    if(move_page && m_data_movement->isQueueFull(pkt_time)) {
-        move_page = false;
-        ++m_move_page_cancelled_datamovement_queue_full;
-    } 
+    // if(move_page && m_data_movement->isQueueFull(pkt_time)) {
+    //     move_page = false;
+    //     ++m_move_page_cancelled_datamovement_queue_full;
+    // } 
 
     // Adding data movement cost of the entire page for now (this just adds contention in the queue)
     if (move_page) {

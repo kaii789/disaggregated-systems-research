@@ -114,7 +114,7 @@ class DramPerfModelDisagg : public DramPerfModel
         std::list<UInt64> m_remote_pages; // Pages of remote memory
         std::list<UInt64> m_dirty_pages; // Dirty pages of local memory
         std::map<UInt64, SubsecondTime> m_inflight_pages; // Inflight pages that are being transferred from remote memory to local memory
-        std::map<UInt64, UInt32> m_inflight_redundant; 
+        std::map<UInt64, UInt32> m_inflight_redundant;
         std::map<UInt64, SubsecondTime> m_inflightevicted_pages; // Inflight pages that are being transferred from local memory to remote memory
 
         std::map<UInt64, std::pair<SubsecondTime, UInt32>> m_throttled_pages_tracker;  // keep track of pages that were throttled. The value is a (time, count) pair of the last time the page was throttled and the number of times the page was requested within the same 10^6 ns
@@ -122,12 +122,18 @@ class DramPerfModelDisagg : public DramPerfModel
 
         // TODO: Compression
         bool m_use_compression;
-        CompressionModel *m_compression_model;
+        CompressionModel *m_cacheline_compression_model;
         UInt64 bytes_saved = 0;
         SubsecondTime m_total_compression_latency = SubsecondTime::Zero();
         SubsecondTime m_total_decompression_latency = SubsecondTime::Zero();
         std::map<IntPtr, UInt32> address_to_compressed_size;
         std::map<IntPtr, UInt32> address_to_num_cache_lines;
+
+        bool m_use_cacheline_compression;
+        CompressionModel *m_compression_model;
+        UInt64 cacheline_bytes_saved = 0;
+        SubsecondTime m_total_cacheline_compression_latency = SubsecondTime::Zero();
+        SubsecondTime m_total_cacheline_decompression_latency = SubsecondTime::Zero();
 
         // Variables to keep track of stats
         UInt64 m_dram_page_hits;

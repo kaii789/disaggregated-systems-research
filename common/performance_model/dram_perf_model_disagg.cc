@@ -173,6 +173,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
 
     // Compression
     m_use_compression = Sim()->getCfg()->getBool("perf_model/dram/compression_model/use_compression");
+    m_use_cacheline_compression = Sim()->getCfg()->getBool("perf_model/dram/compression_model/cacheline/use_cacheline_compression");
     if (m_use_compression) {
         String compression_scheme = Sim()->getCfg()->getString("perf_model/dram/compression_model/compression_scheme");
         UInt32 gran_size = m_r_cacheline_gran ? m_cache_line_size : m_page_size;
@@ -181,6 +182,15 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
         registerStatsMetric("compression", core_id, "bytes-saved", &bytes_saved);
         registerStatsMetric("compression", core_id, "total-compression-latency", &m_total_compression_latency);
         registerStatsMetric("compression", core_id, "total-decompression-latency", &m_total_decompression_latency);
+
+        // Cacheline Compression
+        if (m_use_cacheline_compression) {
+            String cacheline_compression_scheme = Sim()->getCfg()->getString("perf_model/dram/compression_model/cacheline/compression_scheme");
+            m_cacheline_compression_model = CompressionModel::create("Cacheline Link Compression Model", m_cache_line_size, m_cache_line_size, cacheline_compression_scheme);
+            registerStatsMetric("compression", core_id, "cacheline-bytes-saved", &cacheline_bytes_saved);
+            registerStatsMetric("compression", core_id, "total-cacheline-compression-latency", &m_total_cacheline_compression_latency);
+            registerStatsMetric("compression", core_id, "total-cacheline-decompression-latency", &m_total_cacheline_decompression_latency);
+        }
     }
 
     LOG_ASSERT_ERROR(cache_block_size == 64, "Hardcoded for 64-byte cache lines");
@@ -550,19 +560,31 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     // Compress
     UInt64 phys_page = address & ~((UInt64(1) << floorLog2(m_page_size)) - 1);
     UInt32 size = pkt_size;
-    if (m_use_compression && m_r_cacheline_gran)
+    if (m_use_compression)
     {
-        UInt32 compressed_cache_lines;
-        SubsecondTime compression_latency = m_compression_model->compress(phys_page, m_cache_line_size, m_core_id, &size, &compressed_cache_lines);
-        if (m_cache_line_size > size)
-            bytes_saved += m_cache_line_size - size;
-        else
-            bytes_saved -= size - m_cache_line_size;
+        if (m_r_cacheline_gran) {
+            UInt32 compressed_cache_lines;
+            SubsecondTime compression_latency = m_compression_model->compress(phys_page, m_cache_line_size, m_core_id, &size, &compressed_cache_lines);
+            if (m_cache_line_size > size)
+                bytes_saved += m_cache_line_size - size;
+            else
+                bytes_saved -= size - m_cache_line_size;
 
-        address_to_compressed_size[phys_page] = size;
-        address_to_num_cache_lines[phys_page] = compressed_cache_lines;
-        m_total_compression_latency += compression_latency;
-        t_now += compression_latency;
+            address_to_compressed_size[phys_page] = size;
+            address_to_num_cache_lines[phys_page] = compressed_cache_lines;
+            m_total_compression_latency += compression_latency;
+            t_now += compression_latency;
+        } else if (m_use_cacheline_compression) {
+            UInt32 compressed_cache_lines;
+            SubsecondTime compression_latency = m_cacheline_compression_model->compress(phys_page, m_cache_line_size, m_core_id, &size, &compressed_cache_lines);
+            if (m_cache_line_size > size)
+                cacheline_bytes_saved += m_cache_line_size - size;
+            else
+                cacheline_bytes_saved -= size - m_cache_line_size;
+            address_to_num_cache_lines[phys_page] = compressed_cache_lines;
+            m_total_cacheline_compression_latency += compression_latency;
+            t_now += compression_latency;
+        }
     }
 
     SubsecondTime datamovement_queue_delay;
@@ -573,11 +595,15 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     }
 
     // TODO: Currently model decompression by adding decompression latency to inflight page time
-    if (m_use_compression && m_r_cacheline_gran)
+    if (m_use_compression && (m_r_cacheline_gran || m_use_cacheline_compression))
     {
-        SubsecondTime decompression_latency = m_compression_model->decompress(phys_page, address_to_num_cache_lines[phys_page], m_core_id);
+        CompressionModel *compression_model = m_r_cacheline_gran ? m_compression_model : m_cacheline_compression_model;
+        SubsecondTime decompression_latency = compression_model->decompress(phys_page, address_to_num_cache_lines[phys_page], m_core_id);
         datamovement_queue_delay += decompression_latency;
-        m_total_decompression_latency += decompression_latency;
+        if (m_r_cacheline_gran)
+            m_total_decompression_latency += decompression_latency;
+        else
+            m_total_cacheline_decompression_latency += decompression_latency;
     }
 
     //std::cout << "Packet size: " << pkt_size << "  Cacheline Processing time: " << m_r_bus_bandwidth.getRoundedLatency(8*pkt_size) << " Remote queue delay " << datamovement_queue_delay << std::endl; 
