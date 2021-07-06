@@ -21,7 +21,7 @@ def run_experiment_two_config(x_axis, x_axis1, x_axis2, result_filename, config_
 
     thread_pool = []
     for val1 in x_axis1:
-        for val2 in x_axis1:
+        for val2 in x_axis2:
             t = threading.Thread(target=sweep_thread_two_config, args=(data, result_filename, config_name, config_param1, config_param2, config_param3, val1, val2, program_command, cwd))
             thread_pool.append(t)
             t.start()
