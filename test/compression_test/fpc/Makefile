@@ -6,24 +6,16 @@ CFLAGS = -Wall -Wextra -fno-ipa-cp
 ## Remove some warnings.
 CFLAGS += -Wno-unused-parameter -Wno-unused-variable -Wno-unused-function
 
-all: sssp_int sssp_float sssp_pthread
+all: fpc
 
 INC_FILE = 
 LIBS += -lpthread -lrt
 
 ## Additional source files
-SRC_FILES = sssp.c ../../common/graph.c
+SRC_FILES = fpc.c
 
-sssp_int: ${SRC_FILES}  ${INC_FILE}
-	$(CC) $(CFLAGS) -DCUSTOM -DINT $^ -o $@ $(LIBS)
-
-sssp_float: ${SRC_FILES}  ${INC_FILE}
-	$(CC) $(CFLAGS) -DCUSTOM -DFLOAT $^ -o $@ $(LIBS)
-
-
-sssp_pthread: ${SRC_FILES}  ${INC_FILE}
-	$(CC) $(CFLAGS) -DPTHREAD -DINT $^ -o $@ $(LIBS)
-
+fpc: ${SRC_FILES}  ${INC_FILE}
+	$(CC) $(CFLAGS) $^ -o $@ $(LIBS)
 
 clean:
-	rm -f sssp_int sssp_float sssp_pthread
+	rm -f fpc
