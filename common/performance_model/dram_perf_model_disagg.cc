@@ -76,6 +76,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_r_throttle_redundant_moves      (Sim()->getCfg()->getBool("perf_model/dram/remote_throttle_redundant_moves"))
     , m_r_use_separate_queue_model      (Sim()->getCfg()->getBool("perf_model/dram/queue_model/use_separate_remote_queue_model")) // Whether to use the separate remote queue model
     , m_r_page_queue_utilization_threshold   (Sim()->getCfg()->getFloat("perf_model/dram/remote_page_queue_utilization_threshold")) // When the datamovement queue for pages has percentage utilization above this, remote pages aren't moved to local
+    , m_r_ideal_pagethrottle_remote_access_history_window_size   (SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/r_ideal_pagethrottle_access_history_window_size")))
     , m_banks               (m_total_banks)
     , m_r_banks               (m_total_banks)
     , m_dram_page_hits           (0)
@@ -649,7 +650,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
 
         // Track future accesses to throttled page
         auto it = m_throttled_pages_tracker.find(phys_page);
-        if (it != m_throttled_pages_tracker.end() && t_now <= 100000 * SubsecondTime::NS() + m_throttled_pages_tracker[phys_page].first) {
+        if (it != m_throttled_pages_tracker.end() && t_now <= m_r_ideal_pagethrottle_remote_access_history_window_size + m_throttled_pages_tracker[phys_page].first) {
             // found it, and last throttle of this page was within 10^5 ns
             m_throttled_pages_tracker[phys_page].first = t_now;
             m_throttled_pages_tracker[phys_page].second += 1;
