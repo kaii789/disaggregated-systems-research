@@ -1,7 +1,11 @@
 #ifndef __GRAPH_H_
 #define __GRAPH_H_
 
+#if INT
 typedef int weight_t;
+#else
+typedef float weight_t;
+#endif
 
 struct AdjListNode
 {

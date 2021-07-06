@@ -18,7 +18,8 @@ public:
 
    SubsecondTime computeQueueDelayTrackBytes(SubsecondTime pkt_time, SubsecondTime processing_time, UInt64 num_bytes, core_id_t requester = INVALID_CORE_ID);
 
-   bool isQueueFull(SubsecondTime pkt_time);
+   // bool isQueueFull(SubsecondTime pkt_time);
+   double getQueueUtilizationPercentage(SubsecondTime pkt_time);
 
 private:
    const SubsecondTime m_window_size;
@@ -43,7 +44,7 @@ private:
    
    double m_specified_bw_GB_per_s;                         // The specified bandwidth this queue model is supposed to have, in GB/s
    double m_max_bandwidth_allowable_excess_ratio;          // Allow effective bandwidth to exceed the specified bandwidth by at most this ratio
-   UInt64 m_effective_bandwidth_exceeded_allowable_max;    // The number of times the effective bandwidth in a window exceeded m_specified_bw_GB_per_s * m_max_bandwidth_allowable_excess_ratio
+   UInt64 m_effective_bandwidth_exceeded_allowable_max;    // The number of actual queue requests for which the effective bandwidth in the window exceeded m_specified_bw_GB_per_s * m_max_bandwidth_allowable_excess_ratio
 
    UInt64 m_bytes_tracking;                                // track the total number of bytes being transferred in the current window
    double m_max_effective_bandwidth;                       // in bytes / ps
@@ -57,7 +58,7 @@ private:
    void removeItems(SubsecondTime earliest_time);
 
    void addItemUpdateBytes(SubsecondTime pkt_time, UInt64 num_bytes, SubsecondTime pkt_queue_delay);
-   void removeItemsUpdateBytes(SubsecondTime earliest_time, SubsecondTime pkt_time);
+   void removeItemsUpdateBytes(SubsecondTime earliest_time, SubsecondTime pkt_time, bool track_effective_bandwidth);
 };
 
 #endif /* __QUEUE_MODEL_WINDOWED_MG1_REMOTE_H__ */

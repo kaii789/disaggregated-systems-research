@@ -110,7 +110,11 @@ struct Graph* graph_read_mtx(const char *filename)
             token=strtok(NULL," ");
             dest = atoi(token);
             edges++;
-            weight = 1;//getRandomWeight();//FIXME MUST=same weights in eddes!!!
+#if INT 
+            weight = (int)rand()/(int)(RAND_MAX);
+#else
+            weight = (float)rand()/(float)(RAND_MAX);
+#endif
             //printf("%d %d\n", source, dest);
             addEdge(graph, source - 1, dest - 1, weight);
         }

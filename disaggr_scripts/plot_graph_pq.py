@@ -84,17 +84,17 @@ def run_from_cmdline(
         StatSetting(
             "num redundant moves type1",
             int,
-            name_for_legend="num redundant moves type1",
+            name_for_legend="  num redundant moves type1",
         ),
         StatSetting(
             "num type1 cache slower than page",
             int,
-            name_for_legend="num type1 cache slower than page",
+            name_for_legend="    num type1 cache slower than page",
         ),
         StatSetting(
             "num redundant moves type2",
             int,
-            name_for_legend="num redundant moves type2",
+            name_for_legend="  num redundant moves type2",
         ),
         StatSetting(
             "PQ=1 type1 time savings (ns)",
@@ -189,6 +189,11 @@ def run_from_cmdline(
     save_graph_pq(output_directory_path, y_values, stat_settings, log_file)
 
 
+def get_list_padded_str(l: List[Any]):
+    elements = ['{:>7}'.format(val) for val in l]
+    return "[" + ", ".join(elements) + "]"
+
+
 def save_graph_pq(
     output_directory_path: PathLike,
     y_values: List[List[Any]],
@@ -199,7 +204,7 @@ def save_graph_pq(
 
     if len(y_values[0]) == 7:
         x_axis = [
-            "remote mem\ndisabled",
+            "no\nremote\nmem\n",
             "page\nmove\ninstant",
             "page\nmove\nnet lat\nonly",
             "page\nmove\nbw\nonly",
@@ -209,7 +214,7 @@ def save_graph_pq(
         ]
     elif len(y_values[0]) == 6:
         x_axis = [
-            "remote mem\ndisabled",
+            "no\nremote\nmem\n",
             "page\nmove\ninstant",
             "page\nmove\nnet lat\nonly",
             "page\nmove\nbw\nonly",
@@ -217,21 +222,44 @@ def save_graph_pq(
             "pq1",
         ]
     elif len(y_values[0]) == 4:  # Older experiment config setup
-        x_axis = ["remote mem\ndisabled", "pq0\n0 network\nlatency", "pq0", "pq1"]
+        x_axis = ["no\nremote\nmem\n", "pq0\n0 network\nlatency", "pq0", "pq1"]
+    elif len(y_values[0]) > 7:  # PQ and cacheline combined series
+        x_axis = [
+            "no\nremote\nmem\n",
+            "page\nmove\ninstant",
+            "page\nmove\nnet lat\nonly",
+            "page\nmove\nbw\nonly",
+            "pq0",
+            "pq1\ncl=\n0.1",
+            "pq1\ncl=\n0.15",
+            "pq1\ncl=\n0.2",
+            "pq1\ncl=\n0.25",
+            "pq1\ncl=\n0.3",
+            "pq1\ncl=\n0.35",
+            "pq1\ncl=\n0.4",
+            "pq1\ncl=\n0.45",
+            "pq1\ncl=\n0.5",
+            "pq1\ncl=\n0.55",
+            "pq1\ncl=\n0.6",
+        ]
+        plt.figure(figsize=(10, 4.8))  # (width, height) in inches
     else:
         raise ValueError("number of experiment runs={}, inaccurate?".format(len(y_values[0])))
 
+    print("{}:".format(os.path.basename(os.path.normpath(output_directory_path))))
     print("X values:\n", [s.replace("\n", " ") for s in x_axis])
     print("Y values:")
     for i, y_value_list in enumerate(y_values):
-        print("{}: {}".format(stat_settings[i].name_for_legend, y_value_list))
+        print("{}: {}".format(stat_settings[i].name_for_legend, get_list_padded_str(y_value_list)))
+        
+    print()
 
     if log_file:  # Also print to log file
         print("X values:\n", [s.replace("\n", " ") for s in x_axis], file=log_file)
         print("Y values:", file=log_file)
         for i, y_value_list in enumerate(y_values):
             print(
-                "{}: {}".format(stat_settings[i].name_for_legend, y_value_list),
+                "{}: {}".format(stat_settings[i].name_for_legend, get_list_padded_str(y_value_list)),
                 file=log_file,
             )
 
@@ -252,11 +280,14 @@ def save_graph_pq(
     plt.plot(x_axis, y_values[0], ".--r", label=stat_settings[0].name_for_legend)
     # Uniform scale among experiments for the same application and input
     y_axis_top = 0.55
-    if max(y_values[0]) > y_axis_top:
-        y_axis_top = max(y_values[0])
-    plt.ylim(bottom=0, top=y_axis_top)
+    if "bcsstk" in output_directory_path:
+        y_axis_top = 1.4
+    data_y_max = max(y_values[0])
+    if data_y_max > y_axis_top:
+        y_axis_top = data_y_max + max(0.2, data_y_max * 0.05)
+    plt.ylim(bottom=0, top=y_axis_top + 0.04)
     plt.yticks(
-        np.arange(0, y_axis_top + 0.01, step=0.05)
+        np.arange(0, y_axis_top + 0.01, step=(0.05 if y_axis_top < 0.8 else 0.1))
     )  # +0.01 to include y_axis_top
 
     title_str = "Effect of Partition Queues"
@@ -265,11 +296,15 @@ def save_graph_pq(
     plt.ylabel("Stats")
     # plt.axvline(x=70000000)  # For local DRAM size graph
     plt.legend()
+    plt.tight_layout()
     # Note: .png files are deleted by 'make clean' in the test/shared Makefile in the original repo
-    # graph_filename = "{}-{}.png".format(output_directory_path, title_str)
-    graph_filename = "{}.png".format(title_str)
+    graph_filename = "{} {}.png".format(os.path.basename(os.path.normpath(output_directory_path)), title_str)
     plt.savefig(os.path.join(output_directory_path, graph_filename))
     # plt.show()
+
+    old_file_path = os.path.join(output_directory_path, "Effect of Partition Queues.png")
+    if os.path.isfile(old_file_path):
+        os.remove(old_file_path)
 
 
 if __name__ == "__main__":

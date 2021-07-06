@@ -1,6 +1,5 @@
 #include <stdlib.h>
 #include "barrier_api.h"
-#include "zsim_hooks.h"
 
 struct barrier_struct {
     unsigned int nthreads;
@@ -39,12 +38,6 @@ void barrier_wait(barrier_t *barrier, int tid)
 
     if(__sync_fetch_and_add(&b->cnt, 1) == (b->nthreads - 1)) {   
         // The last thread, faced barrier.
-
-        msg_t msg;
-        msg.addr = &b->passed;
-        msg.toCore = 0;
-        msg.type = 2;
-        zsim_PIM_send_msg(&msg);
 
         b->cnt = 0;
         // *bar* should be reseted strictly before updating of barriers counter.

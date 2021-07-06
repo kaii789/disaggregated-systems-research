@@ -44,9 +44,9 @@ class DramPerfModelDisagg : public DramPerfModel
         const UInt32 m_randomize_offset;
         const UInt32 m_column_bits_shift; // Position of column bits for closed-page mapping (after cutting interleaving/channel/rank/bank from bottom)
         const ComponentBandwidth m_bus_bandwidth;
-        const ComponentBandwidth m_r_bus_bandwidth;   // Remote
-        const ComponentBandwidth m_r_part_bandwidth;  // Remote - Partitioned Queues => Page Queue
-        const ComponentBandwidth m_r_part2_bandwidth; // Remote - Partitioned Queues => Cacheline Queue
+        ComponentBandwidth m_r_bus_bandwidth;   // Remote
+        ComponentBandwidth m_r_part_bandwidth;  // Remote - Partitioned Queues => Page Queue
+        ComponentBandwidth m_r_part2_bandwidth; // Remote - Partitioned Queues => Cacheline Queue
         const SubsecondTime m_bank_keep_open;
         const SubsecondTime m_bank_open_delay;
         const SubsecondTime m_bank_close_delay;
@@ -81,6 +81,9 @@ class DramPerfModelDisagg : public DramPerfModel
         const UInt32 m_r_limit_redundant_moves; 
         const bool m_r_throttle_redundant_moves;
         const bool m_r_use_separate_queue_model;  // Whether to use the separate remote queue model
+        double m_r_page_queue_utilization_threshold;  // When the datamovement queue for pages has percentage utilization above this, remote pages aren't moved to local
+        double m_r_mode_5_limit_moves_threshold;  // When m_r_mode == 5, operate according to m_r_mode 2 when the page queue utilization is >= this value, otherwise operate according to m_r_mode 1
+        SubsecondTime m_r_mode_5_remote_access_history_window_size;  // When m_r_mode == 5, and operating according to m_r_mode, track page accesses using the most recent window size number of ns
 
         // Local Memory
         std::vector<QueueModel*> m_queue_model;
@@ -104,13 +107,18 @@ class DramPerfModelDisagg : public DramPerfModel
 
         std::vector<BankInfo> m_r_banks;
 
-        std::map<UInt64, UInt32> m_remote_access_tracker; 
+        std::map<UInt64, UInt32> m_remote_access_tracker;  // Track remote page accesses
+        std::multimap<SubsecondTime, UInt64> m_recent_remote_accesses;  // Track remote page access that are recent
         std::list<UInt64> m_local_pages; // Pages of local memory
+        std::map<UInt64, char> m_local_pages_remote_origin;  // Pages of local memory that were originally in remote
         std::list<UInt64> m_remote_pages; // Pages of remote memory
         std::list<UInt64> m_dirty_pages; // Dirty pages of local memory
         std::map<UInt64, SubsecondTime> m_inflight_pages; // Inflight pages that are being transferred from remote memory to local memory
         std::map<UInt64, UInt32> m_inflight_redundant; 
         std::map<UInt64, SubsecondTime> m_inflightevicted_pages; // Inflight pages that are being transferred from local memory to remote memory
+
+        std::map<UInt64, std::pair<SubsecondTime, UInt32>> m_throttled_pages_tracker;  // keep track of pages that were throttled. The value is a (time, count) pair of the last time the page was throttled and the number of times the page was requested within the same 10^6 ns
+        std::vector<std::pair<UInt64, UInt32>> m_throttled_pages_tracker_values;       // values to keep track of for stats
 
         // TODO: Compression
         bool m_use_compression;
@@ -126,6 +134,8 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_dram_page_empty;
         UInt64 m_dram_page_closing;
         UInt64 m_dram_page_misses;
+        UInt64 m_local_reads_remote_origin;
+        UInt64 m_local_writes_remote_origin;
         UInt64 m_remote_reads;
         UInt64 m_remote_writes;
         UInt64 m_page_moves;
@@ -142,6 +152,8 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_max_bufferspace;                   // the maximum number of localdram pages actually used to back inflight and inflight_evicted pages 
         UInt64 m_move_page_cancelled_bufferspace_full;         // the number of times moving a remote page to local was cancelled due to localdram bufferspace being full
         UInt64 m_move_page_cancelled_datamovement_queue_full;  // the number of times moving a remote page to local was cancelled due to the queue for pages being full
+        UInt64 m_move_page_cancelled_rmode5;                   // the number of times a remote page was not moved to local due to rmode5
+        UInt64 m_rmode5_page_moved_due_to_threshold;           // the number of time when in rmode5 and acting according to rmode2, a page was moved because the threshold number of accesses was reached
         std::map<UInt64, UInt32> m_page_usage_map;  // track number of times each phys page is accessed
         UInt64 m_unique_pages_accessed;             // track number of unique pages accessed
         SubsecondTime m_redundant_moves_type1_time_savings;

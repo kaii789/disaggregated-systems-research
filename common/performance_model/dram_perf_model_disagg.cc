@@ -7,6 +7,8 @@
 #include "address_home_lookup.h"
 #include "utils.h"
 
+#include <algorithm>
+
 DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_size, AddressHomeLookup* address_home_lookup)
     : DramPerfModel(core_id, cache_block_size)
     , m_core_id(core_id)
@@ -73,12 +75,15 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_r_limit_redundant_moves      (Sim()->getCfg()->getInt("perf_model/dram/remote_limit_redundant_moves"))
     , m_r_throttle_redundant_moves      (Sim()->getCfg()->getBool("perf_model/dram/remote_throttle_redundant_moves"))
     , m_r_use_separate_queue_model      (Sim()->getCfg()->getBool("perf_model/dram/queue_model/use_separate_remote_queue_model")) // Whether to use the separate remote queue model
+    , m_r_page_queue_utilization_threshold   (Sim()->getCfg()->getFloat("perf_model/dram/remote_page_queue_utilization_threshold")) // When the datamovement queue for pages has percentage utilization above this, remote pages aren't moved to local
     , m_banks               (m_total_banks)
     , m_r_banks               (m_total_banks)
     , m_dram_page_hits           (0)
     , m_dram_page_empty          (0)
     , m_dram_page_closing        (0)
     , m_dram_page_misses         (0)
+    , m_local_reads_remote_origin(0)
+    , m_local_writes_remote_origin(0)
     , m_remote_reads        (0)
     , m_remote_writes       (0)
     , m_page_moves          (0)
@@ -95,6 +100,8 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_max_bufferspace     (0)
     , m_move_page_cancelled_bufferspace_full(0)
     , m_move_page_cancelled_datamovement_queue_full(0)
+    , m_move_page_cancelled_rmode5(0)
+    , m_rmode5_page_moved_due_to_threshold(0)
     , m_unique_pages_accessed      (0)
     , m_redundant_moves_type1_time_savings(SubsecondTime::Zero())
     , m_redundant_moves_type2_time_savings(SubsecondTime::Zero())
@@ -157,6 +164,13 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
                     m_intercommand_delay_long));
     }
 
+    if (m_r_mode == 5) {
+        m_r_mode_5_limit_moves_threshold = Sim()->getCfg()->getFloat("perf_model/dram/r_mode_5_page_queue_utilization_mode_switch_threshold");
+        m_r_mode_5_remote_access_history_window_size = SubsecondTime::NS(Sim()->getCfg()->getInt("perf_model/dram/r_mode_5_remote_access_history_window_size"));
+        registerStatsMetric("dram", core_id, "rmode5-move-page-cancelled", &m_move_page_cancelled_rmode5);
+        registerStatsMetric("dram", core_id, "rmode5-page-moved-due-to-threshold", &m_rmode5_page_moved_due_to_threshold);
+    }
+
     // Compression
     m_use_compression = Sim()->getCfg()->getBool("perf_model/dram/compression_model/use_compression");
     if (m_use_compression) {
@@ -183,6 +197,8 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     registerStatsMetric("dram", core_id, "total-access-latency", &m_total_access_latency); // cgiannoula
     registerStatsMetric("dram", core_id, "total-local-access-latency", &m_total_local_access_latency);
     registerStatsMetric("dram", core_id, "total-remote-access-latency", &m_total_remote_access_latency);
+    registerStatsMetric("dram", core_id, "local-reads-remote-origin", &m_local_reads_remote_origin);
+    registerStatsMetric("dram", core_id, "local-writes-remote-origin", &m_local_writes_remote_origin);
     registerStatsMetric("dram", core_id, "remote-reads", &m_remote_reads);
     registerStatsMetric("dram", core_id, "remote-writes", &m_remote_writes);
     registerStatsMetric("dram", core_id, "page-moves", &m_page_moves);
@@ -196,6 +212,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     registerStatsMetric("dram", core_id, "bufferspace-full-move-page-cancelled", &m_move_page_cancelled_bufferspace_full);
     registerStatsMetric("dram", core_id, "queue-full-move-page-cancelled", &m_move_page_cancelled_datamovement_queue_full);
     registerStatsMetric("dram", core_id, "unique-pages-accessed", &m_unique_pages_accessed);
+    registerStatsMetric("dram", core_id, "cacheline-queue-request-cancelled", &m_cacheline_queue_request_cancelled);
 
     // Stats for partition_queues experiments
     if (m_r_partition_queues) {
@@ -249,6 +266,104 @@ DramPerfModelDisagg::~DramPerfModelDisagg()
     if(m_r_partition_queues == 1) {
         delete m_data_movement_2;
     }
+
+    // Add values in the map at the end of program execution to m_throttled_pages_tracker_values
+    for (std::map<UInt64, std::pair<SubsecondTime, UInt32>>::iterator it = m_throttled_pages_tracker.begin(); it != m_throttled_pages_tracker.end(); ++it) {
+        // if ((it->second).second > 0)
+        m_throttled_pages_tracker_values.push_back(std::pair<UInt64, UInt32>(it->first, (it->second).second));
+    }
+    if (m_throttled_pages_tracker_values.size() < 1) {
+        return;
+    }
+
+    // Build vectors of the stats we want
+    std::cout << "dram_perf_model_disagg.cc:" << std::endl;
+    std::vector<UInt32> throttled_pages_tracker_individual_counts;  // counts for the same phys_page are separate values
+    std::map<UInt64, UInt32> throttled_pages_tracker_page_aggregated_counts_map;  // temporary variable
+    std::vector<UInt32> throttled_pages_tracker_page_aggregated_counts;  // aggregate all numbers for a particular phys_page together
+    for (std::vector<std::pair<UInt64, UInt32>>::iterator it = m_throttled_pages_tracker_values.begin(); it != m_throttled_pages_tracker_values.end(); ++it) {
+        UInt64 phys_page = it->first;
+        UInt32 count = it->second;
+
+        throttled_pages_tracker_individual_counts.push_back(count);  // update individual counts
+
+        if (!throttled_pages_tracker_page_aggregated_counts_map.count(phys_page)) {  // update aggregated counts map
+            throttled_pages_tracker_page_aggregated_counts_map[phys_page] = 0;
+        }
+        throttled_pages_tracker_page_aggregated_counts_map[phys_page] += count;
+    }
+    // Generate aggregated counts vector
+    for (std::map<UInt64, UInt32>::iterator it = throttled_pages_tracker_page_aggregated_counts_map.begin(); it != throttled_pages_tracker_page_aggregated_counts_map.end(); ++it) {
+        throttled_pages_tracker_page_aggregated_counts.push_back(it->second);
+    }
+    std::sort(throttled_pages_tracker_individual_counts.begin(), throttled_pages_tracker_individual_counts.end());
+    std::sort(throttled_pages_tracker_page_aggregated_counts.begin(), throttled_pages_tracker_page_aggregated_counts.end());
+
+    UInt64 index;
+    UInt32 percentile;
+    double percentage;
+    
+    // Compute individual_counts percentiles for output
+    std::cout << "Throttled pages tracker individual counts:" << std::endl;
+    UInt32 num_bins = 40;  // the total number of points is 1 more than num_bins, since it includes the endpoints
+    std::map<double, UInt32> individual_counts_percentiles;
+    for (UInt32 bin = 0; bin < num_bins; ++bin) {
+       percentage = (double)bin / num_bins;
+       index = (UInt64)(percentage * (throttled_pages_tracker_individual_counts.size() - 1));  // -1 so array indices don't go out of bounds
+       percentile = throttled_pages_tracker_individual_counts[index];
+       std::cout << "percentage: " << percentage << ", vector index: " << index << ", percentile: " << percentile << std::endl;
+       individual_counts_percentiles.insert(std::pair<double, UInt32>(percentage, percentile));
+    }
+    // Add the maximum
+    percentage = 1.0;
+    percentile = throttled_pages_tracker_individual_counts[throttled_pages_tracker_individual_counts.size() - 1];
+    std::cout << "percentage: " << percentage << ", vector index: " << throttled_pages_tracker_individual_counts.size() - 1 << ", percentile: " << percentile << std::endl;
+    individual_counts_percentiles.insert(std::pair<double, UInt32>(percentage, percentile));
+    // Print output in format that can easily be graphed in Python
+    std::ostringstream percentages_buffer;
+    std::ostringstream cdf_buffer_individual_counts;
+    percentages_buffer << "[";
+    cdf_buffer_individual_counts << "[";
+    for (std::map<double, UInt32>::iterator it = individual_counts_percentiles.begin(); it != individual_counts_percentiles.end(); ++it) {
+       percentages_buffer << it->first << ", ";
+       cdf_buffer_individual_counts << it->second << ", ";
+    }
+    percentages_buffer << "]";
+    cdf_buffer_individual_counts << "]";
+
+    std::cout << "CDF X values (throttled page accesses within time frame):\n" << cdf_buffer_individual_counts.str() << std::endl;
+    std::cout << "CDF Y values (probability):\n" << percentages_buffer.str() << std::endl;
+
+    // Compute aggregated_counts percentiles for output
+    std::cout << "Throttled pages tracker page aggregated counts:" << std::endl;
+    num_bins = 40;  // the total number of points is 1 more than num_bins, since it includes the endpoints
+    std::map<double, UInt32> page_aggregated_counts_percentiles;
+    for (UInt32 bin = 0; bin < num_bins; ++bin) {
+       percentage = (double)bin / num_bins;
+       index = (UInt64)(percentage * (throttled_pages_tracker_page_aggregated_counts.size() - 1));  // -1 so array indices don't go out of bounds
+       percentile = throttled_pages_tracker_page_aggregated_counts[index];
+       std::cout << "percentage: " << percentage << ", vector index: " << index << ", percentile: " << percentile << std::endl;
+       page_aggregated_counts_percentiles.insert(std::pair<double, UInt32>(percentage, percentile));
+    }
+    // Add the maximum
+    percentage = 1.0;
+    percentile = throttled_pages_tracker_page_aggregated_counts[throttled_pages_tracker_page_aggregated_counts.size() - 1];
+    std::cout << "percentage: " << percentage << ", vector index: " << throttled_pages_tracker_page_aggregated_counts.size() - 1 << ", percentile: " << percentile << std::endl;
+    page_aggregated_counts_percentiles.insert(std::pair<double, UInt32>(percentage, percentile));
+    // Print output in format that can easily be graphed in Python
+    std::ostringstream percentages_buffer_2;
+    std::ostringstream cdf_buffer_page_aggregated_counts;
+    percentages_buffer_2 << "[";
+    cdf_buffer_page_aggregated_counts << "[";
+    for (std::map<double, UInt32>::iterator it = page_aggregated_counts_percentiles.begin(); it != page_aggregated_counts_percentiles.end(); ++it) {
+       percentages_buffer_2 << it->first << ", ";
+       cdf_buffer_page_aggregated_counts << it->second << ", ";
+    }
+    percentages_buffer_2 << "]";
+    cdf_buffer_page_aggregated_counts << "]";
+
+    std::cout << "CDF X values (throttled page accesses aggregated by phys_page):\n" << cdf_buffer_page_aggregated_counts.str() << std::endl;
+    std::cout << "CDF Y values (probability):\n" << percentages_buffer_2.str() << std::endl;
 }
 
 UInt64
@@ -453,8 +568,6 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     SubsecondTime datamovement_queue_delay;
     if (m_r_partition_queues == 1) {
         datamovement_queue_delay = m_data_movement_2->computeQueueDelayTrackBytes(t_now, m_r_part2_bandwidth.getRoundedLatency(8*size), size, requester);
-        m_redundant_moves++;
-        ++m_redundant_moves_type1;
     } else {
         datamovement_queue_delay = m_data_movement->computeQueueDelayTrackBytes(t_now, m_r_bus_bandwidth.getRoundedLatency(8*size), size, requester);
     }
@@ -471,8 +584,84 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     // LOG_PRINT("Packet size: %ld; Cacheline processing time: %ld; ddr_processing_time: %ld",
     //           pkt_size, m_r_bus_bandwidth.getRoundedLatency(8*pkt_size).getNS(), ddr_processing_time.getNS());
 
-
     t_now += ddr_processing_time;
+
+    // Track access to page
+    if(m_r_cacheline_gran) 
+        phys_page =  address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1); // Was << 6
+    bool move_page = false;
+    if (m_r_mode == 2 || m_r_mode == 5) {  // Update m_remote_access_tracker
+        auto it = m_remote_access_tracker.find(phys_page);
+        if (it != m_remote_access_tracker.end()) {
+            m_remote_access_tracker[phys_page] += 1; 
+        }
+        else {
+            m_remote_access_tracker[phys_page] = 1;
+        }
+        m_recent_remote_accesses.insert(std::pair<SubsecondTime, UInt64>(t_now, phys_page));
+    }
+    if (m_r_mode == 2 && m_remote_access_tracker[phys_page] > m_r_datamov_threshold) {
+        // Only move pages when the page has been accessed remotely m_r_datamov_threshold times
+        move_page = true;
+    } 
+    if (m_r_mode == 1 || m_r_mode == 3) {
+        move_page = true; 
+    }
+    if (m_r_mode == 5) {
+        // Use m_recent_remote_accesses to update m_remote_access_tracker so that it only keeps recent (10^5 ns) remote accesses
+        while (!m_recent_remote_accesses.empty() && m_recent_remote_accesses.begin()->first + m_r_mode_5_remote_access_history_window_size < t_now) {
+            auto entry = m_recent_remote_accesses.begin();
+            m_remote_access_tracker[entry->second] -= 1;
+            m_recent_remote_accesses.erase(entry);
+        }
+
+        double page_queue_utilization = m_data_movement->getQueueUtilizationPercentage(t_now);
+        if (page_queue_utilization < m_r_mode_5_limit_moves_threshold) {
+            // If queue utilization percentage is less than threshold, always move.
+            move_page = true;
+        } else {
+            if (m_remote_access_tracker[phys_page] > m_r_datamov_threshold) {
+                // Otherwise, only move if the page has been accessed a threshold number of times.
+                move_page = true;
+                ++m_rmode5_page_moved_due_to_threshold;
+            } else {
+                ++m_move_page_cancelled_rmode5;  // we chose not to move the page
+            }
+        }
+    }
+    // Cancel moving the page if the amount of reserved bufferspace in localdram for inflight + inflight_evicted pages is not enough to support an additional move
+    if(move_page && m_r_reserved_bufferspace > 0 && ((m_inflight_pages.size() + m_inflightevicted_pages.size())  >= ((double)m_r_reserved_bufferspace/100)*(m_localdram_size/m_page_size))) {
+        move_page = false;
+        ++m_move_page_cancelled_bufferspace_full;
+    }
+    // Cancel moving the page if the queue used to move the page is already full
+    if(move_page && m_data_movement->getQueueUtilizationPercentage(t_now) > m_r_page_queue_utilization_threshold) {  // save 5% for evicted pages?
+        move_page = false;
+        ++m_move_page_cancelled_datamovement_queue_full;
+
+        // Track future accesses to throttled page
+        auto it = m_throttled_pages_tracker.find(phys_page);
+        if (it != m_throttled_pages_tracker.end() && t_now <= 100000 * SubsecondTime::NS() + m_throttled_pages_tracker[phys_page].first) {
+            // found it, and last throttle of this page was within 10^5 ns
+            m_throttled_pages_tracker[phys_page].first = t_now;
+            m_throttled_pages_tracker[phys_page].second += 1;
+        } else {
+            if (it != m_throttled_pages_tracker.end()) {  // there was previously a value in the map
+                // printf("disagg.cc: m_throttled_pages_tracker[%lu] max was %u\n", phys_page, m_throttled_pages_tracker[phys_page].second);
+                m_throttled_pages_tracker_values.push_back(std::pair<UInt64, UInt32>(phys_page, m_throttled_pages_tracker[phys_page].second));
+            }
+            m_throttled_pages_tracker[phys_page] = std::pair<SubsecondTime, UInt32>(t_now, 0);
+        }
+    } else {
+        // Page was not throttled
+        auto it = m_throttled_pages_tracker.find(phys_page);
+        if (it != m_throttled_pages_tracker.end()) {  // there was previously a value in the map
+            // printf("disagg.cc: m_throttled_pages_tracker[%lu] max was %u\n", phys_page, m_throttled_pages_tracker[phys_page].second);
+            m_throttled_pages_tracker_values.push_back(std::pair<UInt64, UInt32>(phys_page, m_throttled_pages_tracker[phys_page].second));
+            m_throttled_pages_tracker.erase(phys_page);  // page was moved, clear
+        }
+    }
+
     // LOG_PRINT("Processing time before remote added latency: %ld ns; datamovement_queue_delay: %ld ns",
     //           (t_now - pkt_time).getNS(), datamovement_queue_delay.getNS());
     // LOG_PRINT("m_r_bus_bandwidth getRoundedLatency=%ld ns; getLatency=%ld ns", m_r_bus_bandwidth.getRoundedLatency(8*pkt_size).getNS(), m_r_bus_bandwidth.getLatency(8*pkt_size).getNS());
@@ -485,34 +674,6 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     } 
 
     perf->updateTime(t_now, ShmemPerf::DRAM_BUS);
-
-    // Track access to page
-    // UInt64 phys_page = address & ~((UInt64(1) << floorLog2(m_page_size)) - 1);
-    if(m_r_cacheline_gran) 
-        phys_page =  address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1); // Was << 6
-    bool move_page = false; 
-    if(m_r_mode == 2) { //Only move pages when the page has been accessed remotely m_r_datamov_threshold times
-        auto it = m_remote_access_tracker.find(phys_page);
-        if (it != m_remote_access_tracker.end())
-            m_remote_access_tracker[phys_page]++; 
-        else
-            m_remote_access_tracker[phys_page] = 1;
-        if (m_remote_access_tracker[phys_page] > m_r_datamov_threshold)
-            move_page = true;
-    } 
-    if(m_r_mode == 1 || m_r_mode == 3) {
-        move_page = true; 
-    }
-    // Cancel moving the page if the amount of reserved bufferspace in localdram for inflight + inflight_evicted pages is not enough to support an additional move
-    if(move_page && (m_r_reserved_bufferspace > 0) && ((m_inflight_pages.size() + m_inflightevicted_pages.size())  >= (m_r_reserved_bufferspace/100)*m_localdram_size/m_page_size)) {
-        move_page = false;
-        ++m_move_page_cancelled_bufferspace_full;
-    }
-    // Cancel moving the page if the queue used to move the page is already full
-    if(move_page && m_data_movement->isQueueFull(pkt_time)) {
-        move_page = false;
-        ++m_move_page_cancelled_datamovement_queue_full;
-    } 
 
     // Adding data movement cost of the entire page for now (this just adds contention in the queue)
     if (move_page) {
@@ -542,6 +703,9 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             }
 
             if(m_r_partition_queues == 1) {
+                m_redundant_moves++;
+                ++m_redundant_moves_type1;
+
                 page_datamovement_queue_delay = m_data_movement->computeQueueDelayTrackBytes(t_now, m_r_part_bandwidth.getRoundedLatency(8*page_size), page_size, requester);
 
                 // Approximation of time savings:
@@ -575,6 +739,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         assert(std::find(m_local_pages.begin(), m_local_pages.end(), phys_page) == m_local_pages.end()); 
         assert(std::find(m_remote_pages.begin(), m_remote_pages.end(), phys_page) != m_remote_pages.end()); 
         m_local_pages.push_back(phys_page);
+        m_local_pages_remote_origin[phys_page] = 1;
         if(m_r_exclusive_cache)
             m_remote_pages.remove(phys_page);
 
@@ -658,6 +823,15 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
         }
         //	printf("Remote access: %d\n",m_remote_reads); 
         return (getAccessLatencyRemote(pkt_time, pkt_size, requester, address, access_type, perf)); 
+    }
+    // m_local_reads_remote_origin
+    if (m_local_pages_remote_origin.count(phys_page)) {
+        m_local_pages_remote_origin[phys_page] += 1;
+        if (access_type == DramCntlrInterface::READ) {
+            ++m_local_reads_remote_origin;
+        } else {  // access_type == DramCntlrInterface::WRITE
+            ++m_local_writes_remote_origin;
+        }
     }
 
     // pkt_size is in 'Bytes'
@@ -845,7 +1019,7 @@ DramPerfModelDisagg::isRemoteAccess(IntPtr address, core_id_t requester, DramCnt
             return true; 
         }
     }
-    else if(m_r_mode == 1 || m_r_mode == 2 || m_r_mode == 3) {  // local DRAM as a cache 
+    else if(m_r_mode == 1 || m_r_mode == 2 || m_r_mode == 3 || m_r_mode == 5) {  // local DRAM as a cache 
         if (std::find(m_local_pages.begin(), m_local_pages.end(), phys_page) != m_local_pages.end()) { // Is it in local DRAM?
             m_local_pages.remove(phys_page); // LRU
             m_local_pages.push_back(phys_page);
@@ -907,14 +1081,16 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
             }	
             // If a non-dirty page is found, just remove this page to make space
             if (found) {
-                m_local_pages.remove(evicted_page); 
+                m_local_pages.remove(evicted_page);
+                m_local_pages_remote_origin.erase(evicted_page);
             }
         }
 
         // If found==false, remove the first page
         if(!found) {
             evicted_page = m_local_pages.front(); // Evict the least recently used page
-            m_local_pages.pop_front(); 
+            m_local_pages.pop_front();
+            m_local_pages_remote_origin.erase(evicted_page);
         }
         ++m_local_evictions; 
 
@@ -1039,6 +1215,7 @@ DramPerfModelDisagg::possiblyPrefetch(UInt64 phys_page, SubsecondTime t_now, cor
         assert(std::find(m_local_pages.begin(), m_local_pages.end(), pref_page) == m_local_pages.end()); 
         assert(std::find(m_remote_pages.begin(), m_remote_pages.end(), pref_page) != m_remote_pages.end()); 
         m_local_pages.push_back(pref_page);
+        m_local_pages_remote_origin[pref_page] = 1;
         if(m_r_exclusive_cache)
             m_remote_pages.remove(pref_page);
         m_inflight_pages.erase(pref_page);
