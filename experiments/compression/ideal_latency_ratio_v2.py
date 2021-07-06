@@ -89,7 +89,7 @@ def run_ideal_latency(x_axis, x_axis_label, x_axis_config_param, program_command
 
 if __name__ == "__main__":
     # IPC vs Compression/Decompression latency
-    latency = [0, 50, 500, 2000]
+    latency = [0, 2, 5, 10, 20, 30, 40, 50]
     compressed_page_size = [64, 1024, 2048]
     x_axis_label = "Compression/Decompression Latency"
     x_axis_config_param = "perf_model/dram/compression_model/ideal/compression_latency"
