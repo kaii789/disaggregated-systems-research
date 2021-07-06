@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 from base import *
 
-def sweep_thread_two_config(data, result_filename, config_name, config_param1, config_param2, config_param3, val1, val2, program_command, cwd):
-    run_directory = "./{}-{}-{}-{}-{}".format(result_filename, config_param1.split("/")[-1], val1, config_param3.split("/")[-1], val2)
+def sweep_thread_two_config(data, result_filename, config_name, config_param1, config_param2, config_param3, val1, val2, program_command, bench_name, cwd):
+    run_directory = "./{}-{}-{}-{}-{}-{}".format(bench_name, result_filename, config_param1.split("/")[-1], val1, config_param3.split("/")[-1], val2)
     sniper_path = os.path.abspath("../../run-sniper")
     output_directory = os.path.abspath("./{}".format(run_directory))
     if not cwd: cwd = run_directory
@@ -14,7 +14,7 @@ def sweep_thread_two_config(data, result_filename, config_name, config_param1, c
     data['IPC'].append(ipc)
     #log_compression_stats(run_directory, "{}.log".format(result_filename), program_command, config_param1, val1, config_param3, val2)
 
-def run_experiment_two_config(x_axis, x_axis1, x_axis2, result_filename, config_name, config_param1, config_param2, config_param3, program_command, cwd):
+def run_experiment_two_config(x_axis, x_axis1, x_axis2, result_filename, config_name, config_param1, config_param2, config_param3, program_command, bench_name, cwd):
 
     data = {x_axis:x_axis1,
             'IPC':[]}
@@ -22,7 +22,7 @@ def run_experiment_two_config(x_axis, x_axis1, x_axis2, result_filename, config_
     thread_pool = []
     for val1 in x_axis1:
         for val2 in x_axis2:
-            t = threading.Thread(target=sweep_thread_two_config, args=(data, result_filename, config_name, config_param1, config_param2, config_param3, val1, val2, program_command, cwd))
+            t = threading.Thread(target=sweep_thread_two_config, args=(data, result_filename, config_name, config_param1, config_param2, config_param3, val1, val2, program_command, bench_name, cwd))
             thread_pool.append(t)
             t.start()
 
@@ -36,16 +36,16 @@ def run_experiment_two_config(x_axis, x_axis1, x_axis2, result_filename, config_
 
     return data['IPC']
 
-def thread_experiment_two_config(x_axis, x_axis1, x_axis2, result_filename, config_name, config_param1, config_param2, config_param3, program_command, res, cwd
+def thread_experiment_two_config(x_axis, x_axis1, x_axis2, result_filename, config_name, config_param1, config_param2, config_param3, program_command, res, bench_name, cwd
 ):
-    experiment_res = run_experiment_two_config(x_axis, x_axis1, x_axis2, result_filename, config_name, config_param1, config_param2, config_param3, program_command, cwd) # "{}-{}".format(result_filename, program_command)
+    experiment_res = run_experiment_two_config(x_axis, x_axis1, x_axis2, result_filename, config_name, config_param1, config_param2, config_param3, program_command, bench_name, cwd) # "{}-{}".format(result_filename, program_command)
     res.append(experiment_res)
 
-def run_ideal_ratio(x_axis1, x_axis2, x_axis_label, x_axis_config_param, x_axis_config_param2, x_axis_config_param3, program_command, result_name, cwd=None
+def run_ideal_ratio(x_axis1, x_axis2, x_axis_label, x_axis_config_param, x_axis_config_param2, x_axis_config_param3, program_command, result_name, bench_name, cwd=None
 ):
     # Multithread
     res1 = []
-    t1 = threading.Thread(target=thread_experiment_two_config, args=(x_axis_label, x_axis1, x_axis2, "ratio", os.path.abspath("./yes_compression_no_partition_queues"), x_axis_config_param, x_axis_config_param2, x_axis_config_param3, program_command, res1, cwd))
+    t1 = threading.Thread(target=thread_experiment_two_config, args=(x_axis_label, x_axis1, x_axis2, "ratio", os.path.abspath("./yes_compression_no_partition_queues"), x_axis_config_param, x_axis_config_param2, x_axis_config_param3, program_command, res1, bench_name, cwd))
 
     for t in [t1]:
         t.start()
@@ -95,24 +95,19 @@ if __name__ == "__main__":
     x_axis_config_param = "perf_model/dram/compression_model/ideal/compression_latency"
     x_axis_config_param2 = "perf_model/dram/compression_model/ideal/decompression_latency"
     x_axis_config_param3 = "perf_model/dram/compression_model/ideal/compressed_page_size"
-    #program_command = "../../../test/crono/apps/sssp/sssp ../../../test/crono/inputs/bcsstk05.mtx 1"
-    program_command = "../../../benchmarks/ligra/apps/BFS -s -rounds 1 ../../../benchmarks/ligra/inputs/rMat_1000000" # TODO: change me
+    program_command = "../../../test/crono/apps/sssp/sssp_int ../../../test/crono/inputs/roadNet-PA.mtx 1"
     result_name = "ipc_vs_compression_latency"
-    t1 = threading.Thread(target=run_ideal_ratio, args=(latency, compressed_page_size, x_axis_label, x_axis_config_param, x_axis_config_param2, x_axis_config_param3, program_command, result_name))
+    #t1 = threading.Thread(target=run_ideal_ratio, args=(latency, compressed_page_size, x_axis_label, x_axis_config_param, x_axis_config_param2, x_axis_config_param3, program_command, result_name, "sssp"))
+    #t1.start()
+
+    # Ligra
+    program_command = "../../../benchmarks/ligra/apps/BFS -s -rounds 1 ../../../benchmarks/ligra/inputs/rMat_1000000" # TODO: change me
+    t2 = threading.Thread(target=run_ideal_ratio, args=(latency, compressed_page_size, x_axis_label, x_axis_config_param, x_axis_config_param2, x_axis_config_param3, program_command, result_name, "bfs"))
+    t2.start()
 
     # Darknet
-    # program_command = "./darknet classifier predict cfg/imagenet1k.data cfg/darknet19.cfg tiny.weights data/dog.jpg" # TODO: change me
-    # cwd = "../../benchmarks/darknet"
-    # t1 = threading.Thread(target=run_compression_queue_experiment, args=(bandwidth_scalefactor, x_axis_label, x_axis_config_param, program_command, result_name, cwd))
+    rogram_command = "./darknet classifier predict cfg/imagenet1k.data cfg/darknet19.cfg tiny.weights data/dog.jpg" # TODO: change me
+    cwd = "../../benchmarks/darknet"
+    #t3 = threading.Thread(target=run_ideal_ratio, args=(latency, compressed_page_size, x_axis_label, x_axis_config_param, x_axis_config_param2, x_axis_config_param3, program_command, result_name, "darknet", cwd))
 
-    # IPC vs Compressed Page Size
-    #compressed_page_size = [64, 1024, 2048]
-    #x_axis_label = "Compressed Page Size(bytes)"
-    #x_axis_config_param = "perf_model/dram/compression_model/ideal/compressed_page_size"
-    #program_command = "../../../test/crono/apps/sssp/sssp ../../../test/crono/inputs/bcsstk05.mtx 1"
-    #program_command = "../../../benchmarks/ligra/apps/BFS -s -rounds 1 ../../../benchmarks/ligra/inputs/rMat_1000000" # TODO: change me
-    #result_name = "ipc_vs_compressed_page_size"
-    #t2 = threading.Thread(target=run_ideal_latency, args=(compressed_page_size, x_axis_label, x_axis_config_param, program_command, result_name))
-
-    t1.start()
-    #t2.start()
+    #t3.start()
