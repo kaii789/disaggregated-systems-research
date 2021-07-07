@@ -11,7 +11,7 @@ import threading
 import sys
 sys.path.insert(1, '../../disaggr_scripts')
 import sniper_lib
-import automation as automation
+import run_sniper_repeat_base as automation
 
 # Sweep BW 4, 32
 # Test P1C0, P1C1 no cacheline ideal, P1C1 cacheline ideal, P1C1 no cacheline, P1C1 cacheline
