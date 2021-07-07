@@ -410,10 +410,14 @@ def get_stats_from_files(
                                     stat_settings[index].line_beginning
                                 )
                             )
-                    raise ValueError("\n".join(error_strs))
+                    # raise ValueError("\n".join(error_strs))
+                    print("\n".join(error_strs))
             else:
                 # Read the lines of pertinant information
                 for index in range(len(y_values)):
+                    if y_value_line_nos[index] is None:
+                        y_values[index].append(np.nan)  # ignore missing stats
+                        continue
                     line = out_file_lines[y_value_line_nos[index]]
                     y_values[index].append(
                         stat_settings[index].format_func(line.split()[-1])
@@ -483,6 +487,21 @@ def process_and_graph_pq_and_cacheline_series(output_directory_path: PathLike, g
         for filename in natsort.os_sorted(os.listdir(output_directory_path)):
             filename_path = os.path.join(output_directory_path, filename)
             if os.path.isdir(filename_path) and "output_files" in filename:
+                if get_output_from_temp_folders:
+                    # Copy files from temp folders into this directory
+                    for sub_filename in natsort.os_sorted(os.listdir(filename_path)):
+                        sub_filename_path = os.path.join(filename_path, sub_filename)
+                        if (
+                            os.path.isdir(sub_filename_path)
+                            and sub_filename.startswith("run_")
+                            and "temp" in sub_filename
+                        ):
+                            run_no = int(sub_filename[4:sub_filename.find("_", 4)])  # 4 is len("run_")
+                            for file_to_save in ["sim.cfg", "sim.out", "sim.stats.sqlite3"]:
+                                src_path = os.path.join(sub_filename_path, file_to_save)
+                                dst_path = os.path.join(filename_path, "{}_".format(run_no) + file_to_save)
+                                shutil.copy2(src_path, dst_path)
+
                 # Record some stats
                 # print(filename)
                 print(filename, file=log_file)
@@ -557,33 +576,23 @@ def process_and_graph_pq_and_cacheline_series(output_directory_path: PathLike, g
                 # print()
                 print(file=log_file)
 
-                if get_output_from_temp_folders:
-                    for sub_filename in natsort.os_sorted(os.listdir(filename_path)):
-                        sub_filename_path = os.path.join(filename_path, sub_filename)
-                        if (
-                            os.path.isdir(sub_filename_path)
-                            and sub_filename.startswith("run_")
-                            and "temp" in sub_filename
-                        ):
-                            run_no = int(sub_filename[4:sub_filename.find("_", 4)])  # 4 is len("run_")
-                            for file_to_save in ["sim.cfg", "sim.out", "sim.stats.sqlite3"]:
-                                src_path = os.path.join(sub_filename_path, file_to_save)
-                                dst_path = os.path.join(filename_path, "{}_".format(run_no) + file_to_save)
-                                shutil.copy2(src_path, dst_path)
-
                 # Generate graph
-                if "partition_queue" in filename_path:
-                    # Partition queue series
-                    plot_graph_pq.run_from_cmdline(filename_path)
-                elif "pq_cacheline_combined" in filename_path:
-                    # PQ + cacheline combined series
-                    plot_graph_pq.run_from_cmdline(filename_path)
-                # elif "cacheline_ratio_series" in filename_path:
-                #     # Cacheline ratio series
-                #     plot_graph.run_from_cmdline(filename_path, "perf_model/dram", "remote_cacheline_queue_fraction")
-                else:
-                    # Unknown series type
-                    print("\n\nUnknown series type for {}, cannot graph\n".format(filename))
+                with open(os.path.join(filename_path, filename[:filename.find("_output_files")] + " Stats.txt"), "w") as experiment_log_file:
+                    if "partition_queue" in filename_path:
+                        # Partition queue series
+                        plot_graph_pq.run_from_cmdline(filename_path, log_file=experiment_log_file)
+                    elif "pq_cacheline_combined" in filename_path:
+                        # PQ + cacheline combined series
+                        plot_graph_pq.run_from_cmdline(filename_path, log_file=experiment_log_file)
+                    elif "pq_new_series" in filename_path:
+                        # PQ + cacheline combined series, edited (13 runs)
+                        plot_graph_pq.run_from_cmdline(filename_path, log_file=experiment_log_file)
+                    # elif "cacheline_ratio_series" in filename_path:
+                    #     # Cacheline ratio series
+                    #     plot_graph.run_from_cmdline(filename_path, "perf_model/dram", "remote_cacheline_queue_fraction")
+                    else:
+                        # Unknown series type
+                        print("\n\nUnknown series type for {}, cannot graph\n".format(filename))
 
             elif os.path.isdir(filename_path):
                 passed_over_directories.append(filename)
@@ -621,6 +630,438 @@ def delete_experiment_run_temp_folders(output_directory_path: PathLike):
             print("  {}".format(dirname))
 
 
+def rename_double_underscore(output_directory_path: PathLike):
+    processed_folders = []
+    renamed_files = []
+    for filename in natsort.os_sorted(os.listdir(output_directory_path)):
+        filename_path = os.path.join(output_directory_path, filename)
+        if os.path.isdir(filename_path) and "output_files" in filename and "__" in filename:
+            for sub_filename in natsort.os_sorted(os.listdir(filename_path)):
+                sub_filename_path = os.path.join(filename_path, sub_filename)
+                if (
+                    os.path.isfile(sub_filename_path)
+                    and "__" in sub_filename
+                ):
+                    os.rename(sub_filename_path, os.path.join(filename_path, sub_filename.replace("__", "_")))
+                    print("Renamed file:", sub_filename)
+                    renamed_files.append(sub_filename)
+            # Rename directory
+            os.rename(filename_path, os.path.join(output_directory_path, filename.replace("__", "_")))
+            print("Renamed old folder:", filename_path)
+            processed_folders.append(filename)
+    print("Renamed {} folders, {} files".format(len(processed_folders), len(renamed_files)))
+
+def rename_dot_zero(output_directory_path: PathLike):
+    processed_folders = []
+    renamed_files = []
+    for filename in natsort.os_sorted(os.listdir(output_directory_path)):
+        filename_path = os.path.join(output_directory_path, filename)
+        if os.path.isdir(filename_path) and "output_files" in filename and ".0" in filename:
+            for sub_filename in natsort.os_sorted(os.listdir(filename_path)):
+                sub_filename_path = os.path.join(filename_path, sub_filename)
+                if (
+                    os.path.isfile(sub_filename_path)
+                    and ".0" in sub_filename
+                ):
+                    # print("Will rename {} to {}".format(sub_filename, sub_filename.replace(".0", "")))
+                    os.rename(sub_filename_path, os.path.join(filename_path, sub_filename.replace(".0", "")))
+                    print("Renamed old file:", sub_filename)
+                    renamed_files.append(sub_filename)
+            # Rename directory
+            os.rename(filename_path, os.path.join(output_directory_path, filename.replace(".0", "")))
+            print("Renamed old folder:", filename_path)
+            processed_folders.append(filename)
+    print("Renamed {} folders, {} files".format(len(processed_folders), len(renamed_files)))
+
+def rename_add_net_lat(output_directory_path: PathLike):
+    processed_folders = []
+    renamed_files = []
+    for filename in natsort.os_sorted(os.listdir(output_directory_path)):
+        filename_path = os.path.join(output_directory_path, filename)
+        if os.path.isdir(filename_path) and "output_files" in filename and "netlat" not in filename:
+            for sub_filename in natsort.os_sorted(os.listdir(filename_path)):
+                sub_filename_path = os.path.join(filename_path, sub_filename)
+                if (
+                    os.path.isfile(sub_filename_path)
+                    and "netlat" not in sub_filename
+                    and "bw_scalefactor" in sub_filename
+                ):
+                    # print("Will rename {} to {}".format(sub_filename, sub_filename.replace(".0", "")))
+                    os.rename(sub_filename_path, os.path.join(filename_path, sub_filename.replace("bw_scalefactor", "netlat_120_bw_scalefactor")))
+                    print("Renamed old file:", sub_filename)
+                    renamed_files.append(sub_filename)
+            # Rename directory
+            os.rename(filename_path, os.path.join(output_directory_path, filename.replace("bw_scalefactor", "netlat_120_bw_scalefactor")))
+            print("Renamed old folder:", filename_path)
+            processed_folders.append(filename)
+    print("Renamed {} folders, {} files".format(len(processed_folders), len(renamed_files)))
+
+
+def save_graph_pq(
+    output_directory_path: PathLike,
+    y_values: List[List[Any]],
+    stat_settings: List[StatSetting],
+    labels: List[str],
+    log_file: Optional[TextIO] = None,
+    title_str: str = None,
+):
+    plt.clf()
+
+    if len(y_values[0]) == 7:
+        x_axis = [
+            "no\nremote\nmem\n",
+            "page\nmove\ninstant",
+            "page\nmove\nnet lat\nonly",
+            "page\nmove\nbw\nonly",
+            "pq0",
+            "pq1",
+            "page\nmove\n120ns net lat\nonly",
+        ]
+    elif len(y_values[0]) == 6:
+        x_axis = [
+            "no\nremote\nmem\n",
+            "page\nmove\ninstant",
+            "page\nmove\nnet lat\nonly",
+            "page\nmove\nbw\nonly",
+            "pq0",
+            "pq1",
+        ]
+    elif len(y_values[0]) == 4:  # Older experiment config setup
+        x_axis = ["no\nremote\nmem\n", "pq0\n0 network\nlatency", "pq0", "pq1"]
+    elif len(y_values[0]) == 16:  # PQ and cacheline combined series
+        x_axis = [
+            "no\nremote\nmem\n",
+            "page\nmove\ninstant",
+            "page\nmove\nnet lat\nonly",
+            "page\nmove\nbw\nonly",
+            "pq0",
+            "pq1\ncl=\n0.1",
+            "pq1\ncl=\n0.15",
+            "pq1\ncl=\n0.2",
+            "pq1\ncl=\n0.25",
+            "pq1\ncl=\n0.3",
+            "pq1\ncl=\n0.35",
+            "pq1\ncl=\n0.4",
+            "pq1\ncl=\n0.45",
+            "pq1\ncl=\n0.5",
+            "pq1\ncl=\n0.55",
+            "pq1\ncl=\n0.6",
+        ]
+        plt.figure(figsize=(10, 4.8))  # (width, height) in inches
+    elif len(y_values[0]) == 13:  # PQ and cacheline combined series, edited
+        x_axis = [
+            "no\nremote\nmem\n",
+            "page\nmove\ninstant",
+            "pq0",
+            "pq1\ncl=\n0.005",
+            "pq1\ncl=\n0.01",
+            "pq1\ncl=\n0.025",
+            "pq1\ncl=\n0.05",
+            "pq1\ncl=\n0.075",
+            "pq1\ncl=\n0.1",
+            "pq1\ncl=\n0.15",
+            "pq1\ncl=\n0.2",
+            "pq1\ncl=\n0.3",
+            "pq1\ncl=\n0.5",
+        ]
+        plt.figure(figsize=(9, 4.8))  # (width, height) in inches
+    else:
+        raise ValueError("number of experiment runs={}, inaccurate?".format(len(y_values[0])))
+
+    if not labels:
+        labels = [stat_settings[i].name_for_legend.strip() for i in range(len(y_values))]
+
+    if title_str:
+        print("{}:".format(title_str))
+    else:
+        print("{}:".format(os.path.basename(os.path.normpath(output_directory_path))))
+    print("X values:\n", [s.replace("\n", " ") for s in x_axis])
+    print("Y values:")
+    for i, y_value_list in enumerate(y_values):
+        print("{:45}: {}".format(labels[i], get_list_padded_str(y_value_list)))
+    print()
+
+    if log_file:  # Also print to log file
+        print("X values:\n", [s.replace("\n", " ") for s in x_axis], file=log_file)
+        print("Y values:", file=log_file)
+        for i, y_value_list in enumerate(y_values):
+            print(
+                "{:45}: {}".format(labels[i], get_list_padded_str(y_value_list)),
+                file=log_file,
+            )
+        print(file=log_file)
+
+    # Plot as graph
+    line_style_list = [".--", ".--", ".--", ".--", ".--", ".--"]
+    colors_list = ["r", "g", "b", "y", "c", "m", "darkorange", "navy", "dimgray", "violet"]
+    if len(line_style_list) < len(y_values):
+        line_style_list.extend(
+            [line_style_list[0] for _ in range(len(y_values) - len(line_style_list))]
+        )  # Extend list
+    elif len(line_style_list) > len(y_values):
+        line_style_list = line_style_list[: len(y_values)]  # Truncate list
+    if len(colors_list) < len(y_values):
+        colors_list.extend(
+            [colors_list[0] for _ in range(len(y_values) - len(colors_list))]
+        )  # Extend list
+    elif len(colors_list) > len(y_values):
+        colors_list = colors_list[: len(y_values)]  # Truncate list
+
+    for i, (y_value_list, label, line_style, color) in enumerate(zip(y_values, labels, line_style_list, colors_list)):
+        plt.plot(
+            x_axis, y_value_list, line_style, label=label, color=color
+        )
+    # Uniform scale among experiments for the same application and input
+    y_axis_top = 0.55
+    if "bcsstk" in output_directory_path:
+        y_axis_top = 1.4
+    data_y_max = max(y_values[0])
+    if data_y_max > y_axis_top:
+        y_axis_top = data_y_max + max(0.2, data_y_max * 0.05)
+    plt.ylim(bottom=0, top=y_axis_top + 0.04)
+    plt.yticks(
+        np.arange(0, y_axis_top + 0.01, step=(0.05 if y_axis_top < 0.8 else 0.1))
+    )  # +0.01 to include y_axis_top
+
+    if title_str is None:
+        title_str = "Effect of Partition Queues"
+    plt.title(title_str)
+    # plt.xlabel("{}".format(config_param_name))
+    plt.ylabel("Stats")
+    # plt.axvline(x=70000000)  # For local DRAM size graph
+    plt.legend()
+    plt.tight_layout()
+    # Note: .png files are deleted by 'make clean' in the test/shared Makefile in the original repo
+    graph_filename = "{}.png".format(title_str)
+    plt.savefig(os.path.join(output_directory_path, graph_filename))
+    # plt.show()
+
+
+def ideal_window_size_combining(output_directory_path: PathLike):
+    ideal_window_size_throttling_dir = "/home/jonathan/Desktop/experiment_results/experimentrun_D5_add (rmode1, idealwinsize, remote_init=true)"
+    fcfs_baseline_throttling_dir = "/home/jonathan/Desktop/experiment_results/experimentrun_D3 (rmode1, FCFS throttling baseline)"
+    ideal_baseline_throttling_dir = "/home/jonathan/Desktop/experiment_results/experimentrun_D5-mel-15"
+    
+    passed_over_directories = []
+
+    last_experiment_name_root = None
+    # baseline_y_values = None
+    # baseline_stat_settings = None
+    graph_y_values = []
+    graph_stat_settings = []
+
+    labels = ["IPC, FIFO throttling baseline", "IPC, ideal baseline winsize=100000"]
+    for win_size in [10000, 20000, 500000, 1000000]:
+        labels.append("IPC, ideal winsize={}".format(win_size))
+
+    for filename in natsort.os_sorted(os.listdir(ideal_window_size_throttling_dir)):
+        filename_path = os.path.join(ideal_window_size_throttling_dir, filename)
+        if not os.path.isdir(filename_path):
+            continue
+        if not "output_files" in filename:
+            passed_over_directories.append(filename)
+            continue
+        if "remoteinit" not in filename:
+            print("Directory {} doesn't contain the string 'remoteinit', passing over".format(filename))
+            continue
+        # The second index of the slice is the underscore right after "remoteinit_true" or "remoteinit_false"
+        current_experiment_name_root = filename[:filename.find("_", filename.find("remoteinit") + len("remoteinit") + 1)]
+        if current_experiment_name_root != last_experiment_name_root:
+            if last_experiment_name_root is not None:
+                # Wrap up previous series
+                save_graph_pq(output_directory_path, graph_y_values, graph_stat_settings, labels, title_str=last_experiment_name_root)
+                graph_y_values.clear()
+                graph_stat_settings.clear()
+            # Starting new series
+            last_experiment_name_root = current_experiment_name_root
+            # Get FIFO throttling baseline results
+            baseline_experiment_output_dir_list = []
+            for candidate_file in os.listdir(fcfs_baseline_throttling_dir):
+                candidate_file_path = os.path.join(fcfs_baseline_throttling_dir, candidate_file)
+                if os.path.isdir(candidate_file_path) and candidate_file.startswith(current_experiment_name_root):
+                    baseline_experiment_output_dir_list.append(candidate_file_path)
+            if len(baseline_experiment_output_dir_list) != 1:
+                print("Error: did not find one FIFO baseline experiment with the same name root:", baseline_experiment_output_dir_list)
+                    
+            fifo_baseline_y_values, fifo_baseline_stat_settings = get_stats_from_files(baseline_experiment_output_dir_list[0])
+            # Get the IPC ones, at index 0
+            graph_y_values.append(fifo_baseline_y_values[0])
+            graph_stat_settings.append(fifo_baseline_stat_settings[0])
+
+            # Get ideal throttling default 10^5 winsize results
+            ideal_baseline_experiment_output_dir_list = []
+            for candidate_file in os.listdir(ideal_baseline_throttling_dir):
+                candidate_file_path = os.path.join(ideal_baseline_throttling_dir, candidate_file)
+                if os.path.isdir(candidate_file_path) and candidate_file.startswith(current_experiment_name_root):
+                    ideal_baseline_experiment_output_dir_list.append(candidate_file_path)
+            if len(ideal_baseline_experiment_output_dir_list) != 1:
+                print("Error: did not find one ideal baseline experiment with the same name root:", ideal_baseline_experiment_output_dir_list)
+                    
+            ideal_baseline_y_values, ideal_baseline_stat_settings = get_stats_from_files(ideal_baseline_experiment_output_dir_list[0])
+            # Get the IPC ones, at index 0
+            graph_y_values.append(ideal_baseline_y_values[0])
+            graph_stat_settings.append(ideal_baseline_stat_settings[0])
+
+        y_values, stat_settings = get_stats_from_files(filename_path)
+        # Get the IPC ones, at index 0
+        graph_y_values.append(y_values[0])
+        graph_stat_settings.append(stat_settings[0])
+
+    # last series        
+    if len(graph_y_values) > 0:
+        save_graph_pq(output_directory_path, graph_y_values, graph_stat_settings, labels, title_str=last_experiment_name_root)
+    if len(passed_over_directories) > 0:
+        print("\nPassed over {} directories:".format(len(passed_over_directories)))
+        for dirname in passed_over_directories:
+            print("  {}".format(dirname))
+
+
+def ideal_thresholds_combining(output_directory_path: PathLike):
+    ideal_thresholds_throttling_dir = "/home/jonathan/Desktop/experiment_results/experimentrun_D5_add (rmode2, idealthresholds, remote_init=true)"
+    fcfs_baseline_throttling_dir = "/home/jonathan/Desktop/experiment_results/experimentrun_D3 (rmode2, FCFS throttling baseline)"
+    
+    passed_over_directories = []
+
+    last_experiment_name_root = None
+    graph_y_values = []
+    graph_stat_settings = []
+
+    labels = ["IPC, FIFO rmode2 threshold 5", "IPC, FIFO rmode2 threshold 10"]
+    for threshold in [5, 10, 15]:
+        labels.append("IPC, ideal rmode2 threshold={}".format(threshold))
+
+    for filename in natsort.os_sorted(os.listdir(ideal_thresholds_throttling_dir)):
+        filename_path = os.path.join(ideal_thresholds_throttling_dir, filename)
+        if not os.path.isdir(filename_path):
+            continue
+        if not ("output_files" in filename and "idealwinsize" not in filename):
+            passed_over_directories.append(filename)
+            continue
+        if "remoteinit" not in filename:
+            print("Directory {} doesn't contain the string 'remoteinit', passing over".format(filename))
+            continue
+        current_experiment_name_root = filename[:filename.find("threshold") - 1]
+        if current_experiment_name_root != last_experiment_name_root:
+            if last_experiment_name_root is not None:
+                # Wrap up previous series
+                save_graph_pq(output_directory_path, graph_y_values, graph_stat_settings, labels, title_str=last_experiment_name_root)
+                graph_y_values.clear()
+                graph_stat_settings.clear()
+            # Starting new series
+            last_experiment_name_root = current_experiment_name_root
+            # Get FIFO throttling baseline results
+            baseline_experiment_output_dir_list = []
+            for candidate_file in os.listdir(fcfs_baseline_throttling_dir):
+                candidate_file_path = os.path.join(fcfs_baseline_throttling_dir, candidate_file)
+                if os.path.isdir(candidate_file_path) and candidate_file.startswith(current_experiment_name_root):
+                    baseline_experiment_output_dir_list.append(candidate_file_path)
+                    
+            for fifo_baseline in baseline_experiment_output_dir_list:
+                fifo_baseline_y_values, fifo_baseline_stat_settings = get_stats_from_files(fifo_baseline)
+                # Get the IPC ones, at index 0
+                graph_y_values.append(fifo_baseline_y_values[0])
+                graph_stat_settings.append(fifo_baseline_stat_settings[0])
+
+        y_values, stat_settings = get_stats_from_files(filename_path)
+        # Get the IPC ones, at index 0
+        graph_y_values.append(y_values[0])
+        graph_stat_settings.append(stat_settings[0])
+
+    # last series        
+    if len(graph_y_values) > 0:
+        save_graph_pq(output_directory_path, graph_y_values, graph_stat_settings, labels, title_str=last_experiment_name_root)
+    if len(passed_over_directories) > 0:
+        print("\nPassed over {} directories:".format(len(passed_over_directories)))
+        for dirname in passed_over_directories:
+            print("  {}".format(dirname))
+
+def convert_old_pq_cacheline_combined_y_values(ipcs_list: List[Any]):
+    new_series_format = []
+    for index in [0, 1, 4]:
+        new_series_format.append(ipcs_list[index])
+    for i in range(5):
+        new_series_format.append(np.nan)  # 5 np.nan for the runs that are not in the old baselines
+    for index in [5, 6, 7, 9, 13]:
+        new_series_format.append(ipcs_list[index])
+    return new_series_format
+
+def limit_redundant_moves_combining(output_directory_path: PathLike):
+    limit_redundant_moves_dir = "/home/jonathan/Desktop/experiment_results/experimentrun_D5_cont (rmode1, limitredundantmoves)"
+    fcfs_baseline_throttling_dir = "/home/jonathan/Desktop/experiment_results/experimentrun_D3 (rmode1, FCFS throttling baseline)"
+    ideal_baseline_throttling_dir = "/home/jonathan/Desktop/experiment_results/experimentrun_D5-mel-15"
+    
+    passed_over_directories = []
+
+    last_experiment_name_root = None
+    graph_y_values = []
+    graph_stat_settings = []
+
+    labels = ["IPC, FIFO baseline"]
+    for limit_redundant_moves in [2, 5, 10, 40]:
+        labels.append("IPC, ideal limitmoves={}".format(limit_redundant_moves))
+        labels.append("IPC, nonideal limitmoves={}".format(limit_redundant_moves))
+
+    for filename in natsort.os_sorted(os.listdir(limit_redundant_moves_dir)):
+        filename_path = os.path.join(limit_redundant_moves_dir, filename)
+        if not os.path.isdir(filename_path):
+            continue
+        if not ("output_files" in filename):
+            passed_over_directories.append(filename)
+            continue
+        if "remoteinit" not in filename:
+            print("Directory {} doesn't contain the string 'remoteinit', passing over".format(filename))
+            continue
+        # The second index of the slice is the underscore right after "remoteinit_true" or "remoteinit_false"
+        current_experiment_name_root = filename[:filename.find("_", filename.find("remoteinit") + len("remoteinit") + 1)]
+        if current_experiment_name_root != last_experiment_name_root:
+            if last_experiment_name_root is not None:
+                # Wrap up previous series
+                save_graph_pq(output_directory_path, graph_y_values, graph_stat_settings, labels, title_str=last_experiment_name_root)
+                graph_y_values.clear()
+                graph_stat_settings.clear()
+            # Starting new series
+            last_experiment_name_root = current_experiment_name_root
+            # Get FIFO throttling baseline results
+            baseline_experiment_output_dir_list = []
+            for candidate_file in os.listdir(fcfs_baseline_throttling_dir):
+                candidate_file_path = os.path.join(fcfs_baseline_throttling_dir, candidate_file)
+                if os.path.isdir(candidate_file_path) and candidate_file.startswith(current_experiment_name_root):
+                    baseline_experiment_output_dir_list.append(candidate_file_path)
+                    
+            for fifo_baseline in baseline_experiment_output_dir_list:
+                fifo_baseline_y_values, fifo_baseline_stat_settings = get_stats_from_files(fifo_baseline)
+                # Get the IPC ones, at index 0
+                graph_y_values.append(convert_old_pq_cacheline_combined_y_values(fifo_baseline_y_values[0]))
+                graph_stat_settings.append(fifo_baseline_stat_settings[0])
+
+            # # Get ideal throttling default 10^5 winsize results
+            # ideal_baseline_experiment_output_dir_list = []
+            # for candidate_file in os.listdir(ideal_baseline_throttling_dir):
+            #     candidate_file_path = os.path.join(ideal_baseline_throttling_dir, candidate_file)
+            #     if os.path.isdir(candidate_file_path) and candidate_file.startswith(current_experiment_name_root):
+            #         ideal_baseline_experiment_output_dir_list.append(candidate_file_path)
+            # if len(ideal_baseline_experiment_output_dir_list) != 1:
+            #     print("Error: did not find one ideal baseline experiment with the same name root:", ideal_baseline_experiment_output_dir_list)
+                    
+            # ideal_baseline_y_values, ideal_baseline_stat_settings = get_stats_from_files(ideal_baseline_experiment_output_dir_list[0])
+            # # Get the IPC ones, at index 0
+            # graph_y_values.append(ideal_baseline_y_values[0])
+            # graph_stat_settings.append(ideal_baseline_stat_settings[0])
+
+        y_values, stat_settings = get_stats_from_files(filename_path)
+        # Get the IPC ones, at index 0
+        graph_y_values.append(y_values[0])
+        graph_stat_settings.append(stat_settings[0])
+
+    # last series        
+    if len(graph_y_values) > 0:
+        save_graph_pq(output_directory_path, graph_y_values, graph_stat_settings, labels, title_str=last_experiment_name_root)
+    if len(passed_over_directories) > 0:
+        print("\nPassed over {} directories:".format(len(passed_over_directories)))
+        for dirname in passed_over_directories:
+            print("  {}".format(dirname))
+
+
 if __name__ == "__main__":
     # with open("/home/jonathan/Desktop/percentages.txt", "r") as file:
     #     line = file.readline()
@@ -633,10 +1074,16 @@ if __name__ == "__main__":
 
     output_directory_path = "."
 
-    # process_and_graph_pq_and_cacheline_series(output_directory_path, get_output_from_temp_folders=True)
+    process_and_graph_pq_and_cacheline_series(output_directory_path, get_output_from_temp_folders=True)
     
     # delete_experiment_run_temp_folders(output_directory_path)
 
-    process_and_graph_pq_and_cacheline_series(output_directory_path, get_output_from_temp_folders=False)
+    # process_and_graph_pq_and_cacheline_series(output_directory_path, get_output_from_temp_folders=False)
 
-    
+    # rename_double_underscore(output_directory_path)
+    # rename_dot_zero(output_directory_path)
+    # rename_add_net_lat(output_directory_path)
+
+    # ideal_window_size_combining(".")
+    # ideal_thresholds_combining(".")
+    # limit_redundant_moves_combining(".")
