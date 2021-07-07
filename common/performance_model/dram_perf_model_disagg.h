@@ -107,15 +107,17 @@ class DramPerfModelDisagg : public DramPerfModel
 
         std::vector<BankInfo> m_r_banks;
 
-        std::map<UInt64, UInt32> m_remote_access_tracker;  // Track remote page accesses
-        std::multimap<SubsecondTime, UInt64> m_recent_remote_accesses;  // Track remote page access that are recent
         std::list<UInt64> m_local_pages; // Pages of local memory
         std::map<UInt64, char> m_local_pages_remote_origin;  // Pages of local memory that were originally in remote
         std::list<UInt64> m_remote_pages; // Pages of remote memory
         std::list<UInt64> m_dirty_pages; // Dirty pages of local memory
         std::map<UInt64, SubsecondTime> m_inflight_pages; // Inflight pages that are being transferred from remote memory to local memory
-        std::map<UInt64, UInt32> m_inflight_redundant;
+        std::map<UInt64, UInt32> m_inflight_redundant;    // Count the number of redundant moves that occur for each inflight page while it is being transferred
         std::map<UInt64, SubsecondTime> m_inflightevicted_pages; // Inflight pages that are being transferred from local memory to remote memory
+
+        std::map<UInt64, UInt32> m_page_usage_map;  // track number of times each phys page is accessed
+        std::map<UInt64, UInt32> m_remote_access_tracker;  // Track remote page accesses
+        std::multimap<SubsecondTime, UInt64> m_recent_remote_accesses;  // Track remote page access that are recent
 
         std::map<UInt64, std::pair<SubsecondTime, UInt32>> m_throttled_pages_tracker;  // keep track of pages that were throttled. The value is a (time, count) pair of the last time the page was throttled and the number of times the page was requested within the same 10^6 ns
         std::vector<std::pair<UInt64, UInt32>> m_throttled_pages_tracker_values;       // values to keep track of for stats
@@ -160,7 +162,6 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_move_page_cancelled_datamovement_queue_full;  // the number of times moving a remote page to local was cancelled due to the queue for pages being full
         UInt64 m_move_page_cancelled_rmode5;                   // the number of times a remote page was not moved to local due to rmode5
         UInt64 m_rmode5_page_moved_due_to_threshold;           // the number of time when in rmode5 and acting according to rmode2, a page was moved because the threshold number of accesses was reached
-        std::map<UInt64, UInt32> m_page_usage_map;  // track number of times each phys page is accessed
         UInt64 m_unique_pages_accessed;             // track number of unique pages accessed
         SubsecondTime m_redundant_moves_type1_time_savings;
         SubsecondTime m_redundant_moves_type2_time_savings;
