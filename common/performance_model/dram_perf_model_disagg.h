@@ -84,6 +84,7 @@ class DramPerfModelDisagg : public DramPerfModel
         double m_r_page_queue_utilization_threshold;  // When the datamovement queue for pages has percentage utilization above this, remote pages aren't moved to local
         double m_r_mode_5_limit_moves_threshold;  // When m_r_mode == 5, operate according to m_r_mode 2 when the page queue utilization is >= this value, otherwise operate according to m_r_mode 1
         SubsecondTime m_r_mode_5_remote_access_history_window_size;  // When m_r_mode == 5, and operating according to m_r_mode, track page accesses using the most recent window size number of ns
+        bool m_use_ideal_page_throttling;  // Whether to use ideal page throttling
         SubsecondTime m_r_ideal_pagethrottle_remote_access_history_window_size;  // Track remote page accesses using the most recent window size number of ns
 
         // Local Memory
