@@ -229,9 +229,11 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     }
 
     // Stats for ideal page throttling algorithm
-    registerStatsMetric("dram", core_id, "ideal-page-throttling-num-swaps-inflight", &m_ideal_page_throttling_swaps_inflight);
-    registerStatsMetric("dram", core_id, "ideal-page-throttling-num-swaps-non-inflight", &m_ideal_page_throttling_swaps_non_inflight);
-    registerStatsMetric("dram", core_id, "ideal-page-throttling-num-swap-unavailable", &m_ideal_page_throttling_swap_unavailable);
+    if (m_use_ideal_page_throttling) {
+        registerStatsMetric("dram", core_id, "ideal-page-throttling-num-swaps-inflight", &m_ideal_page_throttling_swaps_inflight);
+        registerStatsMetric("dram", core_id, "ideal-page-throttling-num-swaps-non-inflight", &m_ideal_page_throttling_swaps_non_inflight);
+        registerStatsMetric("dram", core_id, "ideal-page-throttling-num-swap-unavailable", &m_ideal_page_throttling_swap_unavailable);
+    }
 }
 
 DramPerfModelDisagg::~DramPerfModelDisagg()
