@@ -97,21 +97,39 @@ if __name__ == "__main__":
     x_axis_config_param3 = "perf_model/dram/compression_model/ideal/compressed_page_size"
     program_command = "../../../test/crono/apps/sssp/sssp_int ../../../test/crono/inputs/roadNet-PA.mtx 1"
     result_name = "ipc_vs_compression_latency-sssp"
-    t1 = threading.Thread(target=run_ideal_ratio, args=(latency, compressed_page_size, x_axis_label, x_axis_config_param, x_axis_config_param2, x_axis_config_param3, program_command, result_name, "sssp"))
-    t1.start()
-    t1.join()
+    #t1 = threading.Thread(target=run_ideal_ratio, args=(latency, compressed_page_size, x_axis_label, x_axis_config_param, x_axis_config_param2, x_axis_config_param3, program_command, result_name, "sssp"))
+    #t1.start()
+    #t1.join()
 
     # Ligra
     result_name = "ipc_vs_compression_latency-bfs"
     program_command = "../../../benchmarks/ligra/apps/BFS -s -rounds 1 ../../../benchmarks/ligra/inputs/rMat_1000000" # TODO: change me
-    t2 = threading.Thread(target=run_ideal_ratio, args=(latency, compressed_page_size, x_axis_label, x_axis_config_param, x_axis_config_param2, x_axis_config_param3, program_command, result_name, "bfs"))
-    t2.start()
-    t2.join()
+    #t2 = threading.Thread(target=run_ideal_ratio, args=(latency, compressed_page_size, x_axis_label, x_axis_config_param, x_axis_config_param2, x_axis_config_param3, program_command, result_name, "bfs"))
+    #t2.start()
+    #t2.join()
 
     # Darknet
     result_name = "ipc_vs_compression_latency-darknet"
     program_command = "./darknet classifier predict cfg/imagenet1k.data cfg/darknet19.cfg tiny.weights data/dog.jpg" # TODO: change me
     cwd = "../../benchmarks/darknet"
-    t3 = threading.Thread(target=run_ideal_ratio, args=(latency, compressed_page_size, x_axis_label, x_axis_config_param, x_axis_config_param2, x_axis_config_param3, program_command, result_name, "darknet", cwd))
-    t3.start()
-    t3.join()
+    #t3 = threading.Thread(target=run_ideal_ratio, args=(latency, compressed_page_size, x_axis_label, x_axis_config_param, x_axis_config_param2, x_axis_config_param3, program_command, result_name, "darknet", cwd))
+    #t3.start()
+    #t3.join()
+
+
+    # SpMV
+    program_command = "../../../benchmarks/spmv/bench_spdmv ../../../test/crono/inputs/roadNet-PA.mtx 1 1"
+    result_name = "ipc_vs_compression_latency-spmv"
+    t4 = threading.Thread(target=run_ideal_ratio, args=(latency, compressed_page_size, x_axis_label, x_axis_config_param, x_axis_config_param2, x_axis_config_param3, program_command, result_name, "spmv"))
+    t4.start()
+    t4.join()
+
+ 
+    # SpMV
+    program_command = "../../../benchmarks/stream/stream_sniper 3"
+    result_name = "ipc_vs_compression_latency-stream"
+    t5 = threading.Thread(target=run_ideal_ratio, args=(latency, compressed_page_size, x_axis_label, x_axis_config_param, x_axis_config_param2, x_axis_config_param3, program_command, result_name, "stream"))
+    t5.start()
+    t5.join()
+
+        
