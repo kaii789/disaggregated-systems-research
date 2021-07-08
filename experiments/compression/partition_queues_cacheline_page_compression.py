@@ -372,27 +372,27 @@ def gen_settings_for_graph(benchmark_name):
         res_name = "bfs_reg_8MB_combo"
         benchmark_list = []
         benchmark_list.append("ligra_{}_".format("bfs"))
-        local_dram_list = [8]
+        local_dram_list = ["8MB"]
         bw_scalefactor_list = [4, 32]
     elif benchmark_name == "tinynet":
         res_name = "tinynet_2MB_combo"
         benchmark_list = []
         for model in ["tinynet"]:
             benchmark_list.append("darknet_{}".format(model))
-        local_dram_list = [2]
+        local_dram_list = ["2MB"]
         bw_scalefactor_list = [4, 32]
     elif benchmark_name == "darknet19":
         res_name = "tinynet_2MB_combo"
         benchmark_list = []
         for model in ["darknet19"]:
             benchmark_list.append("darknet_{}".format(model))
-        local_dram_list = [2]
+        local_dram_list = ["2MB"]
         bw_scalefactor_list = [4, 32]
     elif benchmark_name == "stream_1":
         res_name = "stream_1_2MB_combo"
         benchmark_list = []
         benchmark_list.append("stream_1")
-        local_dram_list = [2]
+        local_dram_list = ["2MB"]
         bw_scalefactor_list = [4, 32]
 
     return res_name, benchmark_list, local_dram_list, bw_scalefactor_list
