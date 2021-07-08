@@ -76,7 +76,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_r_throttle_redundant_moves      (Sim()->getCfg()->getBool("perf_model/dram/remote_throttle_redundant_moves"))
     , m_r_use_separate_queue_model      (Sim()->getCfg()->getBool("perf_model/dram/queue_model/use_separate_remote_queue_model")) // Whether to use the separate remote queue model
     , m_r_page_queue_utilization_threshold   (Sim()->getCfg()->getFloat("perf_model/dram/remote_page_queue_utilization_threshold")) // When the datamovement queue for pages has percentage utilization above this, remote pages aren't moved to local
-    , m_use_ideal_page_throttling    (Sim()->getCfg()->getBool("perf_model/dram/remote_use_cacheline_granularity"))  // Whether to use ideal page throttling (alternative currently is FCFS throttling)
+    , m_use_ideal_page_throttling    (Sim()->getCfg()->getBool("perf_model/dram/r_use_ideal_page_throttling"))  // Whether to use ideal page throttling (alternative currently is FCFS throttling)
     , m_r_ideal_pagethrottle_remote_access_history_window_size   (SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/r_ideal_pagethrottle_access_history_window_size")))
     , m_banks               (m_total_banks)
     , m_r_banks               (m_total_banks)
