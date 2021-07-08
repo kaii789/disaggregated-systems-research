@@ -56,12 +56,12 @@ def run_from_cmdline(
         StatSetting(
             "remote datamovement queue model avg access latency",
             float,
-            name_for_legend="page queue avg access latency (ns)",
+            name_for_legend="  page queue avg access latency (ns)",
         ),
         StatSetting(
             "remote datamovement2 queue model avg access latency",
             float,
-            name_for_legend="cacheline queue avg access latency (ns)",
+            name_for_legend="  cacheline queue avg access latency (ns)",
         ),
         StatSetting(
             "local dram avg access latency",
@@ -75,6 +75,11 @@ def run_from_cmdline(
         ),
         StatSetting("num page moves", int, name_for_legend="num page moves"),
         StatSetting("num inflight hits", int, name_for_legend="num inflight hits"),
+        StatSetting(
+            "num local evictions",
+            lambda s: int(s) / 1000,
+            name_for_legend="local evictions (1000s)",
+        ),
         # StatSetting("num redundant moves", int, name_for_legend="num redundant moves total"),
         StatSetting(
             "num redundant moves total",
@@ -107,10 +112,30 @@ def run_from_cmdline(
             name_for_legend="PQ=1 type2 approx latency savings (ns)",
         ),
         StatSetting(
-            "num local evictions",
-            lambda s: int(s) / 1000,
-            name_for_legend="local evictions (1000s)",
+            "ideal page throttling: num swaps inflight",
+            int,
+            name_for_legend="ideal page throttling: # swaps inflight",
         ),
+        StatSetting(
+            "ideal page throttling: num swaps non-inflight",
+            int,
+            name_for_legend="ideal page throttling: # swaps non-inflight",
+        ),
+        StatSetting(
+            "ideal page throttling: num swaps unavailable",
+            int,
+            name_for_legend="ideal page throttling: # swaps unavailable",
+        ),
+        StatSetting(
+            "remote page move cancelled due to full bufferspace",
+            int,
+            name_for_legend="remote move cancelled, full bufferspace",
+        ),
+        StatSetting(
+            "remote page move cancelled due to full queue",
+            int,
+            name_for_legend="remote move cancelled, full queue",
+        ), 
         #  StatSetting("DDR page hits", int),
         #  StatSetting("DDR page misses", int),
     ]
@@ -154,10 +179,14 @@ def run_from_cmdline(
                                     stat_settings[index].line_beginning
                                 )
                             )
-                    raise ValueError("\n".join(error_strs))
+                    # raise ValueError("\n".join(error_strs))
+                    print("\n".join(error_strs))
             else:
                 # Read the lines of pertinant information
                 for index in range(len(y_values)):
+                    if y_value_line_nos[index] is None:
+                        y_values[index].append(np.nan)  # ignore missing stats
+                        continue
                     line = out_file_lines[y_value_line_nos[index]]
                     y_values[index].append(
                         stat_settings[index].format_func(line.split()[-1])
@@ -223,7 +252,7 @@ def save_graph_pq(
         ]
     elif len(y_values[0]) == 4:  # Older experiment config setup
         x_axis = ["no\nremote\nmem\n", "pq0\n0 network\nlatency", "pq0", "pq1"]
-    elif len(y_values[0]) > 7:  # PQ and cacheline combined series
+    elif len(y_values[0]) == 16:  # PQ and cacheline combined series
         x_axis = [
             "no\nremote\nmem\n",
             "page\nmove\ninstant",
@@ -243,6 +272,23 @@ def save_graph_pq(
             "pq1\ncl=\n0.6",
         ]
         plt.figure(figsize=(10, 4.8))  # (width, height) in inches
+    elif len(y_values[0]) == 13:  # PQ and cacheline combined series, edited
+        x_axis = [
+            "no\nremote\nmem\n",
+            "page\nmove\ninstant",
+            "pq0",
+            "pq1\ncl=\n0.005",
+            "pq1\ncl=\n0.01",
+            "pq1\ncl=\n0.025",
+            "pq1\ncl=\n0.05",
+            "pq1\ncl=\n0.075",
+            "pq1\ncl=\n0.1",
+            "pq1\ncl=\n0.15",
+            "pq1\ncl=\n0.2",
+            "pq1\ncl=\n0.3",
+            "pq1\ncl=\n0.5",
+        ]
+        plt.figure(figsize=(9, 4.8))  # (width, height) in inches
     else:
         raise ValueError("number of experiment runs={}, inaccurate?".format(len(y_values[0])))
 
@@ -250,8 +296,7 @@ def save_graph_pq(
     print("X values:\n", [s.replace("\n", " ") for s in x_axis])
     print("Y values:")
     for i, y_value_list in enumerate(y_values):
-        print("{}: {}".format(stat_settings[i].name_for_legend, get_list_padded_str(y_value_list)))
-        
+        print("{:45}: {}".format(stat_settings[i].name_for_legend, get_list_padded_str(y_value_list)))
     print()
 
     if log_file:  # Also print to log file
@@ -259,9 +304,10 @@ def save_graph_pq(
         print("Y values:", file=log_file)
         for i, y_value_list in enumerate(y_values):
             print(
-                "{}: {}".format(stat_settings[i].name_for_legend, get_list_padded_str(y_value_list)),
+                "{:45}: {}".format(stat_settings[i].name_for_legend, get_list_padded_str(y_value_list)),
                 file=log_file,
             )
+        print(file=log_file)
 
     # Plot as graph
     line_style_list = [".--r", ".--g", ".--b", ".--c", ".--m", ".--y"]
