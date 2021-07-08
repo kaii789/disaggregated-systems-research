@@ -371,7 +371,7 @@ def gen_settings_for_graph(benchmark_name):
     elif benchmark_name == "bfs_reg":
         res_name = "bfs_reg_8MB_combo"
         benchmark_list = []
-        benchmark_list.append("ligra_{}_".format("regular_input"))
+        benchmark_list.append("ligra_{}_".format("bfs"))
         local_dram_list = [8]
         bw_scalefactor_list = [4, 32]
     elif benchmark_name == "tinynet":
