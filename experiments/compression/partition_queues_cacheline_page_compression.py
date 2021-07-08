@@ -92,7 +92,15 @@ command_str2c_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}
     sniper_root=subfolder_sniper_root_relpath
 )
 
+
 command_strs = {}
+
+stream_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/stream/stream_sniper {{0}}".format(
+    sniper_root=subfolder_sniper_root_relpath
+)
+spmv_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/spmv/bench_spdmv {sniper_root}/test/crono/inputs/{{0}} 1 1".format(
+    sniper_root=subfolder_sniper_root_relpath
+)
 
 ###  Darknet command strings  ###
 # Note: using os.system(), the 'cd' of working directory doesn't persist to the next call to os.system()
@@ -189,7 +197,7 @@ def run_bfs(ligra_input_selection, num_MB):
 
             experiments.append(
                 automation.Experiment(
-                    experiment_name="ligra_{}_{}localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_pq_cacheline_combined_series".format(
+                    experiment_name="ligra_{}_{}localdram_{}_netlat_{}_bw_scalefactor_{}_combo".format(
                         application_name.lower(),
                         ""
                         if ligra_input_selection == "regular_input"
@@ -197,7 +205,6 @@ def run_bfs(ligra_input_selection, num_MB):
                         localdram_size_str,
                         net_lat,
                         bw_scalefactor,
-                        remote_init,
                     ),
                     command_str=command_str,
                     experiment_run_configs=config_list,
@@ -246,7 +253,7 @@ def run_tinynet(model_type):
 
             experiments.append(
                 automation.Experiment(
-                    experiment_name="darknet_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_pq_cacheline_combined_series".format(
+                    experiment_name="darknet_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_combo".format(
                         model_type.lower(), localdram_size_str, net_lat, bw_scalefactor
                     ),
                     command_str=command_str,
@@ -276,8 +283,60 @@ def run_tinynet(model_type):
         print(log_str)
         print(log_str, file=log_file)
 
-run_bfs("regular_input", 8)
-run_bfs("reg_8x", 32)
-run_tinynet("tiny")
-run_tinynet("darknet19")
-run_tinynet("resnet50")
+# TODO: Stream, 2 MB
+def run_stream(type):
+    experiments = []
+    net_lat = 120
+    for num_MB in [2]:
+        for bw_scalefactor in [4, 32]:
+            localdram_size_str = "{}MB".format(num_MB)
+            command_str = stream_base_options.format(
+                type,
+                sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+                    int(num_MB * ONE_MB_TO_BYTES),
+                    int(net_lat),
+                    int(bw_scalefactor),
+                    int(1 * ONE_BILLION),
+                ),
+            )
+            # 1 billion instructions cap
+
+            experiments.append(
+                automation.Experiment(
+                    experiment_name="stream_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_combo".format(
+                        type, localdram_size_str, net_lat, bw_scalefactor
+                    ),
+                    command_str=command_str,
+                    experiment_run_configs=config_list,
+                    output_root_directory=".",
+                )
+            )
+
+    log_filename = "run-sniper-repeat2_1.log"
+    num = 2
+    while os.path.isfile(log_filename):
+        log_filename = "run-sniper-repeat2_{}.log".format(num)
+        num += 1
+
+    with open(log_filename, "w") as log_file:
+        log_str = "Script start time: {}".format(automation.datetime.datetime.now().astimezone())
+        print(log_str)
+        print(log_str, file=log_file)
+
+        experiment_manager = automation.ExperimentManager(
+            output_root_directory=".", max_concurrent_processes=16, log_file=log_file
+        )
+        experiment_manager.add_experiments(experiments)
+        experiment_manager.start()
+
+        log_str = "Script end time: {}".format(automation.datetime.datetime.now().astimezone())
+        print(log_str)
+        print(log_str, file=log_file)
+
+# run_bfs("regular_input", 8)
+# run_tinynet("tiny")
+# run_tinynet("darknet19")
+# run_stream("1") # Scale
+
+# run_bfs("reg_8x", 32)
+# run_tinynet("resnet50")
