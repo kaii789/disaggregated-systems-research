@@ -165,6 +165,7 @@ class DramPerfModelDisaggMultipage : public DramPerfModel
         DramPerfModelDisaggMultipage(core_id_t core_id, UInt32 cache_block_size, AddressHomeLookup* address_home_lookup);
 
         ~DramPerfModelDisaggMultipage();
+        void finalizeStats() { return; }
 
         bool isRemoteAccess(IntPtr address, core_id_t requester, DramCntlrInterface::access_t access_type); 
         SubsecondTime getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_size, core_id_t requester, IntPtr address, DramCntlrInterface::access_t access_type, ShmemPerf *perf);

@@ -277,6 +277,11 @@ DramPerfModelDisagg::~DramPerfModelDisagg()
         delete m_data_movement_2;
     }
 
+}
+
+void
+DramPerfModelDisagg::finalizeStats() 
+{
     // Add values in the map at the end of program execution to m_throttled_pages_tracker_values
     for (std::map<UInt64, std::pair<SubsecondTime, UInt32>>::iterator it = m_throttled_pages_tracker.begin(); it != m_throttled_pages_tracker.end(); ++it) {
         // if ((it->second).second > 0)
@@ -374,6 +379,7 @@ DramPerfModelDisagg::~DramPerfModelDisagg()
 
     std::cout << "CDF X values (throttled page accesses aggregated by phys_page):\n" << cdf_buffer_page_aggregated_counts.str() << std::endl;
     std::cout << "CDF Y values (probability):\n" << percentages_buffer_2.str() << std::endl;
+   
 }
 
 UInt64

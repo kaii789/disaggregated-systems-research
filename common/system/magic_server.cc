@@ -12,6 +12,10 @@
 #include "timer.h"
 #include "thread.h"
 
+//cgiannoula
+#include "../core/memory_subsystem/parametric_dram_directory_msi/memory_manager.h"
+using namespace ParametricDramDirectoryMSI;
+
 MagicServer::MagicServer()
       : m_performance_enabled(false)
 {
@@ -54,6 +58,13 @@ UInt64 MagicServer::Magic_unlocked(thread_id_t thread_id, core_id_t core_id, UIn
          Sim()->getHooksManager()->callHooks(HookType::HOOK_APPLICATION_ROI_END, 0);
          if (Sim()->getConfig()->getSimulationROI() == Config::ROI_MAGIC)
          {
+            // cgiannoula
+            // Finalize statistics in dram_perf_model
+            ParametricDramDirectoryMSI::MemoryManager* m_manager = static_cast<MemoryManager *> (Sim()->getCoreManager()->getCoreFromID(0)->getMemoryManager());
+            DramPerfModel* m_dram_perf_model = m_manager->getDramCntlr()->getDramPerfModel();
+            m_dram_perf_model->finalizeStats();
+            // cgiannoula
+
             return setPerformance(false);
          }
          else
