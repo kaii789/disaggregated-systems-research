@@ -377,21 +377,21 @@ def gen_settings_for_graph(benchmark_name):
     elif benchmark_name == "tinynet":
         res_name = "tinynet_2MB_combo"
         benchmark_list = []
-        for model in ["tinynet"]:
-            benchmark_list.append("darknet_{}".format(model))
+        for model in ["tiny"]:
+            benchmark_list.append("darknet_{}_".format(model))
         local_dram_list = ["2MB"]
         bw_scalefactor_list = [4, 32]
     elif benchmark_name == "darknet19":
         res_name = "tinynet_2MB_combo"
         benchmark_list = []
         for model in ["darknet19"]:
-            benchmark_list.append("darknet_{}".format(model))
+            benchmark_list.append("darknet_{}_".format(model))
         local_dram_list = ["2MB"]
         bw_scalefactor_list = [4, 32]
     elif benchmark_name == "stream_1":
         res_name = "stream_1_2MB_combo"
         benchmark_list = []
-        benchmark_list.append("stream_1")
+        benchmark_list.append("stream_1_")
         local_dram_list = ["2MB"]
         bw_scalefactor_list = [4, 32]
 
