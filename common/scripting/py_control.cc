@@ -11,6 +11,11 @@ setROI(PyObject *self, PyObject *args)
    if (!PyArg_ParseTuple(args, "b", &inRoi))
       return NULL;
 
+   // cgiannoula
+   // finalizeStats
+   if(inRoi == false)
+        Sim()->getMagicServer()->finalizeStats();
+ 
    Sim()->getMagicServer()->setPerformance(inRoi);
 
    Py_RETURN_NONE;
@@ -57,10 +62,7 @@ simulatorAbort(PyObject *self, PyObject *args)
 {
    // Exit now, cleaning up as best as possible
    // For benchmarks where, after ROI, functionally simulating until the end takes too long.
-
-   // cgiannoula
-   Sim()->getMagicServer()->finalizeStats();
- 
+  
   // If we're still in ROI, make sure we end it properly
    Sim()->getMagicServer()->setPerformance(false);
 

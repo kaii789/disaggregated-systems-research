@@ -58,13 +58,7 @@ UInt64 MagicServer::Magic_unlocked(thread_id_t thread_id, core_id_t core_id, UIn
          if (Sim()->getConfig()->getSimulationROI() == Config::ROI_MAGIC)
          {
             // cgiannoula
-            if (Sim()->getConfig()->getCachingProtocolType() == "parametric_dram_directory_msi") {
-               // Finalize statistics in dram_perf_model
-               ParametricDramDirectoryMSI::MemoryManager* m_manager = static_cast<ParametricDramDirectoryMSI::MemoryManager *> (Sim()->getCoreManager()->getCoreFromID(0)->getMemoryManager());
-               DramPerfModel* m_dram_perf_model = m_manager->getDramCntlr()->getDramPerfModel();
-               m_dram_perf_model->finalizeStats();
-            }
-            // cgiannoula
+            finalizeStats();
 
             return setPerformance(false);
          }
