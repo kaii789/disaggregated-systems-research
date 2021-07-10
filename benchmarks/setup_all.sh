@@ -45,5 +45,5 @@ make
 # Set up Crono SSSP
 echo
 echo "Compiling Crono SSSP..."
-cd ../../test/crono
+cd ../crono
 make
