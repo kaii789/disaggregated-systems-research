@@ -23,7 +23,7 @@ if __name__ == "__main__":
         sniper_root=subfolder_sniper_root_relpath
     )
     # Assumes input matrices are in the {sniper_root}/test/crono/inputs directory
-    sssp_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/test/crono/apps/sssp/sssp {sniper_root}/test/crono/inputs/{{0}} 1".format(
+    sssp_int_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/test/crono/apps/sssp/sssp_int {sniper_root}/test/crono/inputs/{{0}} 1".format(
         sniper_root=subfolder_sniper_root_relpath
     )
     stream_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/stream/stream_sniper {{0}}".format(
@@ -226,7 +226,7 @@ if __name__ == "__main__":
         for num_B in [131072, 262144]:
             for bw_scalefactor in [4, 8, 32]:
                 localdram_size_str = "{}B".format(num_B)
-                command_str = sssp_base_options.format(
+                command_str = sssp_int_base_options.format(
                     "bcsstk32.mtx",
                     sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={}".format(
                         int(num_B),

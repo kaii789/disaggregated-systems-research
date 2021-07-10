@@ -41,3 +41,9 @@ echo
 echo "Compiling STREAM..."
 cd ../stream
 make
+
+# Set up Crono SSSP
+echo
+echo "Compiling Crono SSSP..."
+cd ../../test/crono
+make
