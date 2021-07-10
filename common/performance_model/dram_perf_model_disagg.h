@@ -116,6 +116,8 @@ class DramPerfModelDisagg : public DramPerfModel
         std::map<UInt64, SubsecondTime> m_inflightevicted_pages; // Inflight pages that are being transferred from local memory to remote memory
 
         std::map<UInt64, UInt32> m_page_usage_map;  // track number of times each phys page is accessed
+        const UInt32 m_page_usage_stats_num_points = 10;  // the number of percentiles (from above 0% to including 100%)
+        std::vector<UInt64> page_usage_count_stats;       // percentiles of phys_page access counts, to be registered as stats
         std::map<UInt64, UInt32> m_remote_access_tracker;  // Track remote page accesses
         std::multimap<SubsecondTime, UInt64> m_recent_remote_accesses;  // Track remote page access that are recent
 

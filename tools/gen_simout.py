@@ -279,6 +279,11 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
       ('  remote datamovement2 % queue capped by custom cap', 'dram.remotequeuemodel_datamovement2_percent_capped_by_custom_cap', format_float(2)),
   ])
 
+  # if '' in results:
+  template.append(('Page locality stats (count within phys_page, entire ROI)', '', ''))
+  for i in range(10, 101, 10):  # 10, 20, ..., 100
+    template.append(('  {}% percentile'.format(i), 'dram.page-access-count-p{}'.format(i), str))
+
   if 'ddr.page-hits' in results:
     template.extend([
         ('DDR', '', ''),
