@@ -1,3 +1,5 @@
 apps/sssp/sssp_pthread
 apps/sssp/sssp_int
 apps/sssp/sssp_float
+apps/teenage_followers/teenage_followers
+apps/teenage_followers/teenage_followers_pthread

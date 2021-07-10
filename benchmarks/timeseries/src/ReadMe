@@ -1,0 +1,9 @@
+./scrimp ../inputs/airquality.txt 50 0.25 #nthreads 2
+./scrimp_pthread ../inputs/airquality.txt 50 0.25 #nthreads 2
+
+./scrimp ../inputs/power_demand.txt 50 0.25 #nthreads 4
+./scrimp_pthread ../inputs/power_demand.txt 50 0.25 #nthreads 4
+
+./scrimp ../inputs/taxi.txt 50 0.25 #nthreads 4
+./scrimp_pthread ../inputs/taxi.txt 50 0.25 #nthreads 4
+

@@ -1,5 +1,5 @@
 # SUBDIRS= apsp bc sssp community connected_components dfs bfs pagerank triangle_counting tsp
-SUBDIRS= sssp
+SUBDIRS= sssp teenage_followers
 
 CRONO_DIR=$(PWD)
 
