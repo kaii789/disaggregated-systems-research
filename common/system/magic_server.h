@@ -30,6 +30,8 @@ class MagicServer
       void enablePerformance();
       void disablePerformance();
       UInt64 setPerformance(bool enabled);
+      // cgiannoula
+      void finalizeStats();
 
       UInt64 setInstrumentationMode(UInt64 sim_api_opt);
 

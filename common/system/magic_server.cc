@@ -213,6 +213,17 @@ UInt64 MagicServer::setPerformance(bool enabled)
    return 0;
 }
 
+// cgiannoula
+void MagicServer::finalizeStats() 
+{
+    if (Sim()->getConfig()->getCachingProtocolType() == "parametric_dram_directory_msi") {
+       // Finalize statistics in dram_perf_model
+       ParametricDramDirectoryMSI::MemoryManager* m_manager = static_cast<ParametricDramDirectoryMSI::MemoryManager *> (Sim()->getCoreManager()->getCoreFromID(0)->getMemoryManager());
+       DramPerfModel* m_dram_perf_model = m_manager->getDramCntlr()->getDramPerfModel();
+       m_dram_perf_model->finalizeStats();
+    }
+}
+
 UInt64 MagicServer::setFrequency(UInt64 core_number, UInt64 freq_in_mhz)
 {
    UInt32 num_cores = Sim()->getConfig()->getApplicationCores();
