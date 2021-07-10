@@ -124,7 +124,7 @@ class DramPerfModelDisagg : public DramPerfModel
 
         // TODO: Compression
         bool m_use_compression;
-        CompressionModel *m_cacheline_compression_model;
+        CompressionModel *m_compression_model;
         UInt64 bytes_saved = 0;
         SubsecondTime m_total_compression_latency = SubsecondTime::Zero();
         SubsecondTime m_total_decompression_latency = SubsecondTime::Zero();
@@ -132,7 +132,7 @@ class DramPerfModelDisagg : public DramPerfModel
         std::map<IntPtr, UInt32> address_to_num_cache_lines;
 
         bool m_use_cacheline_compression;
-        CompressionModel *m_compression_model;
+        CompressionModel *m_cacheline_compression_model;
         UInt64 cacheline_bytes_saved = 0;
         SubsecondTime m_total_cacheline_compression_latency = SubsecondTime::Zero();
         SubsecondTime m_total_cacheline_decompression_latency = SubsecondTime::Zero();
