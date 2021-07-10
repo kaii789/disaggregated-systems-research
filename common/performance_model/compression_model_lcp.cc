@@ -48,7 +48,7 @@ CompressionModelLCP::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
         // Account for exception storage region
         for (int j = 0; j < m_cacheline_count; j++) {
             if (m_compressed_cache_line_sizes[j] > target) {
-                compressed_size += m_compressed_cache_line_sizes[j];
+                compressed_size += m_cache_line_size;
             } else {
                 compressed_cache_lines += 1;
             }
@@ -60,7 +60,12 @@ CompressionModelLCP::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
             total_compressed_cache_lines = compressed_cache_lines;
         }
     }
-    assert(total_bytes <= m_page_size && "[LCP] Wrong compression!");
+
+    // Don't compress when compressed size bigger than orig
+    if (total_bytes > m_page_size) {
+        total_bytes = m_page_size;
+        total_compressed_cache_lines = 0;
+    }
 
     // Return compressed cache lines
     *compressed_cache_lines = total_compressed_cache_lines;
@@ -68,7 +73,7 @@ CompressionModelLCP::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
     // Return compressed pages size in Bytes
     *compressed_page_size = total_bytes;
 
-    // printf("[LCP Compression] Compressed Page Size: %u bytes", total_bytes);
+    printf("[LCP Compression] Compressed Page Size: %u bytes\n", total_bytes);
 
     // Return compression latency
     if (m_compression_latency == 0)
