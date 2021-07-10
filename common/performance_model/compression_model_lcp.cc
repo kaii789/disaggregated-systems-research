@@ -30,8 +30,7 @@ CompressionModelLCP::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
     // Step 1: Compress using cacheline compression algo
     for (UInt32 i = 0; i < m_cacheline_count; i++)
     {
-        // m_compressed_cache_line_sizes[i] = compressCacheLine(m_data_buffer + i * m_cache_line_size, m_compressed_data_buffer + i * m_cache_line_size);
-        UInt32 compressed_cache_lines;
+        UInt32 compressed_cache_lines; // Dummy var
         total_compression_latency += m_compression_model->compress(addr + i * m_cache_line_size, m_cache_line_size, core_id, &m_compressed_cache_line_sizes[i], &compressed_cache_lines);
 
         total_bytes_check += m_compressed_cache_line_sizes[i];
@@ -61,6 +60,7 @@ CompressionModelLCP::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
             total_compressed_cache_lines = compressed_cache_lines;
         }
     }
+    assert(total_bytes <= m_page_size && "[LCP] Wrong compression!");
 
     // Return compressed cache lines
     *compressed_cache_lines = total_compressed_cache_lines;
@@ -71,6 +71,8 @@ CompressionModelLCP::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
     // printf("[LCP Compression] Compressed Page Size: %u bytes", total_bytes);
 
     // Return compression latency
+    if (m_compression_latency == 0)
+        return SubsecondTime::Zero();
     return total_compression_latency;
 }
 
@@ -82,9 +84,7 @@ CompressionModelLCP::~CompressionModelLCP()
 SubsecondTime
 CompressionModelLCP::decompress(IntPtr addr, UInt32 compressed_cache_lines, core_id_t core_id)
 {
-    Core *core = Sim()->getCoreManager()->getCoreFromID(core_id);
-    ComponentLatency decompress_latency(ComponentLatency(core->getDvfsDomain(), compressed_cache_lines * m_decompression_latency));
-    return decompress_latency.getLatency();
+    return m_compression_model->decompress(addr, compressed_cache_lines, core_id);
 }
 
 SubsecondTime
