@@ -54,3 +54,9 @@ echo
 echo "Compiling Timeseries..."
 cd ../timeseries/src
 make
+
+# Set up Rodinia
+echo
+echo "Compiling Rodinia..."
+cd ../../rodinia
+make

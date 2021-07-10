@@ -1,0 +1,16 @@
+bin/backprop 
+bin/bfs 
+bin/cfd 
+bin/heartwall 
+bin/hotspot 
+bin/kmeans 
+bin/lavaMD 
+bin/leukocyte 
+bin/lud 
+bin/nn 
+bin/nw 
+bin/srad 
+bin/streamcluster 
+bin/particlefilter 
+bin/pathfinder
+
