@@ -6,6 +6,7 @@
 #include "compression_model_ideal.h"
 #include "compression_model_bdi.h"
 #include "compression_model_fpc.h"
+#include "compression_model_lcp.h"
 #include "compression_model_fve.h"
 #include "compression_model_lz4.h"
 
@@ -23,6 +24,10 @@ CompressionModel::create(String name, UInt32 page_size, UInt32 cache_line_size, 
     else if (compression_type == "fpc")
     {
         return new CompressionModelFPC(name, page_size, cache_line_size);
+    }
+    else if (compression_type == "lcp")
+    {
+        return new CompressionModelLCP(name, page_size, cache_line_size);
     }
     else if (compression_type == "fve")
     {
