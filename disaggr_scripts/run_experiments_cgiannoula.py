@@ -31,7 +31,7 @@ if __name__ == "__main__":
 
     ###  Darknet command strings  ###
     # Note: using os.system(), the 'cd' of working directory doesn't persist to the next call to os.system()
-    darknet_base_str_options = "cd {1} && ../../run-sniper -d {{{{sniper_output_dir}}}} -c ../../disaggr_config/local_memory_cache.cfg -c {{{{sniper_output_dir}}}}/repeat_testing.cfg {{sniper_options}} -- {0}/darknet classifier predict {0}/cfg/imagenet1k.data {0}/cfg/{{0}}.cfg {0}/{{0}}.weights {0}/data/dog.jpg".format(
+    darknet_base_options = "cd {1} && ../../run-sniper -d {{{{sniper_output_dir}}}} -c ../../disaggr_config/local_memory_cache.cfg -c {{{{sniper_output_dir}}}}/repeat_testing.cfg {{sniper_options}} -- {0}/darknet classifier predict {0}/cfg/imagenet1k.data {0}/cfg/{{0}}.cfg {0}/{{0}}.weights {0}/data/dog.jpg".format(
         ".", darknet_home
     )
 
@@ -319,6 +319,34 @@ if __name__ == "__main__":
                     output_root_directory=".",
                 )
             )
+
+    # darknet bw_factor [4, 16] 
+    darknet_compression_experiments_remoteinit_true = []
+    for model_type in ["tiny"]:
+        for remote_init in ["true"]:  # "false"
+            for bw_scalefactor in [4, 16]:
+                command_str = darknet_base_options.format(
+                    model_type,
+                    sniper_options="-g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -s stop-by-icount:{}".format(
+                        int(bw_scalefactor),
+                        str(remote_init),
+                        int(1 * ONE_BILLION),
+                    ),
+                )
+
+                darknet_compression_experiments_remoteinit_true.append(
+                    Experiment(
+                        experiment_name="darknet_{}_bw_scalefactor_{}_remoteinit_{}_compression_series".format(
+                            model_type.lower(),
+                            bw_scalefactor,
+                            remote_init,
+                        ),
+                        command_str=command_str,
+                        experiment_run_configs=compression_series_experiment_run_configs,
+                        output_root_directory=".",
+                    )
+                )
+
 
 
 
