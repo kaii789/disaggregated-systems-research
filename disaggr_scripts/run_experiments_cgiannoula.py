@@ -24,6 +24,7 @@ if __name__ == "__main__":
     stream_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/stream/stream_sniper {{0}}".format(
         sniper_root=subfolder_sniper_root_relpath
     )
+
     spmv_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/spmv/bench_spdmv {sniper_root}/benchmarks/crono/inputs/{{0}} 1 1".format(
         sniper_root=subfolder_sniper_root_relpath
     )
@@ -274,7 +275,7 @@ if __name__ == "__main__":
     for remote_init in ["true"]:  # "false"
         for bw_scalefactor in [4, 16]:
             command_str = sssp_int_base_options.format(
-                "bcsstk05.mtx",
+                "roadNet-PA.mtx",
                 sniper_options="-g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -s stop-by-icount:{}".format(
                     int(bw_scalefactor),
                     str(remote_init),
@@ -294,9 +295,35 @@ if __name__ == "__main__":
                 )
             )
 
+    # stream triad, bw_factor [4, 16] 
+    stream_triad_compression_experiments_remoteinit_true = []
+    for remote_init in ["true"]:  # "false"
+        for bw_scalefactor in [4, 16]:
+            command_str = stream_base_options.format(
+                "3",
+                sniper_options="-g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -s stop-by-icount:{}".format(
+                    int(bw_scalefactor),
+                    str(remote_init),
+                    int(1 * ONE_BILLION),
+                ),
+            )
+
+            stream_triad_compression_experiments_remoteinit_true.append(
+                Experiment(
+                    experiment_name="stream_triad_bw_scalefactor_{}_remoteinit_{}_compression_series".format(
+                        bw_scalefactor,
+                        remote_init,
+                    ),
+                    command_str=command_str,
+                    experiment_run_configs=compression_series_experiment_run_configs,
+                    output_root_directory=".",
+                )
+            )
+
+
 
     ## add configs to experiment list
-    experiments.extend(sssp_roadNet_compression_experiments_remoteinit_true)
+    #experiments.extend(sssp_roadNet_compression_experiments_remoteinit_true)
 
 
     ### Run Sniper experiments using ExperimentManager ###
