@@ -37,7 +37,7 @@ if __name__ == "__main__":
 
     ###  Ligra command strings  ###
     # Do only 1 timed round to save time during initial experiments
-    ligra_base_str_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c {{{{sniper_output_dir}}}}/repeat_testing.cfg {{sniper_options}} -- {0}/apps/{{0}} -s -rounds 1 {0}/inputs/{{1}}".format(
+    ligra_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c {{{{sniper_output_dir}}}}/repeat_testing.cfg {{sniper_options}} -- {0}/apps/{{0}} -s -rounds 1 {0}/inputs/{{1}}".format(
         ligra_home, sniper_root=subfolder_sniper_root_relpath
     )
     ligra_input_to_file = {
@@ -346,6 +346,57 @@ if __name__ == "__main__":
                         output_root_directory=".",
                     )
                 )
+
+    # spmv pkustk14.mtx, bw_factor [4, 16] 
+    spmv_pkustk14_compression_experiments_remoteinit_true = []
+    for remote_init in ["true"]:  # "false"
+        for bw_scalefactor in [4, 16]:
+            command_str = spmv_base_options.format(
+                "pkustk14.mtx",
+                sniper_options="-g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -s stop-by-icount:{}".format(
+                    int(bw_scalefactor),
+                    str(remote_init),
+                    int(1 * ONE_BILLION),
+                ),
+            )
+
+            spmv_pkustk14_compression_experiments_remoteinit_true.append(
+                Experiment(
+                    experiment_name="spmv_pkustk14_bw_scalefactor_{}_remoteinit_{}_compression_series".format(
+                        bw_scalefactor,
+                        remote_init,
+                    ),
+                    command_str=command_str,
+                    experiment_run_configs=compression_series_experiment_run_configs,
+                    output_root_directory=".",
+                )
+            )
+
+    # BFS rMat_1000000, bw_factor [4, 16] 
+    bfs_rmat1M_compression_experiments_remoteinit_true = []
+    for remote_init in ["true"]:  # "false"
+        for bw_scalefactor in [4, 16]:
+            command_str = ligra_base_options.format(
+                "BFS",
+                "rMat_1000000",
+                sniper_options="-g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -s stop-by-icount:{}".format(
+                    int(bw_scalefactor),
+                    str(remote_init),
+                    int(1 * ONE_BILLION),
+                ),
+            )
+
+            bfs_rmat1M_compression_experiments_remoteinit_true.append(
+                Experiment(
+                    experiment_name="bfs_rmat1M_bw_scalefactor_{}_remoteinit_{}_compression_series".format(
+                        bw_scalefactor,
+                        remote_init,
+                    ),
+                    command_str=command_str,
+                    experiment_run_configs=compression_series_experiment_run_configs,
+                    output_root_directory=".",
+                )
+            )
 
 
 
