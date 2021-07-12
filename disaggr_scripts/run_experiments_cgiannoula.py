@@ -450,6 +450,61 @@ if __name__ == "__main__":
                     experiment_run_configs=compression_series_experiment_run_configs,
 
 
+    # Components rMat_1000000, bw_factor [4, 16] 
+    components_rmat1M_compression_experiments_remoteinit_true = []
+    for remote_init in ["true"]:  # "false"
+        for bw_scalefactor in [4, 16]:
+            command_str = ligra_base_options.format(
+                "Components",
+                "rMat_1000000",
+                sniper_options="-g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -s stop-by-icount:{}".format(
+                    int(bw_scalefactor),
+                    str(remote_init),
+                    int(1 * ONE_BILLION),
+                ),
+            )
+
+            components_rmat1M_compression_experiments_remoteinit_true.append(
+                Experiment(
+                    experiment_name="components_rmat1M_bw_scalefactor_{}_remoteinit_{}_compression_series".format(
+                        bw_scalefactor,
+                        remote_init,
+                    ),
+                    command_str=command_str,
+                    experiment_run_configs=compression_series_experiment_run_configs,
+                    output_root_directory=".",
+                )
+            )
+
+
+    # Radii rMat_1000000, bw_factor [4, 16] 
+    radii_rmat1M_compression_experiments_remoteinit_true = []
+    for remote_init in ["true"]:  # "false"
+        for bw_scalefactor in [4, 16]:
+            command_str = ligra_base_options.format(
+                "Radii",
+                "rMat_1000000",
+                sniper_options="-g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -s stop-by-icount:{}".format(
+                    int(bw_scalefactor),
+                    str(remote_init),
+                    int(1 * ONE_BILLION),
+                ),
+            )
+
+            radii_rmat1M_compression_experiments_remoteinit_true.append(
+                Experiment(
+                    experiment_name="radii_rmat1M_bw_scalefactor_{}_remoteinit_{}_compression_series".format(
+                        bw_scalefactor,
+                        remote_init,
+                    ),
+                    command_str=command_str,
+                    experiment_run_configs=compression_series_experiment_run_configs,
+                    output_root_directory=".",
+                )
+            )
+
+
+
     ## add configs to experiment list
     #experiments.extend(sssp_roadNet_compression_experiments_remoteinit_true)
 
