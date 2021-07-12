@@ -32,7 +32,7 @@ private:
     char *m_compressed_data_buffer;
     UInt32 *m_compressed_cache_line_sizes;
     UInt32 m_cacheline_count;
-    UInt32 m_options = 8; // 8 different options for compression 
+    UInt32 m_options;
     struct m_compress_info {
        bool is_compressible; 
        UInt32 compressed_size; // In bytes
@@ -45,6 +45,8 @@ private:
 
     int m_compression_granularity;
 
+    bool use_additional_options;
+
 
     SInt64 readWord(void*, UInt32, UInt32);
     void writeWord(void*, UInt32, SInt64, UInt32);
@@ -53,7 +55,7 @@ private:
     void specializedCompress(void *, m_compress_info *, void *, SInt32, SInt32);
     bool checkDeltaLimits(SInt64, UInt32);
     UInt32 compressCacheLine(void *in, void *out);
-    UInt32 decompressCacheLine(void *in, void *out);
+   //  UInt32 decompressCacheLine(void *in, void *out);
 
 };
 
