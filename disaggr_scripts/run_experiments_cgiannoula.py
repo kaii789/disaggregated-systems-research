@@ -516,7 +516,7 @@ if __name__ == "__main__":
     timeseries_power_compression_experiments_remoteinit_true = []
     for remote_init in ["true"]:  # "false"
         for bw_scalefactor in [4, 16]:
-            command_str = spmv_base_options.format(
+            command_str = timeseries_base_options.format(
                 "power_demand.txt",
                 sniper_options="-g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -s stop-by-icount:{}".format(
                     int(bw_scalefactor),
