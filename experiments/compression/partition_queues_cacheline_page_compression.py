@@ -19,6 +19,7 @@ config_list = [
     # 1) Compression Off
     automation.ExperimentRunConfig(
         [
+            automation.ConfigEntry("perf_model/l3_cache", "cache_size", "512"),
             automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "1"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
         ]
@@ -26,6 +27,7 @@ config_list = [
     # 2) Page Compression(ideal)
     automation.ExperimentRunConfig(
         [
+            automation.ConfigEntry("perf_model/l3_cache", "cache_size", "512"),
             automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "1"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
             automation.ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
@@ -36,6 +38,7 @@ config_list = [
     # 3) Cacheline + Page Compression(ideal)
     automation.ExperimentRunConfig(
         [
+            automation.ConfigEntry("perf_model/l3_cache", "cache_size", "512"),
             automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "1"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
             automation.ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "true"),
@@ -46,6 +49,7 @@ config_list = [
     # 4) Page Compression
     automation.ExperimentRunConfig(
         [
+            automation.ConfigEntry("perf_model/l3_cache", "cache_size", "512"),
             automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "1"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
             automation.ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
@@ -54,6 +58,7 @@ config_list = [
     # 5) Cacheline + Page Compression
     automation.ExperimentRunConfig(
         [
+            automation.ConfigEntry("perf_model/l3_cache", "cache_size", "512"),
             automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "1"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
             automation.ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "true"),
@@ -180,14 +185,14 @@ command_strs["ligra_bfs_small_input_localdram_1MB"] = ligra_base_str_options.for
 )
 
 
-# BFS, 8 MB
+# BFS, 4 MB
 def run_bfs(ligra_input_selection, num_MB):
     experiments = []
     ligra_input_file = ligra_input_to_file[ligra_input_selection]
     application_name = "BFS"
     net_lat = 120
     for remote_init in ["false"]:  # "false"
-        for bw_scalefactor in [4, 32]:
+        for bw_scalefactor in [4, 16]:
             localdram_size_str = "{}MB".format(num_MB)
             command_str = ligra_base_str_options.format(
                 application_name,
@@ -225,7 +230,7 @@ def run_tinynet(model_type):
     experiments = []
     net_lat = 120
     for num_MB in [2]:
-        for bw_scalefactor in [4, 32]:
+        for bw_scalefactor in [4, 16]:
             localdram_size_str = "{}MB".format(num_MB)
             command_str = darknet_base_str_options.format(
                 model_type,
@@ -257,7 +262,7 @@ def run_stream(type):
     experiments = []
     net_lat = 120
     for num_MB in [2]:
-        for bw_scalefactor in [4, 32]:
+        for bw_scalefactor in [4, 16]:
             localdram_size_str = "{}MB".format(num_MB)
             command_str = stream_base_options.format(
                 type,
@@ -284,13 +289,13 @@ def run_stream(type):
     return experiments
 
 
-# sssp 256KB
+# sssp 512KB
 def run_sssp(input):
     experiments = []
     net_lat = 120
     for remote_init in ["true"]:  # "false"
-        for num_B in [262144]:
-            for bw_scalefactor in [4, 32]:
+        for num_B in [524288]:
+            for bw_scalefactor in [4, 16]:
                 localdram_size_str = "{}B".format(num_B)
                 command_str = sssp_base_options.format(
                     input,
@@ -367,40 +372,47 @@ def gen_settings_for_graph(benchmark_name):
         for input in ["bcsstk05.mtx"]:
             benchmark_list.append("sssp_{}_".format(input))
         local_dram_list = ["262144B"]
-        bw_scalefactor_list = [4, 32]
+        bw_scalefactor_list = [4, 16]
+    if benchmark_name == "sssp_roadNet":
+        res_name = "sssp_524288B_combo"
+        benchmark_list = []
+        for input in ["roadNet-PA.mtx"]:
+            benchmark_list.append("sssp_{}_".format(input))
+        local_dram_list = ["524288B"]
+        bw_scalefactor_list = [4, 16]
     elif benchmark_name == "bfs_reg":
-        res_name = "bfs_reg_8MB_combo"
+        res_name = "bfs_reg_4MB_combo"
         benchmark_list = []
         benchmark_list.append("ligra_{}_".format("bfs"))
-        local_dram_list = ["8MB"]
-        bw_scalefactor_list = [4, 32]
+        local_dram_list = ["4MB"]
+        bw_scalefactor_list = [4, 16]
     elif benchmark_name == "tinynet":
         res_name = "tinynet_2MB_combo"
         benchmark_list = []
         for model in ["tiny"]:
             benchmark_list.append("darknet_{}_".format(model))
         local_dram_list = ["2MB"]
-        bw_scalefactor_list = [4, 32]
+        bw_scalefactor_list = [4, 16]
     elif benchmark_name == "darknet19":
         res_name = "tinynet_2MB_combo"
         benchmark_list = []
         for model in ["darknet19"]:
             benchmark_list.append("darknet_{}_".format(model))
         local_dram_list = ["2MB"]
-        bw_scalefactor_list = [4, 32]
+        bw_scalefactor_list = [4, 16]
     elif benchmark_name == "stream_1":
         res_name = "stream_1_2MB_combo"
         benchmark_list = []
         benchmark_list.append("stream_1_")
         local_dram_list = ["2MB"]
-        bw_scalefactor_list = [4, 32]
+        bw_scalefactor_list = [4, 16]
 
     return res_name, benchmark_list, local_dram_list, bw_scalefactor_list
 
 
 # TODO: Experiment run
 experiments = []
-# experiments.extend(run_bfs("regular_input", 8))
+# experiments.extend(run_bfs("regular_input", 4))
 # experiments.extend(run_tinynet("tiny"))
 # experiments.extend(run_tinynet("darknet19"))
 # experiments.extend(run_stream("0")) # Scale
