@@ -80,14 +80,14 @@ command_str2c_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}
 )
 
 # Assumes input matrices are in the {sniper_root}/test/crono/inputs directory
-sssp_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/test/crono/apps/sssp/sssp_pthread {sniper_root}/test/crono/inputs/{{0}} 1".format(
+sssp_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/crono/apps/sssp/sssp_pthread {sniper_root}/benchmarks/crono/inputs/{{0}} 1".format(
     sniper_root=subfolder_sniper_root_relpath
 )
 
 stream_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/stream/stream_sniper {{0}}".format(
     sniper_root=subfolder_sniper_root_relpath
 )
-spmv_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/spmv/bench_spdmv {sniper_root}/test/crono/inputs/{{0}} 1 1".format(
+spmv_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/spmv/bench_spdmv {sniper_root}/benchmarks/crono/inputs/{{0}} 1 1".format(
     sniper_root=subfolder_sniper_root_relpath
 )
 
@@ -388,7 +388,7 @@ def gen_settings_for_graph(benchmark_name):
 # TODO: Experiment run
 experiments = []
 # experiments.extend(run_bfs("regular_input", 8))
-# experiments.extend(run_tinynet("tiny"))
+experiments.extend(run_tinynet("tiny"))
 # experiments.extend(run_tinynet("darknet19"))
 # experiments.extend(run_stream("0")) # Scale
 
@@ -396,27 +396,27 @@ experiments = []
 # experiments.extend(run_bfs("reg_8x", 32))
 # experiments.extend(run_tinynet("resnet50"))
 
-# log_filename = "run-sniper-repeat2_1.log"
-# num = 2
-# while os.path.isfile(log_filename):
-#     log_filename = "run-sniper-repeat2_{}.log".format(num)
-#     num += 1
+log_filename = "run-sniper-repeat2_1.log"
+num = 2
+while os.path.isfile(log_filename):
+    log_filename = "run-sniper-repeat2_{}.log".format(num)
+    num += 1
 
-# with open(log_filename, "w") as log_file:
-#     log_str = "Script start time: {}".format(automation.datetime.datetime.now().astimezone())
-#     print(log_str)
-#     print(log_str, file=log_file)
+with open(log_filename, "w") as log_file:
+    log_str = "Script start time: {}".format(automation.datetime.datetime.now().astimezone())
+    print(log_str)
+    print(log_str, file=log_file)
 
-#     experiment_manager = automation.ExperimentManager(
-#         output_root_directory=".", max_concurrent_processes=16, log_file=log_file
-#     )
-#     experiment_manager.add_experiments(experiments)
-#     experiment_manager.start()
+    experiment_manager = automation.ExperimentManager(
+        output_root_directory=".", max_concurrent_processes=16, log_file=log_file
+    )
+    experiment_manager.add_experiments(experiments)
+    experiment_manager.start()
 
-#     log_str = "Script end time: {}".format(automation.datetime.datetime.now().astimezone())
-#     print(log_str)
-#     print(log_str, file=log_file)
+    log_str = "Script end time: {}".format(automation.datetime.datetime.now().astimezone())
+    print(log_str)
+    print(log_str, file=log_file)
 
 # TODO: Generate graph
-res_name, benchmark_list, local_dram_list, bw_scalefactor_list = gen_settings_for_graph("sssp")
-graph(res_name, benchmark_list, local_dram_list, bw_scalefactor_list)
+# res_name, benchmark_list, local_dram_list, bw_scalefactor_list = gen_settings_for_graph("sssp")
+# graph(res_name, benchmark_list, local_dram_list, bw_scalefactor_list)
