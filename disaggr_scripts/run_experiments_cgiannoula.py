@@ -35,6 +35,11 @@ if __name__ == "__main__":
         ".", darknet_home
     )
 
+    timeseries_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/timeseries/src/scrimp {sniper_root}/benchmarks/timeseries/inputs/{{0}} 50 0.25 1 4".format(
+        sniper_root=subfolder_sniper_root_relpath
+    )
+
+
     ###  Ligra command strings  ###
     # Do only 1 timed round to save time during initial experiments
     ligra_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c {{{{sniper_output_dir}}}}/repeat_testing.cfg {{sniper_options}} -- {0}/apps/{{0}} -s -rounds 1 {0}/inputs/{{1}}".format(
@@ -502,6 +507,34 @@ if __name__ == "__main__":
                     output_root_directory=".",
                 )
             )
+
+
+    # timeseries power_demand, bw_factor [4, 16] 
+    timeseries_power_compression_experiments_remoteinit_true = []
+    for remote_init in ["true"]:  # "false"
+        for bw_scalefactor in [4, 16]:
+            command_str = spmv_base_options.format(
+                "power_demand.txt",
+                sniper_options="-g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -s stop-by-icount:{}".format(
+                    int(bw_scalefactor),
+                    str(remote_init),
+                    int(1 * ONE_BILLION),
+                ),
+            )
+
+            timeseries_power_compression_experiments_remoteinit_true.append(
+                Experiment(
+                    experiment_name="timeseries_power_bw_scalefactor_{}_remoteinit_{}_compression_series".format(
+                        bw_scalefactor,
+                        remote_init,
+                    ),
+                    command_str=command_str,
+                    experiment_run_configs=compression_series_experiment_run_configs,
+                    output_root_directory=".",
+                )
+            )
+
+
 
 
 
