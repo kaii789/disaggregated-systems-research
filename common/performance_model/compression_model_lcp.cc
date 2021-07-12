@@ -73,7 +73,7 @@ CompressionModelLCP::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
     // Return compressed pages size in Bytes
     *compressed_page_size = total_bytes;
 
-    printf("[LCP Compression] Compressed Page Size: %u bytes\n", total_bytes);
+    // printf("[LCP Compression] Compressed Page Size: %u bytes\n", total_bytes);
 
     // Return compression latency
     if (m_compression_latency == 0)
