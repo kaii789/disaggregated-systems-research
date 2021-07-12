@@ -453,6 +453,9 @@ if __name__ == "__main__":
                     ),
                     command_str=command_str,
                     experiment_run_configs=compression_series_experiment_run_configs,
+                    output_root_directory=".",
+                )
+            )
 
 
     # Components rMat_1000000, bw_factor [4, 16] 
