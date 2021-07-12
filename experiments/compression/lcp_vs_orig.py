@@ -388,7 +388,7 @@ def gen_settings_for_graph(benchmark_name):
 # TODO: Experiment run
 experiments = []
 # experiments.extend(run_bfs("regular_input", 8))
-experiments.extend(run_tinynet("tiny"))
+# experiments.extend(run_tinynet("tiny"))
 # experiments.extend(run_tinynet("darknet19"))
 # experiments.extend(run_stream("0")) # Scale
 
@@ -396,27 +396,27 @@ experiments.extend(run_tinynet("tiny"))
 # experiments.extend(run_bfs("reg_8x", 32))
 # experiments.extend(run_tinynet("resnet50"))
 
-log_filename = "run-sniper-repeat2_1.log"
-num = 2
-while os.path.isfile(log_filename):
-    log_filename = "run-sniper-repeat2_{}.log".format(num)
-    num += 1
+# log_filename = "run-sniper-repeat2_1.log"
+# num = 2
+# while os.path.isfile(log_filename):
+#     log_filename = "run-sniper-repeat2_{}.log".format(num)
+#     num += 1
 
-with open(log_filename, "w") as log_file:
-    log_str = "Script start time: {}".format(automation.datetime.datetime.now().astimezone())
-    print(log_str)
-    print(log_str, file=log_file)
+# with open(log_filename, "w") as log_file:
+#     log_str = "Script start time: {}".format(automation.datetime.datetime.now().astimezone())
+#     print(log_str)
+#     print(log_str, file=log_file)
 
-    experiment_manager = automation.ExperimentManager(
-        output_root_directory=".", max_concurrent_processes=16, log_file=log_file
-    )
-    experiment_manager.add_experiments(experiments)
-    experiment_manager.start()
+#     experiment_manager = automation.ExperimentManager(
+#         output_root_directory=".", max_concurrent_processes=16, log_file=log_file
+#     )
+#     experiment_manager.add_experiments(experiments)
+#     experiment_manager.start()
 
-    log_str = "Script end time: {}".format(automation.datetime.datetime.now().astimezone())
-    print(log_str)
-    print(log_str, file=log_file)
+#     log_str = "Script end time: {}".format(automation.datetime.datetime.now().astimezone())
+#     print(log_str)
+#     print(log_str, file=log_file)
 
 # TODO: Generate graph
-# res_name, benchmark_list, local_dram_list, bw_scalefactor_list = gen_settings_for_graph("sssp")
-# graph(res_name, benchmark_list, local_dram_list, bw_scalefactor_list)
+res_name, benchmark_list, local_dram_list, bw_scalefactor_list = gen_settings_for_graph("sssp")
+graph(res_name, benchmark_list, local_dram_list, bw_scalefactor_list)
