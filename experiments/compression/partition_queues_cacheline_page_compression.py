@@ -185,11 +185,10 @@ command_strs["ligra_bfs_small_input_localdram_1MB"] = ligra_base_str_options.for
 )
 
 
-# BFS, 4 MB
-def run_bfs(ligra_input_selection, num_MB):
+# Ligra
+def run_ligra(application_name, ligra_input_selection, num_MB):
     experiments = []
     ligra_input_file = ligra_input_to_file[ligra_input_selection]
-    application_name = "BFS"
     net_lat = 120
     for remote_init in ["false"]:  # "false"
         for bw_scalefactor in [4, 16]:
@@ -386,6 +385,12 @@ def gen_settings_for_graph(benchmark_name):
         benchmark_list.append("ligra_{}_".format("bfs"))
         local_dram_list = ["4MB"]
         bw_scalefactor_list = [4, 16]
+    elif benchmark_name == "ligra_reg":
+        res_name = "ligra_reg_16MB_combo"
+        benchmark_list = []
+        benchmark_list.append("ligra_{}_".format("ligra"))
+        local_dram_list = ["16MB"]
+        bw_scalefactor_list = [4, 16]
     elif benchmark_name == "tinynet":
         res_name = "tinynet_2MB_combo"
         benchmark_list = []
@@ -412,7 +417,8 @@ def gen_settings_for_graph(benchmark_name):
 
 # TODO: Experiment run
 experiments = []
-# experiments.extend(run_bfs("regular_input", 4))
+# experiments.extend(run_ligra("BFS", "regular_input", 4))
+# experiments.extend(run_ligra("Triangle", "regular_input", 16))
 # experiments.extend(run_tinynet("tiny"))
 # experiments.extend(run_tinynet("darknet19"))
 # experiments.extend(run_stream("0")) # Scale
@@ -443,5 +449,5 @@ experiments = []
 #     print(log_str, file=log_file)
 
 # TODO: Generate graph
-res_name, benchmark_list, local_dram_list, bw_scalefactor_list = gen_settings_for_graph("sssp")
-graph(res_name, benchmark_list, local_dram_list, bw_scalefactor_list)
+# res_name, benchmark_list, local_dram_list, bw_scalefactor_list = gen_settings_for_graph("bfs_reg")
+# graph(res_name, benchmark_list, local_dram_list, bw_scalefactor_list)
