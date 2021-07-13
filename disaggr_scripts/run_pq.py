@@ -1,6 +1,9 @@
 # Python 3
 from run_sniper_repeat_base import *
 
+# For timezones
+import pytz
+
 # Post experiment processing functions
 # import plot_graph
 # import plot_graph_pq
@@ -59,78 +62,27 @@ if __name__ == "__main__":
 
     ###  Darknet command strings  ###
     # Note: using os.system(), the 'cd' of working directory doesn't persist to the next call to os.system()
-    darknet_base_str_options = "cd {1} && ../../run-sniper -d {{{{sniper_output_dir}}}} -c ../../disaggr_config/local_memory_cache.cfg -c {{{{sniper_output_dir}}}}/repeat_testing.cfg {{sniper_options}} -- {0}/darknet classifier predict {0}/cfg/imagenet1k.data {0}/cfg/{{0}}.cfg {0}/{{0}}.weights {0}/data/dog.jpg".format(
+    darknet_base_str_options = "cd {1} && ../../run-sniper -d {{{{sniper_output_dir}}}} -c ../../disaggr_config/local_memory_cache.cfg -c {{{{sniper_output_dir}}}}/repeat_testing.cfg {{sniper_options}} -- {0}/darknet classifier predict {0}/cfg/imagenet1k.data {0}/cfg/{{0}}.cfg {0}/{{0}}.weights {0}/data/dog.jpg && cd {{{{sniper_output_dir}}}}".format(
         ".", darknet_home
     )
-    # Examples:
-    # command_strs["darknet_tiny"] = darknet_base_str_options.format(
-    #     "tiny", sniper_options=""
-    # )
-    # command_strs["darknet_darknet"] = darknet_base_str_options.format(
-    #     "darknet", sniper_options=""
-    # )
-    # command_strs["darknet_darknet19"] = darknet_base_str_options.format(
-    #     "darknet19", sniper_options=""
-    # )
-    # command_strs["darknet_vgg-16"] = darknet_base_str_options.format(
-    #     "vgg-16", sniper_options=""
-    # )
-    # command_strs["darknet_resnet50"] = darknet_base_str_options.format(
-    #     "resnet50", sniper_options=""
-    # )
-    # cd ../benchmarks/darknet && ../../run-sniper -c ../../disaggr_config/local_memory_cache.cfg -- ./darknet classifier predict ./cfg/imagenet1k.data ./cfg/tiny.cfg ./tiny.weights ./data/dog.jpg
+
 
     ###  Ligra command strings  ###
     # Do only 1 timed round to save time during initial experiments
-    ligra_base_str_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c {{{{sniper_output_dir}}}}/repeat_testing.cfg {{sniper_options}} -- {0}/apps/{{0}} -s -rounds 1 {0}/inputs/{{1}}".format(
+    ligra_base_str_options_sym = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c {{{{sniper_output_dir}}}}/repeat_testing.cfg {{sniper_options}} -- {0}/apps/{{0}} -s -rounds 1 {0}/inputs/{{1}}".format(
+        ligra_home, sniper_root=subfolder_sniper_root_relpath
+    )
+    ligra_base_str_options_nonsym = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c {{{{sniper_output_dir}}}}/repeat_testing.cfg {{sniper_options}} -- {0}/apps/{{0}} -rounds 1 {0}/inputs/{{1}}".format(
         ligra_home, sniper_root=subfolder_sniper_root_relpath
     )
     ligra_input_to_file = {
         "regular_input": "rMat_1000000",
-        "small_input": "rMat_100000",
+        # "small_input": "rMat_100000",
         "reg_10x": "rMat_10000000",
         "reg_8x": "rMat_8000000",
+        "regular_input_sym": "rMat_1000000sym",
     }
-    # Examples:
-    # command_strs["ligra_bfs"] = ligra_base_str_options.format(
-    #     "BFS", ligra_input_to_file["regular_input"], sniper_options=""
-    # )
-    # command_strs["ligra_pagerank"] = ligra_base_str_options.format(
-    #     "PageRank", ligra_input_to_file["regular_input"], sniper_options=""
-    # )
 
-    # # Small input: first run some tests with smaller input size
-    # command_strs["ligra_bfs_small_input"] = ligra_base_str_options.format(
-    #     "BFS", ligra_input_to_file["small_input"], sniper_options=""
-    # )
-    # command_strs["ligra_pagerank_small_input"] = ligra_base_str_options.format(
-    #     "PageRank", ligra_input_to_file["small_input"], sniper_options=""
-    # )
-    # # ../run-sniper -c ../disaggr_config/local_memory_cache.cfg -- ../benchmarks/ligra/apps/BFS -s ../benchmarks/ligra/inputs/rMat_1000000
-
-    # # Stop around 100 Million instructions after entering ROI (magic = true in config so don't need --roi flag)
-    # command_strs["ligra_bfs_instrs_100mil"] = ligra_base_str_options.format(
-    #     "BFS",
-    #     ligra_input_to_file["regular_input"],
-    #     sniper_options="-s stop-by-icount:{}".format(100 * ONE_MILLION),
-    # )
-
-    # # 8 MB for ligra_bfs + rMat_1000000
-    # command_strs["ligra_bfs_localdram_8MB"] = ligra_base_str_options.format(
-    #     "BFS",
-    #     ligra_input_to_file["regular_input"],
-    #     sniper_options="-g perf_model/dram/localdram_size={}".format(
-    #         int(8 * ONE_MB_TO_BYTES)
-    #     ),
-    # )
-    # # 1 MB for ligra_bfs + rMat_100000
-    # command_strs["ligra_bfs_small_input_localdram_1MB"] = ligra_base_str_options.format(
-    #     "BFS",
-    #     ligra_input_to_file["small_input"],
-    #     sniper_options="-g perf_model/dram/localdram_size={}".format(
-    #         int(1 * ONE_MB_TO_BYTES)
-    #     ),
-    # )
 
     bandwidth_verification_configs = [
         # 1) test_bandwidth = 0, pq = 0
@@ -423,16 +375,54 @@ if __name__ == "__main__":
         )
         cacheline_queue_ratio_configs.append(config_copy)
 
+    # pq_cacheline_combined_base_configs = partition_queue_series_experiment_run_configs[0:5] + cacheline_queue_ratio_configs
+
+    # remote mem off, page move instant, pq0, pq1 with cacheline ratio 0.01, 0.025, 0.05, 0.075 + 0.1, 0.15, 0.2, 0.3, 0.5
+    cacheline_queue_ratio_additional = []
+    for cacheline_queue_ratio in [
+        "0.01",
+        "0.025",
+        "0.05",
+        "0.075",
+    ]:
+        config_copy = copy.deepcopy(cacheline_queue_ratio_config_base)
+        config_copy.add_config_entry(
+            ConfigEntry(
+                "perf_model/dram",
+                "remote_cacheline_queue_fraction",
+                cacheline_queue_ratio,
+            )
+        )
+        cacheline_queue_ratio_additional.append(config_copy)
+    pq_cacheline_combined_base_configs = [partition_queue_series_experiment_run_configs[0],
+                                          partition_queue_series_experiment_run_configs[1],
+                                          partition_queue_series_experiment_run_configs[4],
+                                          cacheline_queue_ratio_additional[0],
+                                          cacheline_queue_ratio_additional[1],
+                                          cacheline_queue_ratio_additional[2],
+                                          cacheline_queue_ratio_additional[3],
+                                          cacheline_queue_ratio_configs[0],
+                                          cacheline_queue_ratio_configs[1],
+                                          cacheline_queue_ratio_configs[2],
+                                          cacheline_queue_ratio_configs[4],
+                                          cacheline_queue_ratio_configs[8],
+                                         ]
+    # pq_cacheline_combined_base_configs = [cacheline_queue_ratio_additional[0],
+    #                                       cacheline_queue_ratio_additional[1],
+    #                                       cacheline_queue_ratio_additional[2],
+    #                                       cacheline_queue_ratio_additional[3],
+    #                                       cacheline_queue_ratio_additional[4],
+    #                                       cacheline_queue_ratio_configs[0],
+    #                                      ]
+
     pq_cacheline_combined_rmode1_configs = []
     # Only want runs number 1-5 in partition_queue_series_experiment_run_configs
-    for config in (
-        partition_queue_series_experiment_run_configs[0:5]
-        + cacheline_queue_ratio_configs
-    ):
+    for config in pq_cacheline_combined_base_configs:
         config_copy = copy.deepcopy(config)
         config_copy.add_config_entries(
             [
                 ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
+                ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
                 ConfigEntry("perf_model/dram", "remote_memory_mode", "1"),
                 # remote_init  specified in individual experiments
             ]
@@ -441,14 +431,12 @@ if __name__ == "__main__":
 
     pq_cacheline_combined_rmode2_configs = []
     # Only want runs number 1-5 in partition_queue_series_experiment_run_configs
-    for config in (
-        partition_queue_series_experiment_run_configs[0:5]
-        + cacheline_queue_ratio_configs
-    ):
+    for config in pq_cacheline_combined_base_configs:
         config_copy = copy.deepcopy(config)
         config_copy.add_config_entries(
             [
                 ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
+                ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
                 ConfigEntry("perf_model/dram", "remote_memory_mode", "2"),
                 # remote_init  specified in individual experiments
                 # remote_datamov_threshold  specified in individual experiments
@@ -458,14 +446,12 @@ if __name__ == "__main__":
 
     pq_cacheline_combined_rmode5_configs = []
     # Only want runs number 1-5 in partition_queue_series_experiment_run_configs
-    for config in (
-        partition_queue_series_experiment_run_configs[0:5]
-        + cacheline_queue_ratio_configs
-    ):
+    for config in pq_cacheline_combined_base_configs:
         config_copy = copy.deepcopy(config)
         config_copy.add_config_entries(
             [
                 ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
+                ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
                 ConfigEntry("perf_model/dram", "remote_memory_mode", "5"),
                 # remote_init  specified in individual experiments
                 # remote_datamov_threshold  specified in individual experiments
@@ -475,50 +461,11 @@ if __name__ == "__main__":
         )
         pq_cacheline_combined_rmode5_configs.append(config_copy)
 
-    pq_cacheline_combined_rmode5_access_history_50k_configs = []
-    # Only want runs number 1-5 in partition_queue_series_experiment_run_configs
-    for config in (
-        partition_queue_series_experiment_run_configs[0:5]
-        + cacheline_queue_ratio_configs
-    ):
-        config_copy = copy.deepcopy(config)
-        config_copy.add_config_entries(
-            [
-                ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
-                ConfigEntry("perf_model/dram", "remote_memory_mode", "5"),
-                # remote_init  specified in individual experiments
-                # remote_datamov_threshold  specified in individual experiments
-                # r_mode_5_page_queue_utilization_mode_switch_threshold  specified in individual experiments
-                ConfigEntry("perf_model/dram", "r_mode_5_remote_access_history_window_size", "50000"),
-            ]
-        )
-        pq_cacheline_combined_rmode5_access_history_50k_configs.append(config_copy)
-
-    pq_cacheline_combined_rmode5_access_history_500k_configs = []
-    # Only want runs number 1-5 in partition_queue_series_experiment_run_configs
-    for config in (
-        partition_queue_series_experiment_run_configs[0:5]
-        + cacheline_queue_ratio_configs
-    ):
-        config_copy = copy.deepcopy(config)
-        config_copy.add_config_entries(
-            [
-                ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
-                ConfigEntry("perf_model/dram", "remote_memory_mode", "5"),
-                # remote_init  specified in individual experiments
-                # remote_datamov_threshold  specified in individual experiments
-                # r_mode_5_page_queue_utilization_mode_switch_threshold  specified in individual experiments
-                ConfigEntry("perf_model/dram", "r_mode_5_remote_access_history_window_size", "500000"),
-            ]
-        )
-        pq_cacheline_combined_rmode5_access_history_500k_configs.append(config_copy)
-
-
     pq_cacheline_combined_rmode1_configs_ideal_page_throttling = []
     # Only want runs number 1-5 in partition_queue_series_experiment_run_configs
     for config in pq_cacheline_combined_rmode1_configs:
         config_copy = copy.deepcopy(config)
-        config_copy.add_config_entries(
+        config_copy.replace_config_entries(
             [
                 ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "true"),
                 # remote_init  specified in individual experiments
@@ -527,10 +474,9 @@ if __name__ == "__main__":
         pq_cacheline_combined_rmode1_configs_ideal_page_throttling.append(config_copy)
 
     pq_cacheline_combined_rmode2_configs_ideal_page_throttling = []
-    # Only want runs number 1-5 in partition_queue_series_experiment_run_configs
     for config in pq_cacheline_combined_rmode2_configs:
         config_copy = copy.deepcopy(config)
-        config_copy.add_config_entries(
+        config_copy.replace_config_entries(
             [
                 ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "true"),
                 # remote_init  specified in individual experiments
@@ -538,6 +484,20 @@ if __name__ == "__main__":
             ]
         )
         pq_cacheline_combined_rmode2_configs_ideal_page_throttling.append(config_copy)
+
+    pq_cacheline_combined_rmode5_configs_ideal_page_throttling = []
+    for config in pq_cacheline_combined_rmode5_configs:
+        config_copy = copy.deepcopy(config)
+        config_copy.replace_config_entries(
+            [
+                ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "true"),
+                # remote_init  specified in individual experiments
+                # remote_datamov_threshold  specified in individual experiments
+                # r_mode_5_page_queue_utilization_mode_switch_threshold  specified in individual experiments
+            ]
+        )
+        pq_cacheline_combined_rmode5_configs_ideal_page_throttling.append(config_copy)
+
 
 
     #################################
@@ -554,7 +514,7 @@ if __name__ == "__main__":
     for num_MB in [64, 32]:
         for bw_scalefactor in [4]:
             localdram_size_str = "{}MB".format(num_MB)
-            command_str = ligra_base_str_options.format(
+            command_str = ligra_base_str_options_nonsym.format(
                 application_name,
                 ligra_input_file,
                 sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
@@ -583,14 +543,225 @@ if __name__ == "__main__":
             )
     # experiments.extend(bfs_reg_8x_pq_experiments)
 
+    # SSSP Roadnet
+    sssp_roadNetCA_pq_cacheline_combined_experiments_remoteinit_true_rmode1 = []
+    net_lat = 120
+    matrix = "roadNet-CA.mtx"
+    for remote_init in ["true"]:  # "false"
+        for num_MB in [2, 3]:
+            for bw_scalefactor in [4, 8, 16, 32]:
+                localdram_size_str = "{}MB".format(num_MB)
+                command_str = sssp_base_options.format(
+                    matrix,
+                    sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={}".format(
+                        int(num_MB * ONE_MB_TO_BYTES),
+                        int(net_lat),
+                        int(bw_scalefactor),
+                        str(remote_init),
+                    ),
+                )
 
+                sssp_roadNetCA_pq_cacheline_combined_experiments_remoteinit_true_rmode1.append(
+                    Experiment(
+                        experiment_name="{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_pq_newer_series".format(
+                            matrix[:matrix.find(".")].replace("-", ""),
+                            localdram_size_str,
+                            net_lat,
+                            bw_scalefactor,
+                            remote_init,
+                        ),
+                        command_str=command_str,
+                        experiment_run_configs=pq_cacheline_combined_rmode1_configs,
+                        output_root_directory=".",
+                    )
+                )
+    sssp_roadNetCA_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal_page_throttling = []
+    net_lat = 120
+    matrix = "roadNet-CA.mtx"
+    for remote_init in ["true"]:  # "false"
+        for num_MB in [2, 3]:
+            for bw_scalefactor in [4, 8, 16, 32]:
+                localdram_size_str = "{}MB".format(num_MB)
+                command_str = sssp_base_options.format(
+                    matrix,
+                    sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={}".format(
+                        int(num_MB * ONE_MB_TO_BYTES),
+                        int(net_lat),
+                        int(bw_scalefactor),
+                        str(remote_init),
+                    ),
+                )
+
+                sssp_roadNetCA_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal_page_throttling.append(
+                    Experiment(
+                        experiment_name="{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_idealwinsize_{}_pq_newer_series".format(
+                            matrix[:matrix.find(".")].replace("-", ""),
+                            localdram_size_str,
+                            net_lat,
+                            bw_scalefactor,
+                            remote_init,
+                            int(10**5)
+                        ),
+                        command_str=command_str,
+                        experiment_run_configs=pq_cacheline_combined_rmode1_configs_ideal_page_throttling,
+                        output_root_directory=".",
+                    )
+                )
+    sssp_roadNetCA_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds = []
+    net_lat = 120
+    remote_init = "true"
+    matrix = "roadNet-CA.mtx"
+    for num_MB in [2, 3]:
+        for mode_switch_threshold in ["0.6", "0.7", "0.8", "0.9"]:
+            for datamov_threshold in [2, 5, 10]:
+                for bw_scalefactor in [4, 8, 16, 32]:
+                    localdram_size_str = "{}MB".format(num_MB)
+                    command_str = sssp_base_options.format(
+                        matrix,
+                        sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -g perf_model/dram/r_mode_5_page_queue_utilization_mode_switch_threshold={} -g perf_model/dram/remote_datamov_threshold={}".format(
+                            int(num_MB * ONE_MB_TO_BYTES),
+                            int(net_lat),
+                            int(bw_scalefactor),
+                            str(remote_init),
+                            str(mode_switch_threshold),
+                            int(datamov_threshold),
+                        ),
+                    )
+
+                    sssp_roadNetCA_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds.append(
+                        Experiment(
+                            experiment_name="{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_rmode5_threshold_{}_{}_pq_newer_series".format(
+                                matrix[:matrix.find(".")].replace("-", ""),
+                                localdram_size_str,
+                                net_lat,
+                                bw_scalefactor,
+                                remote_init,
+                                mode_switch_threshold,
+                                datamov_threshold,
+                            ),
+                            command_str=command_str,
+                            experiment_run_configs=pq_cacheline_combined_rmode5_configs,
+                            output_root_directory=".",
+                        )
+                    )
+    sssp_roadNetCA_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds_ideal_page_throttling = []
+    net_lat = 120
+    remote_init = "true"
+    matrix = "roadNet-CA.mtx"
+    for num_MB in [2, 3]:
+        for mode_switch_threshold in ["0.6", "0.7", "0.8", "0.9"]:
+            for datamov_threshold in [2, 5, 10]:
+                for bw_scalefactor in [4, 8, 16, 32]:
+                    localdram_size_str = "{}MB".format(num_MB)
+                    command_str = sssp_base_options.format(
+                        matrix,
+                        sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -g perf_model/dram/r_mode_5_page_queue_utilization_mode_switch_threshold={} -g perf_model/dram/remote_datamov_threshold={}".format(
+                            int(num_MB * ONE_MB_TO_BYTES),
+                            int(net_lat),
+                            int(bw_scalefactor),
+                            str(remote_init),
+                            str(mode_switch_threshold),
+                            int(datamov_threshold),
+                        ),
+                    )
+
+                    sssp_roadNetCA_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds_ideal_page_throttling.append(
+                        Experiment(
+                            experiment_name="{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_rmode5_threshold_{}_{}_idealwinsize_{}_pq_newer_series".format(
+                                matrix[:matrix.find(".")].replace("-", ""),
+                                localdram_size_str,
+                                net_lat,
+                                bw_scalefactor,
+                                remote_init,
+                                mode_switch_threshold,
+                                datamov_threshold,
+                                int(10**5),
+                            ),
+                            command_str=command_str,
+                            experiment_run_configs=pq_cacheline_combined_rmode5_configs,
+                            output_root_directory=".",
+                        )
+                    )
+    
+
+
+    sssp_roadNetPA_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds = []
+    net_lat = 120
+    remote_init = "true"
+    matrix = "roadNet-PA.mtx"
+    for num_MB in [1, 2]:
+        for mode_switch_threshold in ["0.6", "0.7", "0.8", "0.9"]:
+            for datamov_threshold in [2, 5, 10]:
+                for bw_scalefactor in [4, 8, 16, 32]:
+                    localdram_size_str = "{}MB".format(num_MB)
+                    command_str = sssp_base_options.format(
+                        matrix,
+                        sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -g perf_model/dram/r_mode_5_page_queue_utilization_mode_switch_threshold={} -g perf_model/dram/remote_datamov_threshold={}".format(
+                            int(num_MB * ONE_MB_TO_BYTES),
+                            int(net_lat),
+                            int(bw_scalefactor),
+                            str(remote_init),
+                            str(mode_switch_threshold),
+                            int(datamov_threshold),
+                        ),
+                    )
+
+                    sssp_roadNetPA_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds.append(
+                        Experiment(
+                            experiment_name="{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_rmode5_threshold_{}_{}_pq_newer_series".format(
+                                matrix[:matrix.find(".")].replace("-", ""),
+                                localdram_size_str,
+                                net_lat,
+                                bw_scalefactor,
+                                remote_init,
+                                mode_switch_threshold,
+                                datamov_threshold,
+                            ),
+                            command_str=command_str,
+                            experiment_run_configs=pq_cacheline_combined_rmode5_configs,
+                            output_root_directory=".",
+                        )
+                    )
+
+    sssp_roadNetPA_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal_page_throttling = []
+    net_lat = 120
+    matrix = "roadNet-PA.mtx"
+    for remote_init in ["true"]:  # "false"
+        for num_MB in [0.5, 1, 2]:
+            for bw_scalefactor in [8, 16, 32]:
+                localdram_size_str = "{}MB".format(num_MB)
+                command_str = sssp_base_options.format(
+                    matrix,
+                    sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={}".format(
+                        int(num_MB * ONE_MB_TO_BYTES),
+                        int(net_lat),
+                        int(bw_scalefactor),
+                        str(remote_init),
+                    ),
+                )
+
+                sssp_roadNetPA_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal_page_throttling.append(
+                    Experiment(
+                        experiment_name="{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_idealwinsize_{}_pq_newer_series".format(
+                            matrix[:matrix.find(".")].replace("-", ""),
+                            localdram_size_str,
+                            net_lat,
+                            bw_scalefactor,
+                            remote_init,
+                            int(10**5)
+                        ),
+                        command_str=command_str,
+                        experiment_run_configs=pq_cacheline_combined_rmode1_configs_ideal_page_throttling,
+                        output_root_directory=".",
+                    )
+                )
 
     # SSSP bcsstk32, 12 8KB and 256 KB (can probably remove 128 KB)
-    bcsstk32_pq_cacheline_combined_experiments_remoteinit_true_rmode1 = []
+    sssp_bcsstk32_pq_cacheline_combined_experiments_remoteinit_true_rmode1 = []
     net_lat = 120
     for remote_init in ["true"]:  # "false"
         for num_B in [131072, 262144]:
-            for bw_scalefactor in [4, 8, 32]:
+            for bw_scalefactor in [16]:
                 localdram_size_str = "{}B".format(num_B)
                 command_str = sssp_bcsstk32_base_options.format(
                     sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={}".format(
@@ -601,9 +772,9 @@ if __name__ == "__main__":
                     ),
                 )
 
-                bcsstk32_pq_cacheline_combined_experiments_remoteinit_true_rmode1.append(
+                sssp_bcsstk32_pq_cacheline_combined_experiments_remoteinit_true_rmode1.append(
                     Experiment(
-                        experiment_name="bcsstk32_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_pq_cacheline_combined_series".format(
+                        experiment_name="bcsstk32_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_pq_newer_series".format(
                             localdram_size_str,
                             net_lat,
                             bw_scalefactor,
@@ -611,6 +782,34 @@ if __name__ == "__main__":
                         ),
                         command_str=command_str,
                         experiment_run_configs=pq_cacheline_combined_rmode1_configs,
+                        output_root_directory=".",
+                    )
+                )
+    sssp_bcsstk32_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal_page_throttling = []
+    net_lat = 120
+    for remote_init in ["true"]:  # "false"
+        for num_B in [131072, 262144]:
+            for bw_scalefactor in [4, 8, 16, 32]:
+                localdram_size_str = "{}B".format(num_B)
+                command_str = sssp_bcsstk32_base_options.format(
+                    sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={}".format(
+                        int(num_B),
+                        int(net_lat),
+                        int(bw_scalefactor),
+                        str(remote_init),
+                    ),
+                )
+
+                sssp_bcsstk32_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal_page_throttling.append(
+                    Experiment(
+                        experiment_name="bcsstk32_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_pq_newer_series".format(
+                            localdram_size_str,
+                            net_lat,
+                            bw_scalefactor,
+                            remote_init,
+                        ),
+                        command_str=command_str,
+                        experiment_run_configs=pq_cacheline_combined_rmode1_configs_ideal_page_throttling,
                         output_root_directory=".",
                     )
                 )
@@ -633,7 +832,7 @@ if __name__ == "__main__":
 
                     bcsstk32_pq_cacheline_combined_experiments_remoteinit_true_rmode2_thresholds.append(
                         Experiment(
-                            experiment_name="bcsstk32_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_rmode2_threshold_{}_pq_cacheline_combined_series".format(
+                            experiment_name="bcsstk32_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_rmode2_threshold_{}_pq_newer_series".format(
                                 localdram_size_str,
                                 net_lat,
                                 bw_scalefactor,
@@ -648,10 +847,10 @@ if __name__ == "__main__":
     bcsstk32_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds = []
     net_lat = 120
     for remote_init in ["true"]:
-        for mode_switch_threshold in ["0.6", "0.7", "0.8"]:
-            for datamov_threshold in [5, 10]:
-                for num_B in [131072, 262144]:
-                    for bw_scalefactor in [4, 8, 32]:
+        for mode_switch_threshold in ["0.6", "0.7", "0.8", "0.9"]:
+            for datamov_threshold in [2, 5, 10]:
+                for num_B in [262144]:
+                    for bw_scalefactor in [4, 8, 16, 32]:
                         localdram_size_str = "{}B".format(num_B)
                         command_str = sssp_bcsstk32_base_options.format(
                             sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -g perf_model/dram/r_mode_5_page_queue_utilization_mode_switch_threshold={} -g perf_model/dram/remote_datamov_threshold={}".format(
@@ -666,7 +865,284 @@ if __name__ == "__main__":
 
                         bcsstk32_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds.append(
                             Experiment(
-                                experiment_name="bcsstk32_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_rmode5_threshold_{}_{}_pq_cacheline_combined_series".format(
+                                experiment_name="bcsstk32_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_rmode5_threshold_{}_{}_pq_newer_series".format(
+                                    localdram_size_str,
+                                    net_lat,
+                                    bw_scalefactor,
+                                    remote_init,
+                                    mode_switch_threshold,
+                                    datamov_threshold,
+                                ),
+                                command_str=command_str,
+                                experiment_run_configs=pq_cacheline_combined_rmode5_configs,
+                                output_root_directory=".",
+                            )
+                        )
+    bcsstk32_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds_ideal_page_throttling = []
+    net_lat = 120
+    for remote_init in ["true"]:
+        for mode_switch_threshold in ["0.6", "0.7", "0.8", "0.9"]:
+            for datamov_threshold in [2, 5, 10]:
+                for num_B in [262144]:
+                    for bw_scalefactor in [4, 8, 16, 32]:
+                        localdram_size_str = "{}B".format(num_B)
+                        command_str = sssp_bcsstk32_base_options.format(
+                            sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -g perf_model/dram/r_mode_5_page_queue_utilization_mode_switch_threshold={} -g perf_model/dram/remote_datamov_threshold={}".format(
+                                int(num_B),
+                                int(net_lat),
+                                int(bw_scalefactor),
+                                str(remote_init),
+                                str(mode_switch_threshold),
+                                int(datamov_threshold),
+                            ),
+                        )
+
+                        bcsstk32_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds_ideal_page_throttling.append(
+                            Experiment(
+                                experiment_name="bcsstk32_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_rmode5_threshold_{}_{}_idealwinsize_{}_pq_newer_series".format(
+                                    localdram_size_str,
+                                    net_lat,
+                                    bw_scalefactor,
+                                    remote_init,
+                                    mode_switch_threshold,
+                                    datamov_threshold,
+                                    int(10**5),
+                                ),
+                                command_str=command_str,
+                                experiment_run_configs=pq_cacheline_combined_rmode5_configs_ideal_page_throttling,
+                                output_root_directory=".",
+                            )
+                        )
+
+    # SPMV, Sparse matrix multiplication
+    spmv_roadnetCA_pq_cacheline_combined_experiments_remoteinit_true_rmode1 = []
+    net_lat = 120
+    remote_init = "true"
+    for matrix in ["roadNet-CA.mtx"]:
+        for num_MB in [0.5]:
+            for bw_scalefactor in [4, 8, 16, 32]:
+                localdram_size_str = "{}MB".format(num_MB)
+                command_str = spmv_base_options.format(
+                    matrix,
+                    sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={}".format(
+                        int(num_MB * ONE_MB_TO_BYTES),
+                        int(net_lat),
+                        int(bw_scalefactor),
+                        str(remote_init),
+                    ),
+                )
+
+                spmv_roadnetCA_pq_cacheline_combined_experiments_remoteinit_true_rmode1.append(
+                    Experiment(
+                        experiment_name="spmv_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_pq_newer_series".format(
+                            matrix[:matrix.find(".")].replace("-", ""),
+                            localdram_size_str,
+                            net_lat,
+                            bw_scalefactor,
+                            remote_init,
+                        ),
+                        command_str=command_str,
+                        experiment_run_configs=pq_cacheline_combined_rmode1_configs,
+                        output_root_directory=".",
+                    )
+                )
+    spmv_roadnetCA_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal_page_throttling = []
+    net_lat = 120
+    remote_init = "true"
+    for matrix in ["roadNet-CA.mtx"]:
+        for num_MB in [0.5]:
+            for bw_scalefactor in [4, 8, 16, 32]:
+                localdram_size_str = "{}MB".format(num_MB)
+                command_str = spmv_base_options.format(
+                    matrix,
+                    sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={}".format(
+                        int(num_MB * ONE_MB_TO_BYTES),
+                        int(net_lat),
+                        int(bw_scalefactor),
+                        str(remote_init),
+                    ),
+                )
+
+                spmv_roadnetCA_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal_page_throttling.append(
+                    Experiment(
+                        experiment_name="spmv_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_idealwinsize_{}_pq_newer_series".format(
+                            matrix[:matrix.find(".")].replace("-", ""),
+                            localdram_size_str,
+                            net_lat,
+                            bw_scalefactor,
+                            remote_init,
+                            int(10**5),
+                        ),
+                        command_str=command_str,
+                        experiment_run_configs=pq_cacheline_combined_rmode1_configs_ideal_page_throttling,
+                        output_root_directory=".",
+                    )
+                )
+    spmv_roadnetCA_roadnetPA_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds = []
+    net_lat = 120
+    remote_init = "true"
+    for matrix in ["roadNet-CA.mtx", "roadNet-PA.mtx"]:
+        for mode_switch_threshold in ["0.7", "0.8", "0.9"]:
+            for datamov_threshold in [2, 5, 10]:
+                for num_MB in [0.5]:
+                    for bw_scalefactor in [4, 8, 16, 32]:
+                        localdram_size_str = "{}MB".format(num_MB)
+                        command_str = spmv_base_options.format(
+                            matrix,
+                            sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -g perf_model/dram/r_mode_5_page_queue_utilization_mode_switch_threshold={} -g perf_model/dram/remote_datamov_threshold={}".format(
+                                int(num_MB * ONE_MB_TO_BYTES),
+                                int(net_lat),
+                                int(bw_scalefactor),
+                                str(remote_init),
+                                str(mode_switch_threshold),
+                                int(datamov_threshold),
+                            ),
+                        )
+
+                        spmv_roadnetCA_roadnetPA_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds.append(
+                            Experiment(
+                                experiment_name="spmv_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_rmode5_threshold_{}_{}_pq_newer_series".format(
+                                    matrix[:matrix.find(".")].replace("-", ""),
+                                    localdram_size_str,
+                                    net_lat,
+                                    bw_scalefactor,
+                                    remote_init,
+                                    mode_switch_threshold,
+                                    datamov_threshold,
+                                ),
+                                command_str=command_str,
+                                experiment_run_configs=pq_cacheline_combined_rmode5_configs,
+                                output_root_directory=".",
+                            )
+                        )
+    spmv_roadnetCA_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds_ideal_page_throttling = []
+    net_lat = 120
+    remote_init = "true"
+    for matrix in ["roadNet-CA.mtx"]:
+        for mode_switch_threshold in ["0.7", "0.8", "0.9"]:
+            for datamov_threshold in [2, 5, 10]:
+                for num_MB in [0.5]:
+                    for bw_scalefactor in [4, 8, 16, 32]:
+                        localdram_size_str = "{}MB".format(num_MB)
+                        command_str = spmv_base_options.format(
+                            matrix,
+                            sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -g perf_model/dram/r_mode_5_page_queue_utilization_mode_switch_threshold={} -g perf_model/dram/remote_datamov_threshold={}".format(
+                                int(num_MB * ONE_MB_TO_BYTES),
+                                int(net_lat),
+                                int(bw_scalefactor),
+                                str(remote_init),
+                                str(mode_switch_threshold),
+                                int(datamov_threshold),
+                            ),
+                        )
+
+                        spmv_roadnetCA_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds_ideal_page_throttling.append(
+                            Experiment(
+                                experiment_name="spmv_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_rmode5_threshold_{}_{}_idealwinsize_{}_pq_newer_series".format(
+                                    matrix[:matrix.find(".")].replace("-", ""),
+                                    localdram_size_str,
+                                    net_lat,
+                                    bw_scalefactor,
+                                    remote_init,
+                                    mode_switch_threshold,
+                                    datamov_threshold,
+                                    int(10**5),
+                                ),
+                                command_str=command_str,
+                                experiment_run_configs=pq_cacheline_combined_rmode5_configs_ideal_page_throttling,
+                                output_root_directory=".",
+                            )
+                        )
+
+    spmv_roadnet_pq_cacheline_combined_experiments_remoteinit_true_rmode1 = []
+    net_lat = 120
+    remote_init = "true"
+    for matrix in ["roadNet-PA.mtx"]:
+        for num_B in [524288]:
+            for bw_scalefactor in [4, 8, 16, 32]:
+                localdram_size_str = "{}B".format(num_B)
+                command_str = spmv_base_options.format(
+                    matrix,
+                    sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={}".format(
+                        int(num_B),
+                        int(net_lat),
+                        int(bw_scalefactor),
+                        str(remote_init),
+                    ),
+                )
+
+                spmv_roadnet_pq_cacheline_combined_experiments_remoteinit_true_rmode1.append(
+                    Experiment(
+                        experiment_name="spmv_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_pq_newer_series".format(
+                            matrix[:matrix.find(".")].replace("-", ""),
+                            localdram_size_str,
+                            net_lat,
+                            bw_scalefactor,
+                            remote_init,
+                        ),
+                        command_str=command_str,
+                        experiment_run_configs=pq_cacheline_combined_rmode1_configs,
+                        output_root_directory=".",
+                    )
+                )
+    spmv_roadnet_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal_page_throttling = []
+    net_lat = 120
+    remote_init = "true"
+    for matrix in ["roadNet-PA.mtx"]:
+        for num_B in [524288]:
+            for bw_scalefactor in [4, 8, 16, 32]:
+                localdram_size_str = "{}B".format(num_B)
+                command_str = spmv_base_options.format(
+                    matrix,
+                    sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={}".format(
+                        int(num_B),
+                        int(net_lat),
+                        int(bw_scalefactor),
+                        str(remote_init),
+                    ),
+                )
+
+                spmv_roadnet_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal_page_throttling.append(
+                    Experiment(
+                        experiment_name="spmv_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_idealwinsize_{}_pq_newer_series".format(
+                            matrix[:matrix.find(".")].replace("-", ""),
+                            localdram_size_str,
+                            net_lat,
+                            bw_scalefactor,
+                            remote_init,
+                            int(10**5),
+                        ),
+                        command_str=command_str,
+                        experiment_run_configs=pq_cacheline_combined_rmode1_configs_ideal_page_throttling,
+                        output_root_directory=".",
+                    )
+                )
+
+    spmv_bcsstk32_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds = []
+    net_lat = 120
+    remote_init = "true"
+    for matrix in ["bcsstk32.mtx"]:
+        for num_B in [262144, 524288]:  # can remove 512 KB?
+            for mode_switch_threshold in ["0.7", "0.8", "0.9"]:
+                for datamov_threshold in [2, 5, 10]:
+                    for bw_scalefactor in [4, 8, 16, 32]:
+                        localdram_size_str = "{}B".format(num_B)
+                        command_str = spmv_base_options.format(
+                            matrix,
+                            sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -g perf_model/dram/r_mode_5_page_queue_utilization_mode_switch_threshold={} -g perf_model/dram/remote_datamov_threshold={}".format(
+                                int(num_MB * ONE_MB_TO_BYTES),
+                                int(net_lat),
+                                int(bw_scalefactor),
+                                str(remote_init),
+                                str(mode_switch_threshold),
+                                int(datamov_threshold),
+                            ),
+                        )
+
+                        spmv_bcsstk32_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds.append(
+                            Experiment(
+                                experiment_name="spmv_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_rmode5_threshold_{}_{}_pq_newer_series".format(
+                                    matrix[:matrix.find(".")].replace("-", ""),
                                     localdram_size_str,
                                     net_lat,
                                     bw_scalefactor,
@@ -681,6 +1157,160 @@ if __name__ == "__main__":
                         )
 
 
+    spmv_bcsstk32_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal_page_throttling = []
+    net_lat = 120
+    remote_init = "true"
+    for matrix in ["bcsstk32.mtx"]:
+        for num_B in [262144, 524288]:  # can remove 512 KB?
+            for bw_scalefactor in [4, 8, 32]:
+                localdram_size_str = "{}B".format(num_B)
+                command_str = spmv_base_options.format(
+                    matrix,
+                    sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={}".format(
+                        int(num_B),
+                        int(net_lat),
+                        int(bw_scalefactor),
+                        str(remote_init),
+                    ),
+                )
+
+                spmv_bcsstk32_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal_page_throttling.append(
+                    Experiment(
+                        experiment_name="spmv_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_idealwinsize_{}_pq_newer_series".format(
+                            matrix[:matrix.find(".")],
+                            localdram_size_str,
+                            net_lat,
+                            bw_scalefactor,
+                            remote_init,
+                            int(10**5),
+                        ),
+                        command_str=command_str,
+                        experiment_run_configs=pq_cacheline_combined_rmode1_configs_ideal_page_throttling,
+                        output_root_directory=".",
+                    )
+                )
+
+    # Ligra non-symmetric, 4, 8 MB
+    ligra_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal = []
+    ligra_input_selection = "regular_input"  # "regular_input" OR "small_input"
+    ligra_input_file = ligra_input_to_file[ligra_input_selection]
+    net_lat = 120
+    remote_init = "true"
+    for application_name in ["BC", "Components"]:  # Full execution: Triangle takes a long time, PageRank takes a very long time
+        for num_MB in [4, 8]:
+            for bw_scalefactor in [4, 8]:
+                localdram_size_str = "{}MB".format(num_MB)
+                command_str = ligra_base_str_options_nonsym.format(
+                    application_name,
+                    ligra_input_file,
+                    sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -s stop-by-icount:{}".format(
+                        int(num_MB * ONE_MB_TO_BYTES),
+                        int(net_lat),
+                        int(bw_scalefactor),
+                        str(remote_init),
+                        int(1 * ONE_BILLION),
+                    ),
+                )
+
+                ligra_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal.append(
+                    Experiment(
+                        experiment_name="ligra_{}_nonsym_{}localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_idealwinsize_{}_pq_newer_series".format(
+                            application_name.lower(),
+                            ""
+                            if ligra_input_selection == "regular_input"
+                            else ligra_input_selection + "_",
+                            localdram_size_str,
+                            net_lat,
+                            bw_scalefactor,
+                            remote_init,
+                            int(10**5),
+                        ),
+                        command_str=command_str,
+                        experiment_run_configs=pq_cacheline_combined_rmode1_configs_ideal_page_throttling,
+                        output_root_directory=".",
+                    )
+                )
+    # Ligra non-symmetric, 4, 8 MB
+    ligra_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal_pagerank = []
+    ligra_input_selection = "regular_input"  # "regular_input" OR "small_input"
+    ligra_input_file = ligra_input_to_file[ligra_input_selection]
+    net_lat = 120
+    remote_init = "true"
+    for application_name in ["PageRank"]:  # Full execution: Triangle takes a long time, PageRank takes a very long time
+        for num_MB in [4, 8]:
+            for bw_scalefactor in [4, 8]:
+                localdram_size_str = "{}MB".format(num_MB)
+                command_str = ligra_base_str_options_nonsym.format(
+                    application_name,
+                    ligra_input_file,
+                    sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -s stop-by-icount:{}".format(
+                        int(num_MB * ONE_MB_TO_BYTES),
+                        int(net_lat),
+                        int(bw_scalefactor),
+                        str(remote_init),
+                        int(1 * ONE_BILLION),
+                    ),
+                )
+
+                ligra_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal_pagerank.append(
+                    Experiment(
+                        experiment_name="ligra_{}_nonsym_{}localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_idealwinsize_{}_pq_newer_series".format(
+                            application_name.lower(),
+                            ""
+                            if ligra_input_selection == "regular_input"
+                            else ligra_input_selection + "_",
+                            localdram_size_str,
+                            net_lat,
+                            bw_scalefactor,
+                            remote_init,
+                            int(10**5),
+                        ),
+                        command_str=command_str,
+                        experiment_run_configs=pq_cacheline_combined_rmode1_configs_ideal_page_throttling,
+                        output_root_directory=".",
+                    )
+                )
+    # Ligra symmetric, 4, 8 MB
+    ligra_sym_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal = []
+    ligra_input_selection = "regular_input_sym"  # "regular_input" OR "small_input"
+    ligra_input_file = ligra_input_to_file[ligra_input_selection]
+    net_lat = 120
+    remote_init = "true"
+    for application_name in ["Triangle"]:  # "BC", "Components", "Triangle" # Full execution: Triangle takes a long time, PageRank takes a very long time
+        for num_MB in [4, 8]:
+            for bw_scalefactor in [4, 8]:
+                localdram_size_str = "{}MB".format(num_MB)
+                command_str = ligra_base_str_options_sym.format(
+                    application_name,
+                    ligra_input_file,
+                    sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -s stop-by-icount:{}".format(
+                        int(num_MB * ONE_MB_TO_BYTES),
+                        int(net_lat),
+                        int(bw_scalefactor),
+                        str(remote_init),
+                        int(1 * ONE_BILLION),
+                    ),
+                )
+
+                ligra_sym_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal.append(
+                    Experiment(
+                        experiment_name="ligra_{}_sym_{}localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_idealwinsize_{}_pq_newer_series".format(
+                            application_name.lower(),
+                            ""
+                            if ligra_input_selection == "regular_input"
+                            else ligra_input_selection + "_",
+                            localdram_size_str,
+                            net_lat,
+                            bw_scalefactor,
+                            remote_init,
+                            int(10**5),
+                        ),
+                        command_str=command_str,
+                        experiment_run_configs=pq_cacheline_combined_rmode1_configs_ideal_page_throttling,
+                        output_root_directory=".",
+                    )
+                )
+
     # BFS, 8 MB
     bfs_pq_cacheline_combined_experiments_remoteinit_true_rmode1 = []
     ligra_input_selection = "regular_input"  # "regular_input" OR "small_input"
@@ -691,7 +1321,7 @@ if __name__ == "__main__":
         for num_MB in [8]:
             for bw_scalefactor in [4, 8, 32]:
                 localdram_size_str = "{}MB".format(num_MB)
-                command_str = ligra_base_str_options.format(
+                command_str = ligra_base_str_options_nonsym.format(
                     application_name,
                     ligra_input_file,
                     sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={}".format(
@@ -704,7 +1334,7 @@ if __name__ == "__main__":
 
                 bfs_pq_cacheline_combined_experiments_remoteinit_true_rmode1.append(
                     Experiment(
-                        experiment_name="ligra_{}_{}localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_pq_cacheline_combined_series".format(
+                        experiment_name="ligra_{}_{}localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_pq_newer_series".format(
                             application_name.lower(),
                             ""
                             if ligra_input_selection == "regular_input"
@@ -730,7 +1360,7 @@ if __name__ == "__main__":
             for num_MB in [8]:  # 16
                 for bw_scalefactor in [4, 32]:  # 8
                     localdram_size_str = "{}MB".format(num_MB)
-                    command_str = ligra_base_str_options.format(
+                    command_str = ligra_base_str_options_nonsym.format(
                         application_name,
                         ligra_input_file,
                         sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -g perf_model/dram/remote_datamov_threshold={}".format(
@@ -744,7 +1374,7 @@ if __name__ == "__main__":
 
                     bfs_pq_cacheline_combined_experiments_remoteinit_true_rmode2_thresholds.append(
                         Experiment(
-                            experiment_name="ligra_{}_{}localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_rmode2_threshold_{}_pq_cacheline_combined_series".format(
+                            experiment_name="ligra_{}_{}localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_rmode2_threshold_{}_pq_newer_series".format(
                                 application_name.lower(),
                                 ""
                                 if ligra_input_selection == "regular_input"
@@ -771,7 +1401,7 @@ if __name__ == "__main__":
                 for num_MB in [8]:  # 16
                     for bw_scalefactor in [4, 8, 32]:
                         localdram_size_str = "{}MB".format(num_MB)
-                        command_str = ligra_base_str_options.format(
+                        command_str = ligra_base_str_options_nonsym.format(
                             application_name,
                             ligra_input_file,
                             sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -g perf_model/dram/r_mode_5_page_queue_utilization_mode_switch_threshold={} -g perf_model/dram/remote_datamov_threshold={}".format(
@@ -786,7 +1416,7 @@ if __name__ == "__main__":
 
                         bfs_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds.append(
                             Experiment(
-                                experiment_name="ligra_{}_{}localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_rmode5_threshold_{}_{}_pq_cacheline_combined_series".format(
+                                experiment_name="ligra_{}_{}localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_rmode5_threshold_{}_{}_pq_newer_series".format(
                                     application_name.lower(),
                                     ""
                                     if ligra_input_selection == "regular_input"
@@ -811,7 +1441,7 @@ if __name__ == "__main__":
                 for num_MB in [8]:  # 16
                     for bw_scalefactor in [4, 32]:
                         localdram_size_str = "{}MB".format(num_MB)
-                        command_str = ligra_base_str_options.format(
+                        command_str = ligra_base_str_options_nonsym.format(
                             application_name,
                             ligra_input_file,
                             sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -g perf_model/dram/r_mode_5_page_queue_utilization_mode_switch_threshold={} -g perf_model/dram/remote_datamov_threshold={}".format(
@@ -826,7 +1456,7 @@ if __name__ == "__main__":
 
                         bfs_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds_add.append(
                             Experiment(
-                                experiment_name="ligra_{}_{}localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_rmode5_threshold_{}_{}_pq_cacheline_combined_series".format(
+                                experiment_name="ligra_{}_{}localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_rmode5_threshold_{}_{}_pq_newer_series".format(
                                     application_name.lower(),
                                     ""
                                     if ligra_input_selection == "regular_input"
@@ -845,41 +1475,155 @@ if __name__ == "__main__":
                         )
 
 
-    # Darknet tiny, 2 MB
-    darknet_all_models_pq_cacheline_combined_experiments = []
+    # Some other darknet models, 4 MB 
+    darknet_others_pq_cacheline_combined_experiments_remoteinit_true_rmode1 = []
     net_lat = 120
-    for model_type in ["tiny", "darknet19", "resnet50"]:
-        for num_MB in [2]:
-            for bw_scalefactor in [4, 8, 32]:
-                localdram_size_str = "{}MB".format(num_MB)
-                command_str = darknet_base_str_options.format(
-                    model_type,
-                    sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
-                        int(num_MB * ONE_MB_TO_BYTES),
-                        int(net_lat),
-                        int(bw_scalefactor),
-                        int(1 * ONE_BILLION),
-                    ),
-                )
-                # 1 billion instructions cap
-
-                darknet_all_models_pq_cacheline_combined_experiments.append(
-                    Experiment(
-                        experiment_name="darknet_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_pq_cacheline_combined_series".format(
-                            model_type.lower(), localdram_size_str, net_lat, bw_scalefactor
+    for model_type in ["darknet19", "resnet50", "vgg-16"]:
+        for remote_init in ["true"]:  # "false"
+            for num_MB in [4]:
+                for bw_scalefactor in [32]: # 32
+                    localdram_size_str = "{}MB".format(num_MB)
+                    command_str = darknet_base_str_options.format(
+                        model_type,
+                        sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -s stop-by-icount:{}".format(
+                            int(num_MB * ONE_MB_TO_BYTES),
+                            int(net_lat),
+                            int(bw_scalefactor),
+                            str(remote_init),
+                            int(1 * ONE_BILLION),
                         ),
-                        command_str=command_str,
-                        experiment_run_configs=pq_cacheline_combined_rmode1_configs,
-                        output_root_directory=".",
                     )
-                )
+                    # 1 billion instructions cap
+
+                    darknet_others_pq_cacheline_combined_experiments_remoteinit_true_rmode1.append(
+                        Experiment(
+                            experiment_name="darknet_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_pq_newer_series".format(
+                                model_type.lower().replace("-", ""),
+                                localdram_size_str,
+                                net_lat,
+                                bw_scalefactor,
+                                remote_init,
+                            ),
+                            command_str=command_str,
+                            experiment_run_configs=pq_cacheline_combined_rmode1_configs,
+                            output_root_directory=".",
+                        )
+                    )
+    darknet_others_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal_page_throttling = []
+    net_lat = 120
+    for model_type in ["darknet19", "resnet50", "vgg-16"]:
+        for remote_init in ["true"]:  # "false"
+            for num_MB in [4]:
+                for bw_scalefactor in [8, 32]:
+                    localdram_size_str = "{}MB".format(num_MB)
+                    command_str = darknet_base_str_options.format(
+                        model_type,
+                        sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -s stop-by-icount:{}".format(
+                            int(num_MB * ONE_MB_TO_BYTES),
+                            int(net_lat),
+                            int(bw_scalefactor),
+                            str(remote_init),
+                            int(1 * ONE_BILLION),
+                        ),
+                    )
+                    # 1 billion instructions cap
+
+                    darknet_others_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal_page_throttling.append(
+                        Experiment(
+                            experiment_name="darknet_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_idealwinsize_{}_pq_newer_series".format(
+                                model_type.lower().replace("-", ""),
+                                localdram_size_str,
+                                net_lat,
+                                bw_scalefactor,
+                                remote_init,
+                                int(10**5),
+                            ),
+                            command_str=command_str,
+                            experiment_run_configs=pq_cacheline_combined_rmode1_configs_ideal_page_throttling,
+                            output_root_directory=".",
+                        )
+                    )
+
+    # Darknet tiny, 2 MB
+    darknet_tiny_pq_cacheline_combined_experiments_remoteinit_true_rmode1_limit_redundant_moves = []
+    net_lat = 120
+    for model_type in ["tiny"]:
+        for remote_init in ["true"]:  # "false"
+            for redundant_moves_limit in [2, 5, 10, 40]:
+                for num_MB in [2]:
+                    for bw_scalefactor in [4, 8, 32]:
+                        localdram_size_str = "{}MB".format(num_MB)
+                        command_str = darknet_base_str_options.format(
+                            model_type,
+                            sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -g perf_model/dram/remote_limit_redundant_moves={} -s stop-by-icount:{}".format(
+                                int(num_MB * ONE_MB_TO_BYTES),
+                                int(net_lat),
+                                int(bw_scalefactor),
+                                str(remote_init),
+                                int(redundant_moves_limit),
+                                int(1 * ONE_BILLION),
+                            ),
+                        )
+                        # 1 billion instructions cap
+
+                        darknet_tiny_pq_cacheline_combined_experiments_remoteinit_true_rmode1_limit_redundant_moves.append(
+                            Experiment(
+                                experiment_name="darknet_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_limredundantmoves_{}_pq_newer_series".format(
+                                    model_type.lower(),
+                                    localdram_size_str,
+                                    net_lat,
+                                    bw_scalefactor,
+                                    remote_init,
+                                    redundant_moves_limit,
+                                ),
+                                command_str=command_str,
+                                experiment_run_configs=pq_cacheline_combined_rmode1_configs,
+                                output_root_directory=".",
+                            )
+                        )
+    darknet_tiny_pq_cacheline_combined_experiments_remoteinit_true_rmode1_limit_redundant_moves_ideal_throttling = []
+    net_lat = 120
+    for model_type in ["tiny"]:
+        for remote_init in ["true"]:  # "false"
+            for redundant_moves_limit in [2, 5, 10, 40]:
+                for num_MB in [2]:
+                    for bw_scalefactor in [4, 8, 32]:
+                        localdram_size_str = "{}MB".format(num_MB)
+                        command_str = darknet_base_str_options.format(
+                            model_type,
+                            sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -g perf_model/dram/remote_limit_redundant_moves={} -s stop-by-icount:{}".format(
+                                int(num_MB * ONE_MB_TO_BYTES),
+                                int(net_lat),
+                                int(bw_scalefactor),
+                                str(remote_init),
+                                int(redundant_moves_limit),
+                                int(1 * ONE_BILLION),
+                            ),
+                        )
+                        # 1 billion instructions cap
+
+                        darknet_tiny_pq_cacheline_combined_experiments_remoteinit_true_rmode1_limit_redundant_moves_ideal_throttling.append(
+                            Experiment(
+                                experiment_name="darknet_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_limredundantmoves_{}_idealwinsize_100000_pq_newer_series".format(
+                                    model_type.lower(),
+                                    localdram_size_str,
+                                    net_lat,
+                                    bw_scalefactor,
+                                    remote_init,
+                                    redundant_moves_limit,
+                                ),
+                                command_str=command_str,
+                                experiment_run_configs=pq_cacheline_combined_rmode1_configs_ideal_page_throttling,
+                                output_root_directory=".",
+                            )
+                        )
 
     darknet_tiny_pq_cacheline_combined_experiments_remoteinit_true_rmode1 = []
     net_lat = 120
     for model_type in ["tiny"]:
         for remote_init in ["true"]:  # "false"
             for num_MB in [2]:
-                for bw_scalefactor in [4, 8, 32]:
+                for bw_scalefactor in [4]:
                     localdram_size_str = "{}MB".format(num_MB)
                     command_str = darknet_base_str_options.format(
                         model_type,
@@ -895,7 +1639,7 @@ if __name__ == "__main__":
 
                     darknet_tiny_pq_cacheline_combined_experiments_remoteinit_true_rmode1.append(
                         Experiment(
-                            experiment_name="darknet_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_pq_cacheline_combined_series".format(
+                            experiment_name="darknet_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_pq_newer_series".format(
                                 model_type.lower(),
                                 localdram_size_str,
                                 net_lat,
@@ -907,14 +1651,48 @@ if __name__ == "__main__":
                             output_root_directory=".",
                         )
                     )
+    darknet_tiny_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal_page_throttling = []
+    net_lat = 120
+    for model_type in ["tiny"]:
+        for remote_init in ["true"]:  # "false"
+            for num_MB in [2]:
+                for bw_scalefactor in [4]:
+                    localdram_size_str = "{}MB".format(num_MB)
+                    command_str = darknet_base_str_options.format(
+                        model_type,
+                        sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -s stop-by-icount:{}".format(
+                            int(num_MB * ONE_MB_TO_BYTES),
+                            int(net_lat),
+                            int(bw_scalefactor),
+                            str(remote_init),
+                            int(1 * ONE_BILLION),
+                        ),
+                    )
+                    # 1 billion instructions cap
+
+                    darknet_tiny_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal_page_throttling.append(
+                        Experiment(
+                            experiment_name="darknet_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_idealwinsize_{}_pq_newer_series".format(
+                                model_type.lower(),
+                                localdram_size_str,
+                                net_lat,
+                                bw_scalefactor,
+                                remote_init,
+                                int(10**5),
+                            ),
+                            command_str=command_str,
+                            experiment_run_configs=pq_cacheline_combined_rmode1_configs_ideal_page_throttling,
+                            output_root_directory=".",
+                        )
+                    )
 
     darknet_tiny_pq_cacheline_combined_experiments_remoteinit_true_rmode2_thresholds = []
     net_lat = 120
     for model_type in ["tiny"]:
         for remote_init in ["true"]:
-            for datamov_threshold in [5, 10]:
+            for datamov_threshold in [2, 5]:
                 for num_MB in [2]:
-                    for bw_scalefactor in [4, 32]:
+                    for bw_scalefactor in [4, 8, 32]:
                         localdram_size_str = "{}MB".format(num_MB)
                         command_str = darknet_base_str_options.format(
                             model_type,
@@ -931,7 +1709,7 @@ if __name__ == "__main__":
 
                         darknet_tiny_pq_cacheline_combined_experiments_remoteinit_true_rmode2_thresholds.append(
                             Experiment(
-                                experiment_name="darknet_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_rmode2_threshold_{}_pq_cacheline_combined_series".format(
+                                experiment_name="darknet_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_rmode2_threshold_{}_pq_newer_series".format(
                                     model_type.lower(),
                                     localdram_size_str,
                                     net_lat,
@@ -948,8 +1726,8 @@ if __name__ == "__main__":
     net_lat = 120
     for model_type in ["tiny"]:
         for remote_init in ["true"]:
-            for mode_switch_threshold in ["0.7"]:
-                for datamov_threshold in [5, 10]:
+            for mode_switch_threshold in ["0.7", "0.8", "0.9"]:
+                for datamov_threshold in [2, 5]:
                     for num_MB in [2]:
                         for bw_scalefactor in [4, 8, 32]:
                             localdram_size_str = "{}MB".format(num_MB)
@@ -969,7 +1747,7 @@ if __name__ == "__main__":
 
                             darknet_tiny_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds.append(
                                 Experiment(
-                                    experiment_name="darknet_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_rmode5_threshold_{}_{}_pq_cacheline_combined_series".format(
+                                    experiment_name="darknet_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_rmode5_threshold_{}_{}_pq_newer_series".format(
                                         model_type.lower(),
                                         localdram_size_str,
                                         net_lat,
@@ -1008,7 +1786,7 @@ if __name__ == "__main__":
 
                             darknet_tiny_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds.append(
                                 Experiment(
-                                    experiment_name="darknet_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_rmode5_threshold_{}_{}_pq_cacheline_combined_series".format(
+                                    experiment_name="darknet_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_rmode5_threshold_{}_{}_pq_newer_series".format(
                                         model_type.lower(),
                                         localdram_size_str,
                                         net_lat,
@@ -1024,6 +1802,73 @@ if __name__ == "__main__":
                             )
 
 
+    # Stream benchmark
+    stream_modes_pq_cacheline_combined_experiments_remoteinit_true_rmode1 = []
+    net_lat = 120
+    remote_init = "true"
+    for bw_scalefactor in [16]:  # 4, 16
+        for num_MB in [4]:  # other size??
+            for mode in [1, 3]:
+                localdram_size_str = "{}MB".format(num_MB)
+                command_str = stream_base_options.format(
+                    mode,
+                    sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={}".format(
+                        int(num_MB * ONE_MB_TO_BYTES),
+                        int(net_lat),
+                        int(bw_scalefactor),
+                        str(remote_init),
+                    ),
+                )
+
+                stream_modes_pq_cacheline_combined_experiments_remoteinit_true_rmode1.append(
+                    Experiment(
+                        experiment_name="stream_mode{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_pq_cacheline_newer_series".format(
+                            mode,
+                            localdram_size_str,
+                            net_lat,
+                            bw_scalefactor,
+                            remote_init,
+                        ),
+                        command_str=command_str,
+                        experiment_run_configs=pq_cacheline_combined_rmode1_configs,
+                        output_root_directory=".",
+                    )
+                )
+    stream_modes_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal_page_throttling = []
+    net_lat = 120
+    remote_init = "true"
+    for bw_scalefactor in [16]:  # 4, 16
+        for num_MB in [4]:  # other size??
+            for mode in [1, 3]:
+                localdram_size_str = "{}MB".format(num_MB)
+                command_str = stream_base_options.format(
+                    mode,
+                    sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={}".format(
+                        int(num_MB * ONE_MB_TO_BYTES),
+                        int(net_lat),
+                        int(bw_scalefactor),
+                        str(remote_init),
+                    ),
+                )
+
+                stream_modes_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal_page_throttling.append(
+                    Experiment(
+                        experiment_name="stream_mode{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_idealwinsize_{}_pq_cacheline_newer_series".format(
+                            mode,
+                            localdram_size_str,
+                            net_lat,
+                            bw_scalefactor,
+                            remote_init,
+                            int(10**5),
+                        ),
+                        command_str=command_str,
+                        experiment_run_configs=pq_cacheline_combined_rmode1_configs_ideal_page_throttling,
+                        output_root_directory=".",
+                    )
+                )
+
+
+    """
     # Bandwidth Verification experiments
     queue_delay_cap_configs_99 = []
     for config in queue_delay_cap_configs:
@@ -1080,7 +1925,7 @@ if __name__ == "__main__":
     for num_MB in [8]:
         for bw_scalefactor in [4, 8, 32]:
             localdram_size_str = "{}MB".format(num_MB)
-            command_str = ligra_base_str_options.format(
+            command_str = ligra_base_str_options_nonsym.format(
                 application_name,
                 ligra_input_file,
                 sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={}".format(
@@ -1124,7 +1969,7 @@ if __name__ == "__main__":
 
                 darknet_tiny_2MB_bw_verification_experiments_99.append(
                     Experiment(
-                        experiment_name="darknet_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_pq_cacheline_combined_series".format(
+                        experiment_name="darknet_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_pq_newer_series".format(
                             model_type.lower(), localdram_size_str, net_lat, bw_scalefactor
                         ),
                         command_str=command_str,
@@ -1165,7 +2010,7 @@ if __name__ == "__main__":
     for num_MB in [8]:  # 16
         for bw_scalefactor in [4, 8, 32]:
             localdram_size_str = "{}MB".format(num_MB)
-            command_str = ligra_base_str_options.format(
+            command_str = ligra_base_str_options_nonsym.format(
                 application_name,
                 ligra_input_file,
                 sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={}".format(
@@ -1213,7 +2058,7 @@ if __name__ == "__main__":
 
                     darknet_tiny_pq_cacheline_combined_experiments_remoteinit_true_ideal_pagethrottling_window_size.append(
                         Experiment(
-                            experiment_name="darknet_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_idealwinsize_{}_pq_cacheline_combined_series".format(
+                            experiment_name="darknet_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_idealwinsize_{}_pq_newer_series".format(
                                 model_type.lower(), localdram_size_str, net_lat, bw_scalefactor, remote_init, int(window_size)
                             ),
                             command_str=command_str,
@@ -1246,7 +2091,7 @@ if __name__ == "__main__":
 
                             darknet_tiny_pq_cacheline_combined_experiments_remoteinit_true_rmode2_ideal_pagethrottling_window_size_add.append(
                                 Experiment(
-                                    experiment_name="darknet_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_rmode2_threshold_{}_idealwinsize_{}_pq_cacheline_combined_series".format(
+                                    experiment_name="darknet_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_rmode2_threshold_{}_idealwinsize_{}_pq_newer_series".format(
                                         model_type.lower(),
                                         localdram_size_str,
                                         net_lat,
@@ -1275,7 +2120,7 @@ if __name__ == "__main__":
 
                 bcsstk32_pq_cacheline_combined_experiments_remoteinit_true_ideal_pagethrottling_window_size.append(
                     Experiment(
-                        experiment_name="bcsstk32_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_idealwinsize_{}_pq_cacheline_combined_series".format(
+                        experiment_name="bcsstk32_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_idealwinsize_{}_pq_newer_series".format(
                             localdram_size_str, net_lat, bw_scalefactor, remote_init, int(window_size)
                         ),
                         command_str=command_str,
@@ -1304,7 +2149,7 @@ if __name__ == "__main__":
 
                         bcsstk32_pq_cacheline_combined_experiments_remoteinit_true_rmode2_ideal_pagethrottling_window_size_add.append(
                             Experiment(
-                                experiment_name="bcsstk32_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_rmode2_threshold_{}_idealwinsize_{}_pq_cacheline_combined_series".format(
+                                experiment_name="bcsstk32_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_rmode2_threshold_{}_idealwinsize_{}_pq_newer_series".format(
                                     localdram_size_str,
                                     net_lat,
                                     bw_scalefactor,
@@ -1327,7 +2172,7 @@ if __name__ == "__main__":
         for window_size in [10**4, 10**5 / 5, 10**5 * 5, 10**6]:
             for bw_scalefactor in [4, 8, 32]:
                 localdram_size_str = "{}MB".format(num_MB)
-                command_str = ligra_base_str_options.format(
+                command_str = ligra_base_str_options_nonsym.format(
                     application_name,
                     ligra_input_file,
                     sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -g perf_model/dram/m_r_ideal_pagethrottle_remote_access_history_window_size={}".format(
@@ -1337,7 +2182,7 @@ if __name__ == "__main__":
 
                 bfs_pq_cacheline_combined_experiments_remoteinit_true_ideal_pagethrottling_window_size.append(
                     Experiment(
-                        experiment_name="ligra_{}_{}localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_idealwinsize_{}_pq_cacheline_combined_series".format(
+                        experiment_name="ligra_{}_{}localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_idealwinsize_{}_pq_newer_series".format(
                             application_name.lower(),
                             ""
                             if ligra_input_selection == "regular_input"
@@ -1364,7 +2209,7 @@ if __name__ == "__main__":
                 for num_MB in [8]:  # 16
                     for bw_scalefactor in [4, 32]:  # 8
                         localdram_size_str = "{}MB".format(num_MB)
-                        command_str = ligra_base_str_options.format(
+                        command_str = ligra_base_str_options_nonsym.format(
                             application_name,
                             ligra_input_file,
                             sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -g perf_model/dram/remote_datamov_threshold={} -g perf_model/dram/m_r_ideal_pagethrottle_remote_access_history_window_size={}".format(
@@ -1379,7 +2224,7 @@ if __name__ == "__main__":
 
                         bfs_pq_cacheline_combined_experiments_remoteinit_true_rmode2_ideal_pagethrottling_window_size_add.append(
                             Experiment(
-                                experiment_name="ligra_{}_{}localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_rmode2_threshold_{}_idealwinsize_{}_pq_cacheline_combined_series".format(
+                                experiment_name="ligra_{}_{}localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_rmode2_threshold_{}_idealwinsize_{}_pq_newer_series".format(
                                     application_name.lower(),
                                     ""
                                     if ligra_input_selection == "regular_input"
@@ -1396,27 +2241,13 @@ if __name__ == "__main__":
                                 output_root_directory=".",
                             )
                         )
-
+    """
 
     # experiments.extend(bcsstk32_bw_verification_experiments_99)
     # experiments.extend(bfs_bw_verification_experiments_99)
     # experiments.extend(darknet_tiny_2MB_bw_verification_experiments_99)
     # experiments.extend(bcsstk32_bw_verification_experiments_95)
     # experiments.extend(bfs_bw_verification_experiments_95)
-
-
-    # experiments.extend(bcsstk32_pq_cacheline_combined_experiments_remoteinit_false)
-    # experiments.extend(bcsstk32_pq_cacheline_combined_experiments_remoteinit_true)
-    # experiments.extend(bcsstk32_pq_cacheline_combined_experiments_remoteinit_false_rmode2_thresholds)
-
-    # experiments.extend(bfs_pq_cacheline_combined_experiments_remoteinit_false)
-    # experiments.extend(darknet_tiny_pq_cacheline_combined_experiments_remoteinit_false)
-
-    # experiments.extend(bfs_pq_cacheline_combined_experiments_remoteinit_false_rmode2_thresholds)
-    # experiments.extend(darknet_tiny_pq_cacheline_combined_experiments_remoteinit_false_rmode2_thresholds)
-    
-    # experiments.extend(bfs_pq_cacheline_combined_experiments_remoteinit_true)
-    # experiments.extend(darknet_tiny_pq_cacheline_combined_experiments_remoteinit_true)
 
 
     # experiments.extend(bcsstk32_pq_cacheline_combined_experiments_remoteinit_true_rmode2_thresholds)
@@ -1426,7 +2257,6 @@ if __name__ == "__main__":
     # experiments.extend(bcsstk32_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds)
     # experiments.extend(bfs_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds)
     # experiments.extend(darknet_tiny_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds)
-
     # experiments.extend(bfs_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds_add)
     # experiments.extend(darknet_tiny_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds_add)
 
@@ -1439,10 +2269,52 @@ if __name__ == "__main__":
     # experiments.extend(bfs_pq_cacheline_combined_experiments_remoteinit_true_rmode2_window_size_add)
     # experiments.extend(darknet_tiny_pq_cacheline_combined_experiments_remoteinit_true_rmode2_window_size_add)
 
- 
-  
+
+    # experiments.extend(darknet_others_pq_cacheline_combined_experiments_remoteinit_true_rmode1)
+    # experiments.extend(darknet_others_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal_page_throttling)
+    # experiments.extend(darknet_tiny_pq_cacheline_combined_experiments_remoteinit_true_rmode1)
+    # experiments.extend(darknet_tiny_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal_page_throttling)
+    # experiments.extend(spmv_bcsstk32_pq_cacheline_combined_experiments_remoteinit_true_rmode1)
+    # experiments.extend(spmv_bcsstk32_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal_page_throttling)
+    # experiments.extend(spmv_roadnet_pq_cacheline_combined_experiments_remoteinit_true_rmode1)
+    # experiments.extend(spmv_roadnet_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal_page_throttling)
+    # experiments.extend(sssp_bcsstk32_pq_cacheline_combined_experiments_remoteinit_true_rmode1)
+    # experiments.extend(sssp_bcsstk32_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal_page_throttling)
+    # experiments.extend(sssp_roadNetPA_pq_cacheline_combined_experiments_remoteinit_true_rmode1)
+    # experiments.extend(sssp_roadNetPA_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal_page_throttling)
+
+    # experiments.extend(ligra_sym_pq_cacheline_combined_experiments_remoteinit_true_rmode1_test)
+    # experiments.extend(ligra_pq_cacheline_combined_experiments_remoteinit_true_rmode1_test[0:3])
+
+
+    # experiments.extend(spmv_roadnetCA_pq_cacheline_combined_experiments_remoteinit_true_rmode1)
+    # experiments.extend(spmv_roadnetCA_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal_page_throttling)
+    # experiments.extend(spmv_roadnetCA_roadnetPA_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds)
+    # experiments.extend(spmv_roadnetCA_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds_ideal_page_throttling)
+
+    # experiments.extend(sssp_roadNetPA_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds)
+    # experiments.extend(sssp_roadNetCA_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds)
+    # experiments.extend(sssp_roadNetCA_pq_cacheline_combined_experiments_remoteinit_true_rmode1)
+    # experiments.extend(sssp_roadNetCA_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal_page_throttling)
+    # experiments.extend(sssp_roadNetCA_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds_ideal_page_throttling)
+
+    # experiments.extend(bcsstk32_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds)
+    # experiments.extend(bcsstk32_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds_ideal_page_throttling)
+    # experiments.extend(spmv_bcsstk32_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds)
+
+    # experiments.extend(darknet_tiny_pq_cacheline_combined_experiments_remoteinit_true_rmode1)
+    # experiments.extend(darknet_tiny_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal_page_throttling)
+    # experiments.extend(darknet_tiny_pq_cacheline_combined_experiments_remoteinit_true_rmode1_limit_redundant_moves)
+    # experiments.extend(darknet_tiny_pq_cacheline_combined_experiments_remoteinit_true_rmode1_limit_redundant_moves_ideal_throttling)
+    # experiments.extend(darknet_tiny_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds)
+
+    # experiments.extend(ligra_sym_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal)
+    # experiments.extend(ligra_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal)
+    # experiments.extend(ligra_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal_pagerank)
+
     ### Run Sniper experiments using ExperimentManager ###
     # Find log filename, to not overwrite previous logs
+    timezone = pytz.timezone("Canada/Eastern")
     log_filename = "run-sniper-repeat_1.log"
     num = 2
     while os.path.isfile(log_filename):
@@ -1450,18 +2322,19 @@ if __name__ == "__main__":
         num += 1
 
     with open(log_filename, "w") as log_file:
-        log_str = "Script start time: {}".format(datetime.datetime.now().astimezone())
+        log_str = "Script start time: {}".format(datetime.datetime.now().astimezone(timezone))
         print(log_str)
         print(log_str, file=log_file)
 
         experiment_manager = ExperimentManager(
-            output_root_directory=".", max_concurrent_processes=16, log_file=log_file
+            output_root_directory=".", max_concurrent_processes=36, log_file=log_file
         )
         experiment_manager.add_experiments(experiments)
         experiment_manager.start(
-            manager_sleep_interval_seconds=60
+            manager_sleep_interval_seconds=60,
+            timezone=timezone,
         )  # main thread sleep for 60 second intervals while waiting
 
-        log_str = "Script end time: {}".format(datetime.datetime.now().astimezone())
+        log_str = "Script end time: {}".format(datetime.datetime.now().astimezone(timezone))
         print(log_str)
         print(log_str, file=log_file)

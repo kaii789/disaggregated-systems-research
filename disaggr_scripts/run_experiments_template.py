@@ -1,6 +1,8 @@
 # Python 3
 from run_sniper_repeat_base import *
 
+# import pytz
+
 if __name__ == "__main__":
     # Relative to directory where command_str will be executed, ie subfolder of subfolder of this file's containing directory
     subfolder_sniper_root_relpath = "../../.."
@@ -35,7 +37,7 @@ if __name__ == "__main__":
 
     ###  Darknet command strings  ###
     # Note: using os.system(), the 'cd' of working directory doesn't persist to the next call to os.system()
-    darknet_base_str_options = "cd {1} && ../../run-sniper -d {{{{sniper_output_dir}}}} -c ../../disaggr_config/local_memory_cache.cfg -c {{{{sniper_output_dir}}}}/repeat_testing.cfg {{sniper_options}} -- {0}/darknet classifier predict {0}/cfg/imagenet1k.data {0}/cfg/{{0}}.cfg {0}/{{0}}.weights {0}/data/dog.jpg".format(
+    darknet_base_str_options = "cd {1} && ../../run-sniper -d {{{{sniper_output_dir}}}} -c ../../disaggr_config/local_memory_cache.cfg -c {{{{sniper_output_dir}}}}/repeat_testing.cfg {{sniper_options}} -- {0}/darknet classifier predict {0}/cfg/imagenet1k.data {0}/cfg/{{0}}.cfg {0}/{{0}}.weights {0}/data/dog.jpg && cd {{{{sniper_output_dir}}}}".format(
         ".", darknet_home
     )
     # Examples:
@@ -61,9 +63,12 @@ if __name__ == "__main__":
     ligra_base_str_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c {{{{sniper_output_dir}}}}/repeat_testing.cfg {{sniper_options}} -- {0}/apps/{{0}} -s -rounds 1 {0}/inputs/{{1}}".format(
         ligra_home, sniper_root=subfolder_sniper_root_relpath
     )
+    ligra_base_str_options_nonsym = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c {{{{sniper_output_dir}}}}/repeat_testing.cfg {{sniper_options}} -- {0}/apps/{{0}} -rounds 1 {0}/inputs/{{1}}".format(
+        ligra_home, sniper_root=subfolder_sniper_root_relpath
+    )
     ligra_input_to_file = {
         "regular_input": "rMat_1000000",
-        "small_input": "rMat_100000",
+        # "small_input": "rMat_100000",
         "reg_10x": "rMat_10000000",
         "reg_8x": "rMat_8000000",
     }
@@ -291,6 +296,8 @@ if __name__ == "__main__":
 
     ### Run Sniper experiments using ExperimentManager ###
     # Find log filename, to not overwrite previous logs
+    timezone = None
+    # timezone = pytz.timezone("Canada/Eastern")
     log_filename = "run-sniper-repeat_1.log"
     num = 2
     while os.path.isfile(log_filename):
@@ -298,7 +305,7 @@ if __name__ == "__main__":
         num += 1
 
     with open(log_filename, "w") as log_file:
-        log_str = "Script start time: {}".format(datetime.datetime.now().astimezone())
+        log_str = "Script start time: {}".format(datetime.datetime.now().astimezone(timezone))
         print(log_str)
         print(log_str, file=log_file)
 
@@ -307,9 +314,10 @@ if __name__ == "__main__":
         )
         experiment_manager.add_experiments(experiments)
         experiment_manager.start(
-            manager_sleep_interval_seconds=60
+            manager_sleep_interval_seconds=60,
+            timezone=timezone,
         )  # main thread sleep for 60 second intervals while waiting
 
-        log_str = "Script end time: {}".format(datetime.datetime.now().astimezone())
+        log_str = "Script end time: {}".format(datetime.datetime.now().astimezone(timezone))
         print(log_str)
         print(log_str, file=log_file)

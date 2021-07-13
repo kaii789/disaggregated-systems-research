@@ -4,8 +4,8 @@ import sys
 import os
 import stat
 import time
-import traceback
 import datetime
+import traceback
 import copy
 import getopt
 import shutil
@@ -416,7 +416,7 @@ class ExperimentManager:
     def add_experiments(self, experiments: Iterable[Experiment]) -> None:
         self._pending_experiments.extend(experiments)
 
-    def start(self, manager_sleep_interval_seconds: int = 60) -> None:
+    def start(self, manager_sleep_interval_seconds: int = 60, timezone: Optional[datetime.tzinfo] = None) -> None:
         """Start running Experiment's added to this ExperimentManager."""
         os.chdir(self.output_directory_abspath)
         process_info = [
@@ -497,7 +497,7 @@ class ExperimentManager:
                             execution_script.write(
                                 process_info[index]
                                 .experiment_run.get_execution_script_str()
-                                .format(sniper_output_dir=os.path.abspath("."))
+                                .format(sniper_output_dir=os.path.abspath("."))  # sniper_output_dir should be an absolute path
                             )
                         os.chmod(
                             execution_script_path,
@@ -523,7 +523,7 @@ class ExperimentManager:
                             index,
                             process_info[index].experiment_run.experiment_name,
                             process_info[index].experiment_run.experiment_run_no,
-                            datetime.datetime.now().astimezone(),
+                            datetime.datetime.now().astimezone(timezone),
                         )
                         print(log_str)
                         print(log_str, file=self.log_file)
@@ -549,7 +549,7 @@ class ExperimentManager:
                                 process_info[index].experiment_run.experiment_name,
                                 process_info[index].experiment_run.experiment_run_no,
                                 end_time - process_info[index].start_time,
-                                datetime.datetime.now().astimezone(),
+                                datetime.datetime.now().astimezone(timezone),
                             )
                             print(log_str)
                             print(log_str, file=self.log_file)
