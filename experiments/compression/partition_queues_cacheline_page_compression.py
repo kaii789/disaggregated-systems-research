@@ -336,25 +336,30 @@ def graph(res_name, benchmark_list, local_dram_list, bw_scalefactor_list):
             for factor in bw_scalefactor_list:
                 dir1 = "{}localdram_{}_netlat_120_bw_scalefactor_{}_combo_output_files".format(benchmark, size, factor)
                 for run in range(1, 1 + num_bars):
-                    dir2 = "run_{}_process_{}_temp".format(run, process)
-                    res_dir = "./{}/{}".format(dir1, dir2)
-                    ipc = stats.get_ipc(res_dir)
-                    res[run].append(ipc)
+                    try:
+                        dir2 = "run_{}_process_{}_temp".format(run, process)
+                        res_dir = "./{}/{}".format(dir1, dir2)
+                        ipc = stats.get_ipc(res_dir)
+                        res[run].append(ipc)
 
-                    # Compression res
-                    if run in range(2, 1 + num_bars):
-                        type = "{}-{}".format(run - 1, factor)
-                        compression_res[type] = {}
-                        cr, cl, dl, ccr, ccl, cdl = stats.get_compression_stats(res_dir)
-                        compression_res[type]['Compression Ratio'] = cr
-                        compression_res[type]['Compression Latency'] = cl
-                        compression_res[type]['Decompression Latency'] = dl
-                        if ccr:
-                            compression_res[type]['Cacheline Compression Ratio'] = ccr
-                            compression_res[type]['Cacheline Compression Latency'] = ccl
-                            compression_res[type]['Cacheline Decompression Latency'] = cdl
+                        # Compression res
+                        if run in range(2, 1 + num_bars):
+                            type = "{}-{}".format(run - 1, factor)
+                            compression_res[type] = {}
+                            cr, cl, dl, ccr, ccl, cdl = stats.get_compression_stats(res_dir)
+                            compression_res[type]['Compression Ratio'] = cr
+                            compression_res[type]['Compression Latency'] = cl
+                            compression_res[type]['Decompression Latency'] = dl
+                            if ccr:
+                                compression_res[type]['Cacheline Compression Ratio'] = ccr
+                                compression_res[type]['Cacheline Compression Latency'] = ccl
+                                compression_res[type]['Cacheline Decompression Latency'] = cdl
 
-                    process += 1
+                        process += 1
+                    except Exception as e:
+                        print(e)
+                        res[run].append(0)
+                        process += 1
 
     data = {labels[i]: res[i] for i in range(len(labels))}
     # print(data)
