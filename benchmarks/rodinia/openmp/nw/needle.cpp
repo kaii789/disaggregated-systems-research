@@ -11,6 +11,10 @@
 
 #define BLOCK_SIZE 16
 
+#include "sim_api.h"
+#include <ostream>
+#include <iostream>
+
 ////////////////////////////////////////////////////////////////////////////////
 // declaration, forward
 void runTest( int argc, char** argv);
@@ -304,8 +308,20 @@ runTest( int argc, char** argv)
    
     long long start_time = get_time();
 
+    SimRoiStart();
+
     nw_optimized( input_itemsets, output_itemsets, referrence,
         max_rows, max_cols, penalty );
+
+
+    if (SimInSimulator()) {
+	    std::cout << "API Test: Running in the simulator" << std::endl;
+    } else {
+	    std::cout << "API Test: Not Running in the simulator" << std::endl;
+    }
+
+    SimRoiEnd();
+
 
     long long end_time = get_time();
 
