@@ -84,6 +84,7 @@ VOID thread_data_server(VOID *arg){
       data_server_response->write(reinterpret_cast<char*>(&addr), sizeof(addr));
       data_server_response->write(read_data, data_size);
       data_server_response->flush();
+      free(read_data);
    }
 }
 
