@@ -11,6 +11,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from scipy import interpolate
 
+from enum import IntEnum
 from typing import Any, Callable, Dict, List, Optional, TextIO, TypeVar
 
 PathLike = TypeVar("PathLike", str, bytes, os.PathLike)  # Type for file/directory paths
@@ -88,7 +89,7 @@ class BandwidthInfo:
 
 def get_stats_from_files(
     output_directory_path: PathLike,
-    first_experiment_no: int = 1,
+    first_experiment_no: Optional[int] = 1,
     log_file: Optional[TextIO] = None,
     stat_settings: Optional[List[StatSetting]] = None,
 ):
@@ -161,6 +162,7 @@ def get_stats_from_files(
                                     stat_settings[index].line_beginning
                                 )
                             )
+                        y_values[index].append(np.nan)  # ignore missing stats
                     # raise ValueError("\n".join(error_strs))
                     print("\n".join(error_strs))
             else:
@@ -192,7 +194,7 @@ def get_stats_from_files(
     return y_values, stat_settings
 
 
-def get_list_padded_str(l: List[Any], col_min_width: int = 7):
+def get_list_padded_str(l: List[Any], col_min_width: Optional[int] = 7):
     format_str = "{{:>{col_min_width}}}".format(col_min_width=col_min_width)
     elements = [format_str.format(val) for val in l]
     return "[" + ", ".join(elements) + "]"
@@ -203,7 +205,7 @@ def print_stats(
     y_values: List[List[Any]],
     stat_settings: List[StatSetting],
     log_file: Optional[TextIO] = None,
-    print_to_terminal: bool = True
+    print_to_terminal: Optional[bool] = True
 ):
     if print_to_terminal:
         print("Y values:")
@@ -223,7 +225,7 @@ def get_and_print_stats(
     output_directory_path: PathLike,
     log_file: Optional[TextIO] = None,
     stat_settings: Optional[List[StatSetting]] = None,
-    print_to_terminal: bool = True,
+    print_to_terminal: Optional[bool] = True,
 ):
     """Run this script in an experiment folder, ie the containing folder of
     numbered Sniper config and output files.
@@ -405,13 +407,119 @@ def delete_experiment_run_temp_folders(output_directory_path: PathLike):
             print("  {}".format(dirname))
 
 
+def print_remote_access_percentage(output_directory_path: PathLike):
+    class StatIndex(IntEnum):
+        """Specify indices of the stats_settings list, only for this function."""
+        TOTAL_ACCESSES = 0
+        TOTAL_READS = 1
+        REMOTE_READS = 2
+        TOTAL_WRITES = 3
+        REMOTE_WRITES = 4
+        INFLIGHT_HITS = 5
+
+    stat_settings = [
+        StatSetting("num dram accesses", int),
+        StatSetting("num dram reads", int),
+        StatSetting("num remote reads", int),
+        StatSetting("num dram writes", int),
+        StatSetting("num remote writes", int),
+        StatSetting("num inflight hits", int),
+    ]
+
+    passed_over_directories = []
+    for filename in natsort.os_sorted(os.listdir(output_directory_path)):
+        filename_path = os.path.join(output_directory_path, filename)
+        if os.path.isdir(filename_path) and "output_files" in filename:
+            # Now in an experiment output folder
+            # y_values, _ = get_stats_from_files(output_directory_path, stat_settings=stat_settings)
+
+            # Only need to get the baseline pq=0, compression=off file.
+            # SPECIFY THE RUN NUMBER BELOW:
+            file_num = 3
+            out_file_path = os.path.join(filename_path, "{}_sim.out".format(file_num))
+            # Read all the output files, starting from 1 and going up
+            if not os.path.isfile(out_file_path):
+                passed_over_directories.append(filename)
+                continue
+            y_value_line_nos = [None for _ in range(len(stat_settings))]
+            stat_values = [None for _ in range(len(stat_settings))]
+            with open(out_file_path, "r") as out_file:
+                out_file_lines = out_file.readlines()
+                if len(out_file_lines) == 0:
+                    # The file is empty...
+                    passed_over_directories.append(filename)
+                    continue
+                # Get line numbers of relevant lines
+                for line_no, line in enumerate(out_file_lines):
+                    for index, stat_setting in enumerate(stat_settings):
+                        if line.strip().startswith(stat_setting.line_beginning):
+                            y_value_line_nos[index] = line_no
+                            stat_values[index] = (stat_setting.format_func(line.split()[-1])
+                                if line.split()[-1] != "|"
+                                else np.nan
+                            )  # The last entry of the line
+                if None in y_value_line_nos:
+                    error_strs = []
+                    for index, value in enumerate(y_value_line_nos):
+                        if value is None:
+                            error_strs.append(
+                                "Error: didn't find desired line starting with '{}' in .out file".format(
+                                    stat_settings[index].line_beginning
+                                )
+                            )
+                    # raise ValueError("\n".join(error_strs))
+                    print("\n".join(error_strs))
+
+            print(stat_values)
+
+            remote_reads_plus_writes = stat_values[StatIndex.REMOTE_READS] + stat_values[StatIndex.REMOTE_WRITES]
+            # Count an inflight hit as this amount of remote accesses, since inflight hits
+            # have an access latency between remote accesses and pure local dram accesses
+            inflight_hit_remote_access_fraction = 0.5
+            remote_accesses_including_inflight_hits = remote_reads_plus_writes + inflight_hit_remote_access_fraction * stat_values[StatIndex.INFLIGHT_HITS]
+            print("{}:".format(filename))
+            print("% reads remote (out of {}), % accesses remote (out of {}), % accesses remote (inflight hits counting as 0.5)".format(
+                stat_values[StatIndex.TOTAL_READS],
+                stat_values[StatIndex.TOTAL_ACCESSES],
+            ))
+            print("{:.2f}, {:.2f}, {:.2f}".format(
+                100 * stat_values[StatIndex.REMOTE_READS] / stat_values[StatIndex.TOTAL_READS],
+                100 * remote_reads_plus_writes / stat_values[StatIndex.TOTAL_ACCESSES],
+                100 * remote_accesses_including_inflight_hits / stat_values[StatIndex.TOTAL_ACCESSES],
+            ))
+            print()
+
+    if len(passed_over_directories) > 0:
+        print("\nPassed over {} directories:".format(len(passed_over_directories)))
+        for dirname in passed_over_directories:
+            print("  {}".format(dirname))
+
+
+def print_all_remote_access_percentages(output_directory_path: PathLike):
+    passed_over_directories = []
+    for filename in natsort.os_sorted(os.listdir(output_directory_path)):
+        filename_path = os.path.join(output_directory_path, filename)
+        if not os.path.isdir(filename_path):
+            continue
+        if filename.startswith("experimentrun") and "test" not in filename.lower():
+            print_remote_access_percentage(filename_path)
+        else:
+            passed_over_directories.append(filename)
+    if len(passed_over_directories) > 0:
+        print("\nPassed over {} directories:".format(len(passed_over_directories)))
+        for dirname in passed_over_directories:
+            print("  {}".format(dirname))
+
+
 if __name__ == "__main__":
     output_directory_path = "."
 
-    process_and_graph_experiment_series(output_directory_path, get_output_from_temp_folders=True, graph_experiment_folders=True, graphing_function=custom_graphing_function)
+    # process_and_graph_experiment_series(output_directory_path, get_output_from_temp_folders=True, graph_experiment_folders=True, graphing_function=custom_graphing_function)
     
     # delete_experiment_run_temp_folders(output_directory_path)
 
     # process_and_graph_experiment_series(output_directory_path, get_output_from_temp_folders=False, graph_experiment_folders=True, graphing_function=custom_graphing_function)
 
     # process_and_graph_experiment_series(output_directory_path, get_output_from_temp_folders=False, graph_experiment_folders=False)
+
+    print_all_remote_access_percentages(output_directory_path)
