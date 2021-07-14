@@ -385,10 +385,10 @@ def gen_settings_for_graph(benchmark_name):
         benchmark_list.append("ligra_{}_".format("bfs"))
         local_dram_list = ["4MB"]
         bw_scalefactor_list = [4, 16]
-    elif benchmark_name == "ligra_reg":
-        res_name = "ligra_reg_16MB_combo"
+    elif benchmark_name == "triangle_reg":
+        res_name = "triangle_reg_16MB_combo"
         benchmark_list = []
-        benchmark_list.append("ligra_{}_".format("ligra"))
+        benchmark_list.append("ligra_{}_".format("triangle"))
         local_dram_list = ["16MB"]
         bw_scalefactor_list = [4, 16]
     elif benchmark_name == "tinynet":
@@ -449,5 +449,5 @@ experiments = []
 #     print(log_str, file=log_file)
 
 # TODO: Generate graph
-# res_name, benchmark_list, local_dram_list, bw_scalefactor_list = gen_settings_for_graph("bfs_reg")
-# graph(res_name, benchmark_list, local_dram_list, bw_scalefactor_list)
+res_name, benchmark_list, local_dram_list, bw_scalefactor_list = gen_settings_for_graph("triangle_reg")
+graph(res_name, benchmark_list, local_dram_list, bw_scalefactor_list)
