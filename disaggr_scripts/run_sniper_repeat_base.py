@@ -298,6 +298,7 @@ class Experiment:
         )
 
         self.start_time = time.time()
+        self._experiment_runs = []
         for experiment_no, config_collection in enumerate(self.experiment_run_configs):
             # Generate ExperimentRun objects
             obj = ExperimentRun(
