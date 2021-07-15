@@ -581,11 +581,14 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         t_now += compression_latency;
     }
 
+    SubsecondTime t_cacheline_request = t_now;
     SubsecondTime datamovement_queue_delay;
     if (m_r_partition_queues == 1) {
-        datamovement_queue_delay = m_data_movement_2->computeQueueDelayTrackBytes(t_now, m_r_part2_bandwidth.getRoundedLatency(8*size), size, requester);
+        // datamovement_queue_delay = m_data_movement_2->computeQueueDelayTrackBytes(t_cacheline_request, m_r_part2_bandwidth.getRoundedLatency(8*size), size, requester);
+        // Use computeQueueDelayNoEffect here, in case need we don't separately get the cacheline through the cacheline queue (in that case, only move the page through the page queue)
+        datamovement_queue_delay = m_data_movement_2->computeQueueDelayNoEffect(t_cacheline_request, m_r_part2_bandwidth.getRoundedLatency(8*size), requester);
     } else {
-        datamovement_queue_delay = m_data_movement->computeQueueDelayTrackBytes(t_now, m_r_bus_bandwidth.getRoundedLatency(8*size), size, requester);
+        datamovement_queue_delay = m_data_movement->computeQueueDelayTrackBytes(t_cacheline_request, m_r_bus_bandwidth.getRoundedLatency(8*size), size, requester);
     }
 
     // TODO: Currently model decompression by adding decompression latency to inflight page time
@@ -725,18 +728,8 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
                 ++m_redundant_moves_type1;
 
                 page_datamovement_queue_delay = m_data_movement->computeQueueDelayTrackBytes(t_now, m_r_part_bandwidth.getRoundedLatency(8*page_size), page_size, requester);
-
-                // Approximation of time savings:
-                SubsecondTime alternative_page_delay = m_data_movement->computeQueueDelayNoEffect(t_now, m_r_bus_bandwidth.getRoundedLatency(8*page_size), requester);
-                if (alternative_page_delay > datamovement_queue_delay) {
-                    m_redundant_moves_type1_time_savings += (alternative_page_delay - datamovement_queue_delay);
-                    // LOG_PRINT("partition_queue=1 resulted in savings of APPROX %lu ns in getAccessLatencyRemote", (alternative_page_delay - datamovement_queue_delay).getNS());
-                } else {
-                    m_redundant_moves_type1_time_savings -= (datamovement_queue_delay - alternative_page_delay);
-                    ++m_redundant_moves_type1_cache_slower_than_page;
-                    // LOG_PRINT("partition_queue=1 resulted in INCREASE of APPROX %lu ns in getAccessLatencyRemote", (datamovement_queue_delay - alternative_page_delay).getNS());
-                }
             } else {
+                // Default is requesting the whole page at once, so remove time of cacheline request
                 page_datamovement_queue_delay = m_data_movement->computeQueueDelayTrackBytes(t_now, m_r_bus_bandwidth.getRoundedLatency(8*page_size), page_size, requester);
                 t_now += page_datamovement_queue_delay;
                 t_now -= datamovement_queue_delay;
@@ -748,6 +741,25 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
                 SubsecondTime decompression_latency = m_compression_model->decompress(phys_page, address_to_num_cache_lines[phys_page], m_core_id);
                 page_datamovement_queue_delay += decompression_latency;
                 m_total_decompression_latency += decompression_latency;
+            }
+
+            if (m_r_partition_queues == 1) {
+                if (page_datamovement_queue_delay < datamovement_queue_delay) {
+                    // If the page arrival time via the page queue is faster than the cacheline via the cacheline queue, use the page queue arrival time
+                    // (and the cacheline request is not sent)
+                    t_now += page_datamovement_queue_delay;
+                    t_now -= datamovement_queue_delay;
+                    m_redundant_moves_type1_time_savings -= (datamovement_queue_delay - page_datamovement_queue_delay);
+                    ++m_redundant_moves_type1_cache_slower_than_page;
+                    // LOG_PRINT("partition_queue=1 resulted in INCREASE of APPROX %lu ns in getAccessLatencyRemote", (datamovement_queue_delay - alternative_page_delay).getNS());
+                } else {
+                    // Actually put the cacheline request on the cacheline queue, since after checking the page arrival time we're sure we actually use the cacheline request
+                    t_now -= datamovement_queue_delay;
+                    datamovement_queue_delay = m_data_movement_2->computeQueueDelayTrackBytes(t_cacheline_request, m_r_part2_bandwidth.getRoundedLatency(8*size), size, requester);
+                    t_now += datamovement_queue_delay;
+                    m_redundant_moves_type1_time_savings += (page_datamovement_queue_delay - datamovement_queue_delay);
+                    // LOG_PRINT("partition_queue=1 resulted in savings of APPROX %lu ns in getAccessLatencyRemote", (alternative_page_delay - datamovement_queue_delay).getNS());
+                }
             }
         }
         else
@@ -767,6 +779,12 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         m_inflight_redundant[phys_page] = 0; 
         if(m_inflight_pages.size() > m_max_bufferspace)
             m_max_bufferspace++; 
+    } else if (m_r_partition_queues == 1) {  // move_page == false
+        // Actually put the cacheline request on the queue, since after checking move_page we're sure we actually use the cacheline request
+        // In the m_r_partition_queues == 0 case, the cacheline request was already added to the queue
+        t_now -= datamovement_queue_delay;
+        datamovement_queue_delay = m_data_movement_2->computeQueueDelayTrackBytes(t_cacheline_request, m_r_part2_bandwidth.getRoundedLatency(8*size), size, requester);
+        t_now += datamovement_queue_delay;
     } 
 
     if(move_page) { //Check if there's place in local DRAM and if not evict an older page to make space
