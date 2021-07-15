@@ -4,6 +4,7 @@
 #include "dram_perf_model.h"
 #include "queue_model.h"
 #include "compression_model.h"
+#include "prefetcher_model.h"
 #include "fixed_types.h"
 #include "subsecond_time.h"
 #include "dram_cntlr_interface.h"
@@ -70,7 +71,6 @@ class DramPerfModelDisagg : public DramPerfModel
         const bool m_r_simulate_sw_pagereclaim_overhead; // Simulate tlb overhead
         const bool m_r_exclusive_cache; // Simulate tlb overhead
         const bool m_remote_init; // All pages are initially allocated to remote memory
-        const bool m_r_enable_nl_prefetcher; // Enable prefetcher to prefetch pages from remote DRAM to local DRAM
         const UInt32 m_r_disturbance_factor; // Other systems using the remote memory and creating disturbance
         const bool m_r_dontevictdirty; // Do not evict dirty data
         const bool m_r_enable_selective_moves; 
@@ -135,6 +135,11 @@ class DramPerfModelDisagg : public DramPerfModel
         std::map<IntPtr, UInt32> address_to_compressed_size;
         std::map<IntPtr, UInt32> address_to_num_cache_lines;
 
+
+        // Prefetcher
+        bool m_r_enable_nl_prefetcher; // Enable prefetcher to prefetch pages from remote DRAM to local DRAM
+        PrefetcherModel *m_prefetcher_model;
+
         // Variables to keep track of stats
         UInt64 m_dram_page_hits;
         UInt64 m_dram_page_empty;
@@ -145,7 +150,9 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_remote_reads;
         UInt64 m_remote_writes;
         UInt64 m_page_moves;
-        UInt64 m_page_prefetches;
+        UInt64 m_page_prefetches;                                 // number of successful prefetches
+        UInt64 m_prefetch_page_not_done_datamovement_queue_full;  // number of times prefetching was not done due to the queue for moving pages having full utilization
+        UInt64 m_prefetch_page_not_done_page_local_already;       // number of times prefetching was not done due to the page to prefetch not being in remote memory (ie already in local memory)
         UInt64 m_inflight_hits;
         UInt64 m_writeback_pages;
         UInt64 m_local_evictions;
