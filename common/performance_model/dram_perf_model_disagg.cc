@@ -592,14 +592,15 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     }
 
     SubsecondTime t_cacheline_request = t_now;
-    SubsecondTime datamovement_queue_delay;
+    SubsecondTime cacheline_delay;
     if (m_r_partition_queues == 1) {
         // datamovement_queue_delay = m_data_movement_2->computeQueueDelayTrackBytes(t_cacheline_request, m_r_part2_bandwidth.getRoundedLatency(8*size), size, requester);
         // Use computeQueueDelayNoEffect here, in case need we don't separately get the cacheline through the cacheline queue (in that case, only move the page through the page queue)
-        datamovement_queue_delay = m_data_movement_2->computeQueueDelayNoEffect(t_cacheline_request, m_r_part2_bandwidth.getRoundedLatency(8*size), requester);
+        cacheline_delay = m_data_movement_2->computeQueueDelayNoEffect(t_cacheline_request, m_r_part2_bandwidth.getRoundedLatency(8*size), requester);
     } else {
-        datamovement_queue_delay = m_data_movement->computeQueueDelayTrackBytes(t_cacheline_request, m_r_bus_bandwidth.getRoundedLatency(8*size), size, requester);
+        cacheline_delay = m_data_movement->computeQueueDelayNoEffect(t_cacheline_request, m_r_bus_bandwidth.getRoundedLatency(8*size), requester);
     }
+    SubsecondTime datamovement_queue_delay = cacheline_delay;
 
     // TODO: Currently model decompression by adding decompression latency to inflight page time
     if (m_use_compression && m_r_cacheline_gran)
@@ -702,7 +703,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     }
     if (m_r_mode != 4 && !m_r_enable_selective_moves) {
         t_now += datamovement_queue_delay;
-    } 
+    }
 
     perf->updateTime(t_now, ShmemPerf::DRAM_BUS);
 
@@ -789,12 +790,19 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         m_inflight_redundant[phys_page] = 0; 
         if (m_inflight_pages.size() > m_max_bufferspace)
             m_max_bufferspace++; 
-    } else if (m_r_partition_queues == 1) {  // move_page == false
+    } else {  // move_page == false
         // Actually put the cacheline request on the queue, since after checking move_page we're sure we actually use the cacheline request
-        // In the m_r_partition_queues == 0 case, the cacheline request was already added to the queue
-        t_now -= datamovement_queue_delay;
-        datamovement_queue_delay = m_data_movement_2->computeQueueDelayTrackBytes(t_cacheline_request, m_r_part2_bandwidth.getRoundedLatency(8*size), size, requester);
-        t_now += datamovement_queue_delay;
+        // This actual cacheline request probably has a similar delay value as the earlier computeQueueDelayNoEffect value, but do this for accuracy
+        if (m_r_partition_queues == 1) {
+            t_now -= cacheline_delay;
+            cacheline_delay = m_data_movement_2->computeQueueDelayTrackBytes(t_cacheline_request, m_r_part2_bandwidth.getRoundedLatency(8*size), size, requester);
+            t_now += cacheline_delay;
+        } else {
+            // partition queues off, but move_page = false so move the cacheline
+            t_now -= cacheline_delay;
+            cacheline_delay = m_data_movement->computeQueueDelayTrackBytes(t_cacheline_request, m_r_bus_bandwidth.getRoundedLatency(8*size), size, requester);
+            t_now += cacheline_delay;
+        }
     } 
 
     if (move_page) { // Check if there's place in local DRAM and if not evict an older page to make space
