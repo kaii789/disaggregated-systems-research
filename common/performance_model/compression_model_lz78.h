@@ -2,6 +2,10 @@
 #define __COMPRESSION_MODEL_LZ78_H__
 
 #include "compression_model.h"
+#include <string>
+#include <map>
+
+using namespace std;
 
 class CompressionModelLZ78 : public CompressionModel
 {
@@ -23,16 +27,25 @@ private:
     char *m_data_buffer;
     char *m_compressed_data_buffer;
     UInt32 m_cacheline_count;
-
-    // Compression latency per CAM access
-    UInt32 m_compression_latency = 3;
-    // Decompression latency per CAM access
-    UInt32 m_decompression_latency = 3;
-
-    UInt32 m_compression_granularity; 
-
     char *multipage_data_buffer;
     char *multipage_compressed_buffer;
+
+    // Compression latency per CAM access
+    UInt32 m_compression_latency = 0;
+    // Decompression latency per CAM access
+    UInt32 m_decompression_latency = 0;
+    // Fine-grain compression granularity within the page
+    UInt8 m_word_size = 1;
+
+    UInt32 m_compression_granularity; 
+    UInt8 m_cam_size = 256;
+    UInt8 m_cam_size_log2 = 8;
+    
+    std::map<string, UInt32> compression_CAM; 
+
+    SInt64 readWord(void*, UInt32, UInt32);
+    void writeWord(void*, UInt32, SInt64, UInt32);
+    UInt32 compressData(void *, void *, UInt32, UInt32 *);
 };
 
 #endif /* __COMPRESSION_MODEL_LZ78_H__ */
