@@ -836,7 +836,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         m_moved_pages_no_access_yet.push_back(phys_page);
 
         m_inflight_pages.erase(phys_page);
-        m_inflight_pages[phys_page] = SubsecondTime::max(Sim()->getClockSkewMinimizationServer()->getGlobalTime(), t_now) + page_compression_latency + page_datamovement_queue_delay;
+        m_inflight_pages[phys_page] = SubsecondTime::max(Sim()->getClockSkewMinimizationServer()->getGlobalTime(), t_now);  // t_now already contains the page compression and datamovment latencies
         m_inflight_redundant[phys_page] = 0; 
         if (m_inflight_pages.size() > m_max_bufferspace)
             m_max_bufferspace++; 
