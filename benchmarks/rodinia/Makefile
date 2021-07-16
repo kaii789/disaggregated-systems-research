@@ -4,6 +4,8 @@ RODINIA_BASE_DIR := $(shell pwd)
 
 OMP_BIN_DIR := $(RODINIA_BASE_DIR)/bin
 
+OMP_BASE_DIR := $(RODINIA_BASE_DIR)/openmp
+
 OMP_DIRS  := backprop bfs cfd heartwall hotspot kmeans lavaMD leukocyte lud nn nw srad streamcluster particlefilter pathfinder
 
 all: OMP 
@@ -29,4 +31,7 @@ OMP:
 clean: OMP_clean 
 
 OMP_clean:
-	cd $(OMP_BIN_DIR); rm ./*
+	cd $(OMP_BIN_DIR); rm -f ./*;
+	for dir in $(OMP_DIRS); do \
+		$(MAKE) clean -C $(OMP_BASE_DIR)/$$dir; \
+	done
