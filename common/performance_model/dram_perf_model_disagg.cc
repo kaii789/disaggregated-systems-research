@@ -390,6 +390,57 @@ DramPerfModelDisagg::~DramPerfModelDisagg()
 
     std::cout << "CDF X values (throttled page accesses aggregated by phys_page):\n" << cdf_buffer_page_aggregated_counts.str() << std::endl;
     std::cout << "CDF Y values (probability):\n" << percentages_buffer_2.str() << std::endl;
+
+
+    // // Print stats for m_page_usage_map (total # cacheline accesses by phys_page)
+    // // Generate counts vector
+    // std::vector<std::pair<UInt32, UInt64>> page_usage_counts;  // first is access count, second is the phys_page
+    // for (std::map<UInt64, UInt32>::iterator it = m_page_usage_map.begin(); it != m_page_usage_map.end(); ++it) {
+    //     page_usage_counts.push_back(std::pair<UInt32, UInt64>(it->second, it->first));
+    // }
+    // std::sort(page_usage_counts.begin(), page_usage_counts.end());  // sort by access count
+
+    // // Compute phys_page access count percentiles for output
+    // std::cout << "m_page_usage_map page total access counts:" << std::endl;
+    // num_bins = 40;  // the total number of points is 1 more than num_bins, since it includes the endpoints
+    // std::map<double, UInt32> page_usage_counts_percentiles;
+    // for (UInt32 bin = 0; bin < num_bins; ++bin) {
+    //    percentage = (double)bin / num_bins;
+    //    index = (UInt64)(percentage * (page_usage_counts.size() - 1));  // -1 so array indices don't go out of bounds
+    //    percentile = page_usage_counts[index].first;
+    //    std::cout << "percentage: " << percentage << ", vector index: " << index << ", percentile: " << percentile << std::endl;
+    //    page_usage_counts_percentiles.insert(std::pair<double, UInt32>(percentage, percentile));
+    // }
+    // // Add the maximum
+    // percentage = 1.0;
+    // percentile = page_usage_counts[page_usage_counts.size() - 1].first;
+    // std::cout << "percentage: " << percentage << ", vector index: " << page_usage_counts.size() - 1 << ", percentile: " << percentile << std::endl;
+    // page_usage_counts_percentiles.insert(std::pair<double, UInt32>(percentage, percentile));
+    // // Print output in format that can easily be graphed in Python
+    // std::ostringstream percentages_buffer_3;
+    // std::ostringstream cdf_buffer_page_usage_counts;
+    // percentages_buffer_3 << "[";
+    // cdf_buffer_page_usage_counts << "[";
+    // for (std::map<double, UInt32>::iterator it = page_usage_counts_percentiles.begin(); it != page_usage_counts_percentiles.end(); ++it) {
+    //    percentages_buffer_3 << it->first << ", ";
+    //    cdf_buffer_page_usage_counts << it->second << ", ";
+    // }
+    // percentages_buffer_3 << "]";
+    // cdf_buffer_page_usage_counts << "]";
+
+    // std::cout << "CDF X values (phys_page total access counts):\n" << cdf_buffer_page_usage_counts.str() << std::endl;
+    // std::cout << "CDF Y values (probability):\n" << percentages_buffer_3.str() << std::endl;
+
+    // // Print the least accessed phys_pages
+    // std::ostringstream least_accessed_phys_pages_buffer;
+    // least_accessed_phys_pages_buffer << "{ ";
+    // std::vector<std::pair<UInt32, UInt64>>::iterator it = page_usage_counts.begin();
+    // for (UInt64 i = 0; i < page_usage_counts.size() / 3; ++i) {
+    //     least_accessed_phys_pages_buffer << it->second << ", ";
+    //     ++it;
+    // }
+    // least_accessed_phys_pages_buffer << " }";
+    // std::cout << "Least accessed phys_pages:\n" << least_accessed_phys_pages_buffer.str() << std::endl;
 }
 
 UInt64
