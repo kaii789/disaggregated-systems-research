@@ -159,7 +159,7 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_extra_pages;
         UInt64 m_redundant_moves;                   // number of times both a cacheline and its containing page are requested together
         UInt64 m_redundant_moves_type1;
-        UInt64 m_redundant_moves_type1_cache_slower_than_page;
+        UInt64 partition_queues_cacheline_slower_than_page;  // with the new change, these situations no longer result in redundant moves
         UInt64 m_redundant_moves_type2;
         UInt64 m_cacheline_queue_request_cancelled; // number of times a cacheline queue request is cancelled (currently, due to m_r_limit_redundant_moves)
         UInt64 m_max_bufferspace;                   // the maximum number of localdram pages actually used to back inflight and inflight_evicted pages 
