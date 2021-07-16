@@ -570,7 +570,7 @@ class ExperimentManager:
                             process_info[index].log_file.close()
                             process_info[index].log_file = None
 
-                            time.sleep(5)  # give a bit of time for things to settle in
+                            time.sleep(2)  # give a bit of time for things to settle in
 
                 # Process experiments that have all runs completed
                 i = 0

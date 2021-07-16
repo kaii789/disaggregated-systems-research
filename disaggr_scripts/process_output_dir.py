@@ -168,7 +168,8 @@ def get_stats_from_files(
             else:
                 # Read the lines of pertinant information
                 for index in range(len(y_values)):
-                    if y_value_line_nos[index] is None or not out_file_lines[y_value_line_nos[index]].strip().startswith(stat_settings[index].line_beginning):
+                    if y_value_line_nos[index] is None \
+                            or not out_file_lines[y_value_line_nos[index]].strip().startswith(stat_settings[index].line_beginning):
                         # Couldn't find the line where it was in the previous file, try looking again for the line in this file
                         y_value_line_nos[index] = None
                         for line_no, line in enumerate(out_file_lines):
@@ -225,7 +226,8 @@ def get_and_print_stats(
     output_directory_path: PathLike,
     log_file: Optional[TextIO] = None,
     stat_settings: Optional[List[StatSetting]] = None,
-    print_to_terminal: Optional[bool] = True,
+    print_to_terminal: bool = True,
+    first_experiment_no: int = 1,
 ):
     """Run this script in an experiment folder, ie the containing folder of
     numbered Sniper config and output files.
@@ -234,6 +236,7 @@ def get_and_print_stats(
         output_directory_path,
         log_file=log_file,
         stat_settings=stat_settings,
+        first_experiment_no=first_experiment_no
     )
 
     print_stats(
@@ -264,6 +267,7 @@ def process_and_graph_experiment_series(
     get_output_from_temp_folders: bool = True,
     graph_experiment_folders: bool = True,
     graphing_function: Optional[Callable[[str, Optional[TextIO]], bool]] = None,
+    first_experiment_no: int = 1,
 ):
     """Run this script in the directory containing experiment folders, ie the
     containing folder of the run.py file.
@@ -296,6 +300,7 @@ def process_and_graph_experiment_series(
                     filename_path,
                     print_to_terminal=False,
                     log_file=log_file,
+                    first_experiment_no=first_experiment_no,
                     stat_settings=[
                         StatSetting("IPC", float),
                         StatSetting(
@@ -522,4 +527,5 @@ if __name__ == "__main__":
 
     # process_and_graph_experiment_series(output_directory_path, get_output_from_temp_folders=False, graph_experiment_folders=False)
 
+    # print_remote_access_percentage(output_directory_path)
     print_all_remote_access_percentages(output_directory_path)

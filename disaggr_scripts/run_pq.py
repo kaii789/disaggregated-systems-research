@@ -83,6 +83,37 @@ if __name__ == "__main__":
         "regular_input_sym": "rMat_1000000sym",
     }
 
+    def input_file_checker(experiments: List[Experiment]):
+        # Temporary function
+        # Assumes the cwd is this file's containing directory
+        input_to_file_path = {"roadnetPA": "{sniper_root}/test/crono/inputs/roadNet-PA.mtx".format(sniper_root=subfolder_sniper_root_relpath),
+                              "roadnetCA": "{sniper_root}/test/crono/inputs/roadNet-CA.mtx".format(sniper_root=subfolder_sniper_root_relpath),
+                              "bcsstk32": "{sniper_root}/test/crono/inputs/bcsstk32.mtx".format(sniper_root=subfolder_sniper_root_relpath),
+                            #   "small_input": "{0}/inputs/{1}".format(ligra_home, ligra_input_to_file["small_input"]),
+                              "reg_8x": "{0}/inputs/{1}".format(ligra_home, ligra_input_to_file["reg_8x"]),
+                              "reg_10x": "{0}/inputs/{1}".format(ligra_home, ligra_input_to_file["reg_10x"]),
+                              "regular_input_sym": "{0}/inputs/{1}".format(ligra_home, ligra_input_to_file["regular_input_sym"]),
+                              "ligra": "{0}/inputs/{1}".format(ligra_home, ligra_input_to_file["regular_input"]),
+                              "darknet_tiny": "{0}/{1}.weights".format(darknet_home, "tiny"),
+                              "darknet_darknet19": "{0}/{1}.weights".format(darknet_home, "darknet19"),
+                              "darknet_resnet50": "{0}/{1}.weights".format(darknet_home, "resnet50"),
+                              "darknet_vgg16": "{0}/{1}.weights".format(darknet_home, "vgg-16"),
+                             }
+        input_missing = False
+        for experiment in experiments:
+            found = False
+            for key in input_to_file_path.keys():
+                if key.lower() in experiment.experiment_name.lower():
+                    found = True
+                    if not os.path.exists(os.path.relpath(input_to_file_path[key], start="../..")):
+                        print("Error: couldn't find input {} at {}".format(key, os.path.relpath(input_to_file_path[key], start="../..")))
+                        input_missing = True
+                    break
+            if not found:
+                print("{} didn't match any of the input file patterns".format(experiment.experiment_name))
+        if input_missing:
+            raise FileNotFoundError()
+
 
     bandwidth_verification_configs = [
         # 1) test_bandwidth = 0, pq = 0
@@ -505,20 +536,20 @@ if __name__ == "__main__":
     experiments = []
 
 
-    # BFS, reg_8x, 64 & 32 MB, 2 Billion instructions cap
+    # BFS, reg_8x, 1 Billion instructions cap
     bfs_reg_8x_pq_experiments = []
     ligra_input_selection = "reg_8x"  # "regular_input" OR "small_input"
     ligra_input_file = ligra_input_to_file[ligra_input_selection]
     application_name = "BFS"
     net_lat = 120
-    for num_MB in [64, 32]:
+    for num_MB in [8, 12, 16]:
         for bw_scalefactor in [4]:
             localdram_size_str = "{}MB".format(num_MB)
-            command_str = ligra_base_str_options_nonsym.format(
+            command_str = ligra_base_str_options_sym.format(
                 application_name,
                 ligra_input_file,
                 sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
-                    int(num_MB * ONE_MB_TO_BYTES), int(net_lat), int(bw_scalefactor), int(2 * ONE_BILLION)
+                    int(num_MB * ONE_MB_TO_BYTES), int(net_lat), int(bw_scalefactor), int(1 * ONE_BILLION)
                 ),
             )
 
@@ -535,9 +566,9 @@ if __name__ == "__main__":
                     ),
                     command_str=command_str,
                     experiment_run_configs=[
-                        pq_cacheline_combined_rmode1_configs[4],
+                        pq_cacheline_combined_rmode1_configs[2],
                         pq_cacheline_combined_rmode1_configs[-3],
-                    ],  # pq=0 + pq=1 w/ 0.5 cacheline
+                    ],  # pq=0 + pq=1 w/ 0.2 cacheline
                     output_root_directory=".",
                 )
             )
@@ -2330,6 +2361,7 @@ if __name__ == "__main__":
             output_root_directory=".", max_concurrent_processes=36, log_file=log_file
         )
         experiment_manager.add_experiments(experiments)
+        input_file_checker(experiments)
         experiment_manager.start(
             manager_sleep_interval_seconds=60,
             timezone=timezone,
