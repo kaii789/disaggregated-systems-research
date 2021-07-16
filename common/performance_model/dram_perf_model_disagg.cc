@@ -92,6 +92,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_page_prefetches     (0)
     , m_prefetch_page_not_done_datamovement_queue_full(0)
     , m_prefetch_page_not_done_page_local_already(0)
+    , m_prefetch_page_not_done_page_not_initialized(0)
     , m_inflight_hits       (0)
     , m_writeback_pages     (0)
     , m_local_evictions     (0)
@@ -193,6 +194,8 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     // Prefetcher
     m_r_enable_nl_prefetcher = Sim()->getCfg()->getBool("perf_model/dram/enable_remote_prefetcher");  // Enable prefetcher to prefetch pages from remote DRAM to local DRAM
     if (m_r_enable_nl_prefetcher) {
+        m_prefetch_unencountered_pages =  Sim()->getCfg()->getBool("perf_model/dram/prefetcher_model/prefetch_unencountered_pages");
+
         // Type of prefetcher checked in PrefetcherModel, additional configs for specific prefetcher types are read there
         m_prefetcher_model = PrefetcherModel::createPrefetcherModel(m_page_size);
     }
@@ -227,6 +230,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     registerStatsMetric("dram", core_id, "page-prefetches", &m_page_prefetches);
     registerStatsMetric("dram", core_id, "queue-full-page-prefetch-not-done", &m_prefetch_page_not_done_datamovement_queue_full);
     registerStatsMetric("dram", core_id, "page-local-already-page-prefetch-not-done", &m_prefetch_page_not_done_page_local_already);
+    registerStatsMetric("dram", core_id, "page-not-initialized-page-prefetch-not-done", &m_prefetch_page_not_done_page_not_initialized);
     registerStatsMetric("dram", core_id, "unique-pages-accessed", &m_unique_pages_accessed);
     registerStatsMetric("dram", core_id, "cacheline-queue-request-cancelled", &m_cacheline_queue_request_cancelled);
 
@@ -1130,7 +1134,7 @@ DramPerfModelDisagg::isRemoteAccess(IntPtr address, core_id_t requester, DramCnt
                 m_dirty_pages.push_back(phys_page);
             }
             return false;
-        } 
+        }
         else if (std::find(m_remote_pages.begin(), m_remote_pages.end(), phys_page) != m_remote_pages.end()) {	
             // printf("Remote page found: %lx\n", phys_page);
             if (m_use_throttled_pages_tracker && m_use_ideal_page_throttling && m_throttled_pages_tracker.count(phys_page)) {
@@ -1350,26 +1354,34 @@ DramPerfModelDisagg::possiblyPrefetch(UInt64 phys_page, SubsecondTime t_now, cor
             continue;  // could return here, but continue the loop to update stats for when prefetching was not done
         }
         UInt64 pref_page = *it;
-        if (std::find(m_local_pages.begin(), m_local_pages.end(), pref_page) == m_local_pages.end() && std::find(m_remote_pages.begin(), m_remote_pages.end(), pref_page) != m_remote_pages.end()) {
-        // pref_page is not in local_pages but in remote_pages, can prefetch
-            ++m_page_prefetches;
-            ++m_page_moves;
-            SubsecondTime page_datamovement_queue_delay = SubsecondTime::Zero();
-            if (m_r_simulate_datamov_overhead) { 
-                page_datamovement_queue_delay = m_data_movement->computeQueueDelayTrackBytes(t_now, m_r_bus_bandwidth.getRoundedLatency(8*m_page_size), m_page_size, requester);
-            } 
-
-            assert(std::find(m_local_pages.begin(), m_local_pages.end(), pref_page) == m_local_pages.end()); 
-            assert(std::find(m_remote_pages.begin(), m_remote_pages.end(), pref_page) != m_remote_pages.end()); 
-            m_local_pages.push_back(pref_page);
-            m_local_pages_remote_origin[pref_page] = 1;
-            if (m_r_exclusive_cache)
-                m_remote_pages.remove(pref_page);
-            m_inflight_pages.erase(pref_page);
-            m_inflight_pages[pref_page] = t_now + page_datamovement_queue_delay;
-            possiblyEvict(phys_page, t_now, requester);
-        } else {
-            ++m_prefetch_page_not_done_page_local_already;
+        if (std::find(m_local_pages.begin(), m_local_pages.end(), pref_page) != m_local_pages.end()) {
+            ++m_prefetch_page_not_done_page_local_already;  // page already in m_local_pages
+            continue;
         }
+        if (std::find(m_remote_pages.begin(), m_remote_pages.end(), pref_page) == m_remote_pages.end()) {
+            if (m_prefetch_unencountered_pages) {
+                m_remote_pages.push_back(pref_page);  // hack for this page to be prefetched
+            } else {
+                ++m_prefetch_page_not_done_page_not_initialized;  // page not in m_remote_pages, means it's uninitialized? or just not seen yet by the system?
+                continue;
+            }
+        }
+        // pref_page is not in local_pages but in remote_pages, can prefetch
+        ++m_page_prefetches;
+        ++m_page_moves;
+        SubsecondTime page_datamovement_queue_delay = SubsecondTime::Zero();
+        if (m_r_simulate_datamov_overhead) { 
+            page_datamovement_queue_delay = m_data_movement->computeQueueDelayTrackBytes(t_now, m_r_bus_bandwidth.getRoundedLatency(8*m_page_size), m_page_size, requester);
+        } 
+
+        assert(std::find(m_local_pages.begin(), m_local_pages.end(), pref_page) == m_local_pages.end()); 
+        assert(std::find(m_remote_pages.begin(), m_remote_pages.end(), pref_page) != m_remote_pages.end()); 
+        m_local_pages.push_back(pref_page);
+        m_local_pages_remote_origin[pref_page] = 1;
+        if (m_r_exclusive_cache)
+            m_remote_pages.remove(pref_page);
+        m_inflight_pages.erase(pref_page);
+        m_inflight_pages[pref_page] = t_now + page_datamovement_queue_delay;
+        possiblyEvict(phys_page, t_now, requester);
     }
 }

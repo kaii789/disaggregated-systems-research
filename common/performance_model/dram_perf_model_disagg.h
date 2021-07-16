@@ -137,8 +137,9 @@ class DramPerfModelDisagg : public DramPerfModel
 
 
         // Prefetcher
-        bool m_r_enable_nl_prefetcher; // Enable prefetcher to prefetch pages from remote DRAM to local DRAM
+        bool m_r_enable_nl_prefetcher;            // Enable prefetcher to prefetch pages from remote DRAM to local DRAM
         PrefetcherModel *m_prefetcher_model;
+        bool m_prefetch_unencountered_pages;      // Whether to prefetch pages that haven't been encountered yet in program execution
 
         // Variables to keep track of stats
         UInt64 m_dram_page_hits;
@@ -151,8 +152,9 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_remote_writes;
         UInt64 m_page_moves;
         UInt64 m_page_prefetches;                                 // number of successful prefetches
-        UInt64 m_prefetch_page_not_done_datamovement_queue_full;  // number of times prefetching was not done due to the queue for moving pages having full utilization
-        UInt64 m_prefetch_page_not_done_page_local_already;       // number of times prefetching was not done due to the page to prefetch not being in remote memory (ie already in local memory)
+        UInt64 m_prefetch_page_not_done_datamovement_queue_full;  // number of times a page prefetch candidate was not prefetched due to the queue for moving pages having full utilization
+        UInt64 m_prefetch_page_not_done_page_local_already;       // number of times a page prefetch candidate was not prefetched due to the page already being in local memory
+        UInt64 m_prefetch_page_not_done_page_not_initialized;     // number of times a page prefetch candidate was not prefetched due to the page not having been initialized already
         UInt64 m_inflight_hits;
         UInt64 m_writeback_pages;
         UInt64 m_local_evictions;

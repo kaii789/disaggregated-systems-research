@@ -197,6 +197,7 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     ('  num page prefetches', 'dram.page-prefetches', str),
     ('  page prefetch not done due to full queue', 'dram.queue-full-page-prefetch-not-done', str),
     ('  page prefetch not done since page local already', 'dram.page-local-already-page-prefetch-not-done', str),
+    ('  page prefetch not done since page uninitialized/not seen yet', 'dram.page-not-initialized-page-prefetch-not-done', str),
     ('  num inflight hits', 'dram.inflight-hits', str),
     ('  num writeback pages', 'dram.writeback-pages', str),
     ('  num local evictions', 'dram.local-evictions', str),
