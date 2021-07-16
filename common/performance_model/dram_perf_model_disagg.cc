@@ -195,9 +195,11 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     m_r_enable_nl_prefetcher = Sim()->getCfg()->getBool("perf_model/dram/enable_remote_prefetcher");  // Enable prefetcher to prefetch pages from remote DRAM to local DRAM
     if (m_r_enable_nl_prefetcher) {
         m_prefetch_unencountered_pages =  Sim()->getCfg()->getBool("perf_model/dram/prefetcher_model/prefetch_unencountered_pages");
+        // When using m_r_cacheline_gran, the prefetcher operates by prefetching cachelines too
+        UInt32 prefetch_granularity = m_r_cacheline_gran ? m_cache_line_size : m_page_size;
 
         // Type of prefetcher checked in PrefetcherModel, additional configs for specific prefetcher types are read there
-        m_prefetcher_model = PrefetcherModel::createPrefetcherModel(m_page_size);
+        m_prefetcher_model = PrefetcherModel::createPrefetcherModel(prefetch_granularity);
     }
 
     LOG_ASSERT_ERROR(cache_block_size == 64, "Hardcoded for 64-byte cache lines");
@@ -671,7 +673,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     t_now += ddr_processing_time;
 
     // Track access to page
-    if (m_r_cacheline_gran) 
+    if (m_r_cacheline_gran)
         phys_page =  address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1); // Was << 6
     bool move_page = false;
     if (m_r_mode == 2 || m_r_mode == 5) {  // Update m_remote_access_tracker
