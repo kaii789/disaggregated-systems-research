@@ -41,3 +41,22 @@ echo
 echo "Compiling STREAM..."
 cd ../stream
 make
+
+# Set up Crono 
+echo
+echo "Compiling Crono..."
+cd ../crono
+make
+
+
+# Set up Timeseries
+echo
+echo "Compiling Timeseries..."
+cd ../timeseries/src
+make
+
+# Set up Rodinia
+echo
+echo "Compiling Rodinia..."
+cd ../../rodinia
+make

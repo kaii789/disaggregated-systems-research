@@ -1,0 +1,5 @@
+Compress with:
+./fpc 20 < file.in > file.fpc
+
+Decompress with:
+./fpc < file.fpc > file.out

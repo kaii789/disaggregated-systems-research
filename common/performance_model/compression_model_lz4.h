@@ -12,6 +12,10 @@ public:
    SubsecondTime compress(IntPtr addr, size_t data_size, core_id_t core_id, UInt32 *compressed_page_size, UInt32 *compressed_cache_lines);
    SubsecondTime decompress(IntPtr addr, UInt32 compressed_cache_lines, core_id_t core_id);
 
+   SubsecondTime compress_multipage(std::vector<UInt64> addr_list, UInt32 num_pages, core_id_t core_id, UInt32 *compressed_multipage_size, std::map<UInt64, UInt32> *address_to_num_cache_lines);
+   SubsecondTime decompress_multipage(std::vector<UInt64> addr_list, UInt32 num_pages, core_id_t core_id, std::map<UInt64, UInt32> *address_to_num_cache_lines);
+
+
 private:
     String m_name;
     UInt32 m_page_size;
@@ -28,6 +32,8 @@ private:
     double m_freq_norm;
     UInt32 m_compression_granularity; 
 
+    char *multipage_data_buffer;
+    char *multipage_compressed_buffer;
 };
 
 #endif /* __COMPRESSION_MODEL_LZ4_H__ */

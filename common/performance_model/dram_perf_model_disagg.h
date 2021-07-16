@@ -119,6 +119,8 @@ class DramPerfModelDisagg : public DramPerfModel
         std::map<UInt64, SubsecondTime> m_inflightevicted_pages; // Inflight pages that are being transferred from local memory to remote memory
 
         std::map<UInt64, UInt32> m_page_usage_map;  // track number of times each phys page is accessed
+        const UInt32 m_page_usage_stats_num_points = 10;  // the number of percentiles (from above 0% to including 100%)
+        std::vector<UInt64> page_usage_count_stats;       // percentiles of phys_page access counts, to be registered as stats
         std::map<UInt64, UInt32> m_remote_access_tracker;  // Track remote page accesses
         std::multimap<SubsecondTime, UInt64> m_recent_remote_accesses;  // Track remote page access that are recent
 
@@ -135,6 +137,11 @@ class DramPerfModelDisagg : public DramPerfModel
         std::map<IntPtr, UInt32> address_to_compressed_size;
         std::map<IntPtr, UInt32> address_to_num_cache_lines;
 
+        bool m_use_cacheline_compression;
+        CompressionModel *m_cacheline_compression_model;
+        UInt64 cacheline_bytes_saved = 0;
+        SubsecondTime m_total_cacheline_compression_latency = SubsecondTime::Zero();
+        SubsecondTime m_total_cacheline_decompression_latency = SubsecondTime::Zero();
 
         // Prefetcher
         bool m_r_enable_nl_prefetcher;            // Enable prefetcher to prefetch pages from remote DRAM to local DRAM
@@ -190,6 +197,7 @@ class DramPerfModelDisagg : public DramPerfModel
         DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_size, AddressHomeLookup* address_home_lookup);
 
         ~DramPerfModelDisagg();
+        void finalizeStats();
 
         bool isRemoteAccess(IntPtr address, core_id_t requester, DramCntlrInterface::access_t access_type); 
         SubsecondTime getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_size, core_id_t requester, IntPtr address, DramCntlrInterface::access_t access_type, ShmemPerf *perf);

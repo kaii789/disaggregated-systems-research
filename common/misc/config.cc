@@ -37,6 +37,8 @@ bool Config::m_circular_log_enabled;
 bool Config::m_knob_enable_pinplay;
 bool Config::m_knob_enable_syscall_emulation;
 
+String Config::m_knob_caching_protocol_type;
+
 Config *Config::m_singleton;
 
 Config *Config::getSingleton()
@@ -112,6 +114,8 @@ Config::Config(SimulationMode mode)
    m_knob_enable_syscall_emulation = !m_knob_enable_pinplay && Sim()->getCfg()->getBool("general/enable_syscall_emulation");
 
    m_knob_clock_skew_minimization_scheme = ClockSkewMinimizationObject::parseScheme(Sim()->getCfg()->getString("clock_skew_minimization/scheme"));
+
+   m_knob_caching_protocol_type = Sim()->getCfg()->getString("caching_protocol/type");
 
    m_total_cores = m_knob_total_cores;
 

@@ -23,3 +23,6 @@ wget -N https://pjreddie.com/media/files/resnet50.weights
 
 # Resnet 152
 # wget -N https://pjreddie.com/media/files/resnet152.weights
+
+# Yolov3
+# wget -N https://pjreddie.com/media/files/yolov3.weights

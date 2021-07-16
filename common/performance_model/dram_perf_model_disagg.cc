@@ -80,6 +80,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_r_ideal_pagethrottle_remote_access_history_window_size   (SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/r_ideal_pagethrottle_access_history_window_size")))
     , m_banks               (m_total_banks)
     , m_r_banks               (m_total_banks)
+    , page_usage_count_stats(m_page_usage_stats_num_points, 0)
     , m_dram_page_hits           (0)
     , m_dram_page_empty          (0)
     , m_dram_page_closing        (0)
@@ -181,6 +182,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
 
     // Compression
     m_use_compression = Sim()->getCfg()->getBool("perf_model/dram/compression_model/use_compression");
+    m_use_cacheline_compression = Sim()->getCfg()->getBool("perf_model/dram/compression_model/cacheline/use_cacheline_compression");
     if (m_use_compression) {
         String compression_scheme = Sim()->getCfg()->getString("perf_model/dram/compression_model/compression_scheme");
         UInt32 gran_size = m_r_cacheline_gran ? m_cache_line_size : m_page_size;
@@ -189,6 +191,15 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
         registerStatsMetric("compression", core_id, "bytes-saved", &bytes_saved);
         registerStatsMetric("compression", core_id, "total-compression-latency", &m_total_compression_latency);
         registerStatsMetric("compression", core_id, "total-decompression-latency", &m_total_decompression_latency);
+
+        // Cacheline Compression
+        if (m_use_cacheline_compression) {
+            String cacheline_compression_scheme = Sim()->getCfg()->getString("perf_model/dram/compression_model/cacheline/compression_scheme");
+            m_cacheline_compression_model = CompressionModel::create("Cacheline Link Compression Model", m_cache_line_size, m_cache_line_size, cacheline_compression_scheme);
+            registerStatsMetric("compression", core_id, "cacheline-bytes-saved", &cacheline_bytes_saved);
+            registerStatsMetric("compression", core_id, "total-cacheline-compression-latency", &m_total_cacheline_compression_latency);
+            registerStatsMetric("compression", core_id, "total-cacheline-decompression-latency", &m_total_cacheline_decompression_latency);
+        }
     }
 
     // Prefetcher
@@ -251,6 +262,15 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
         registerStatsMetric("dram", core_id, "ideal-page-throttling-num-swaps-non-inflight", &m_ideal_page_throttling_swaps_non_inflight);
         registerStatsMetric("dram", core_id, "ideal-page-throttling-num-swap-unavailable", &m_ideal_page_throttling_swap_unavailable);
     }
+    // Register stats for page locality
+    for (UInt32 i = 0; i < m_page_usage_stats_num_points - 1; ++i) {
+        UInt32 percentile = (UInt32)(100.0 / m_page_usage_stats_num_points) * (i + 1);
+        String stat_name = "page-access-count-p";
+        stat_name += std::to_string(percentile).c_str();
+        registerStatsMetric("dram", core_id, stat_name, &(page_usage_count_stats[i]));
+    }
+    // Make sure last one is p100
+    registerStatsMetric("dram", core_id, "page-access-count-p100", &(page_usage_count_stats[m_page_usage_stats_num_points - 1]));
 }
 
 DramPerfModelDisagg::~DramPerfModelDisagg()
@@ -295,158 +315,175 @@ DramPerfModelDisagg::~DramPerfModelDisagg()
     if (m_r_partition_queues == 1) {
         delete m_data_movement_2;
     }
+}
 
-    if (!m_use_throttled_pages_tracker) {
-        return;
-    }
-    // Add values in the map at the end of program execution to m_throttled_pages_tracker_values
-    for (std::map<UInt64, std::pair<SubsecondTime, UInt32>>::iterator it = m_throttled_pages_tracker.begin(); it != m_throttled_pages_tracker.end(); ++it) {
-        // if ((it->second).second > 0)
-        m_throttled_pages_tracker_values.push_back(std::pair<UInt64, UInt32>(it->first, (it->second).second));
-    }
-    if (m_throttled_pages_tracker_values.size() < 1) {
-        return;
-    }
+void
+DramPerfModelDisagg::finalizeStats() 
+{
+    bool process_and_print_page_locality_stats = true;
+    bool process_and_print_throttled_pages_stats = true;
 
-    // Build vectors of the stats we want
-    std::cout << "dram_perf_model_disagg.cc:" << std::endl;
-    std::vector<UInt32> throttled_pages_tracker_individual_counts;  // counts for the same phys_page are separate values
-    std::map<UInt64, UInt32> throttled_pages_tracker_page_aggregated_counts_map;  // temporary variable
-    std::vector<UInt32> throttled_pages_tracker_page_aggregated_counts;  // aggregate all numbers for a particular phys_page together
-    for (std::vector<std::pair<UInt64, UInt32>>::iterator it = m_throttled_pages_tracker_values.begin(); it != m_throttled_pages_tracker_values.end(); ++it) {
-        UInt64 phys_page = it->first;
-        UInt32 count = it->second;
-
-        throttled_pages_tracker_individual_counts.push_back(count);  // update individual counts
-
-        if (!throttled_pages_tracker_page_aggregated_counts_map.count(phys_page)) {  // update aggregated counts map
-            throttled_pages_tracker_page_aggregated_counts_map[phys_page] = 0;
+    if (process_and_print_page_locality_stats && m_page_usage_map.size() > 0) {
+        // Put values in a vector and sort
+        std::vector<std::pair<UInt32, UInt64>> page_usage_counts;  // first is access count, second is the phys_page
+        for (auto it = m_page_usage_map.begin(); it != m_page_usage_map.end(); ++it) {
+            page_usage_counts.push_back(std::pair<UInt32, UInt64>(it->second, it->first));
         }
-        throttled_pages_tracker_page_aggregated_counts_map[phys_page] += count;
+        std::sort(page_usage_counts.begin(), page_usage_counts.end());  // sort by access count
+
+        // Update stats vector
+        for (UInt32 i = 0; i < m_page_usage_stats_num_points - 1; ++i) {
+            UInt64 index = (UInt64)((double)(i + 1) / m_page_usage_stats_num_points * (page_usage_counts.size() - 1));
+            page_usage_count_stats[i] = page_usage_counts[index].first;
+        }
+        // Make sure last one is p100
+        page_usage_count_stats[m_page_usage_stats_num_points - 1] = page_usage_counts[page_usage_counts.size() - 1].first;
+
+        // Compute individual_counts percentiles for output
+        UInt64 index;
+        UInt32 percentile;
+        double percentage;
+        std::cout << "dram_perf_model_disagg.cc:" << std::endl;
+        std::cout << "Page usage counts:" << std::endl;
+        UInt32 num_bins = 40;  // the total number of points is 1 more than num_bins, since it includes the endpoints
+        std::map<double, UInt32> usage_counts_percentiles;
+        for (UInt32 bin = 0; bin < num_bins; ++bin) {
+            percentage = (double)bin / num_bins;
+            index = (UInt64)(percentage * (page_usage_counts.size() - 1));  // -1 so array indices don't go out of bounds
+            percentile = page_usage_counts[index].first;
+            std::cout << "percentage: " << percentage << ", vector index: " << index << ", percentile: " << percentile << std::endl;
+            usage_counts_percentiles.insert(std::pair<double, UInt32>(percentage, percentile));
+        }
+        // Add the maximum
+        percentage = 1.0;
+        percentile = page_usage_counts[page_usage_counts.size() - 1].first;
+        std::cout << "percentage: " << percentage << ", vector index: " << page_usage_counts.size() - 1 << ", percentile: " << percentile << std::endl;
+        usage_counts_percentiles.insert(std::pair<double, UInt32>(percentage, percentile));
+        // Print output in format that can easily be graphed in Python
+        std::ostringstream percentages_buffer;
+        std::ostringstream cdf_buffer_usage_counts;
+        percentages_buffer << "[";
+        cdf_buffer_usage_counts << "[";
+        for (std::map<double, UInt32>::iterator it = usage_counts_percentiles.begin(); it != usage_counts_percentiles.end(); ++it) {
+            percentages_buffer << it->first << ", ";
+            cdf_buffer_usage_counts << it->second << ", ";
+        }
+        percentages_buffer << "]";
+        cdf_buffer_usage_counts << "]";
+
+        std::cout << "CDF X values (page usage counts):\n" << cdf_buffer_usage_counts.str() << std::endl;
+        std::cout << "CDF Y values (probability):\n" << percentages_buffer.str() << std::endl;
+
+        // // Print the least accessed 1/3 of phys_pages
+        // std::ostringstream least_accessed_phys_pages_buffer;
+        // least_accessed_phys_pages_buffer << "{ ";
+        // std::vector<std::pair<UInt32, UInt64>>::iterator it = page_usage_counts.begin();
+        // for (UInt64 i = 0; i < page_usage_counts.size() / 3; ++i) {
+        //     least_accessed_phys_pages_buffer << it->second << ", ";
+        //     ++it;
+        // }
+        // least_accessed_phys_pages_buffer << " }";
+        // std::cout << "Least accessed phys_pages:\n" << least_accessed_phys_pages_buffer.str() << std::endl;
     }
-    // Generate aggregated counts vector
-    for (std::map<UInt64, UInt32>::iterator it = throttled_pages_tracker_page_aggregated_counts_map.begin(); it != throttled_pages_tracker_page_aggregated_counts_map.end(); ++it) {
-        throttled_pages_tracker_page_aggregated_counts.push_back(it->second);
-    }
-    std::sort(throttled_pages_tracker_individual_counts.begin(), throttled_pages_tracker_individual_counts.end());
-    std::sort(throttled_pages_tracker_page_aggregated_counts.begin(), throttled_pages_tracker_page_aggregated_counts.end());
+    if (process_and_print_throttled_pages_stats && m_use_throttled_pages_tracker) {
+        // Add values in the map at the end of program execution to m_throttled_pages_tracker_values
+        for (std::map<UInt64, std::pair<SubsecondTime, UInt32>>::iterator it = m_throttled_pages_tracker.begin(); it != m_throttled_pages_tracker.end(); ++it) {
+            // if ((it->second).second > 0)
+            m_throttled_pages_tracker_values.push_back(std::pair<UInt64, UInt32>(it->first, (it->second).second));
+        }
+        if (m_throttled_pages_tracker_values.size() < 1) {
+            return;
+        }
 
-    UInt64 index;
-    UInt32 percentile;
-    double percentage;
-    
-    // Compute individual_counts percentiles for output
-    std::cout << "Throttled pages tracker individual counts:" << std::endl;
-    UInt32 num_bins = 40;  // the total number of points is 1 more than num_bins, since it includes the endpoints
-    std::map<double, UInt32> individual_counts_percentiles;
-    for (UInt32 bin = 0; bin < num_bins; ++bin) {
-       percentage = (double)bin / num_bins;
-       index = (UInt64)(percentage * (throttled_pages_tracker_individual_counts.size() - 1));  // -1 so array indices don't go out of bounds
-       percentile = throttled_pages_tracker_individual_counts[index];
-       std::cout << "percentage: " << percentage << ", vector index: " << index << ", percentile: " << percentile << std::endl;
-       individual_counts_percentiles.insert(std::pair<double, UInt32>(percentage, percentile));
-    }
-    // Add the maximum
-    percentage = 1.0;
-    percentile = throttled_pages_tracker_individual_counts[throttled_pages_tracker_individual_counts.size() - 1];
-    std::cout << "percentage: " << percentage << ", vector index: " << throttled_pages_tracker_individual_counts.size() - 1 << ", percentile: " << percentile << std::endl;
-    individual_counts_percentiles.insert(std::pair<double, UInt32>(percentage, percentile));
-    // Print output in format that can easily be graphed in Python
-    std::ostringstream percentages_buffer;
-    std::ostringstream cdf_buffer_individual_counts;
-    percentages_buffer << "[";
-    cdf_buffer_individual_counts << "[";
-    for (std::map<double, UInt32>::iterator it = individual_counts_percentiles.begin(); it != individual_counts_percentiles.end(); ++it) {
-       percentages_buffer << it->first << ", ";
-       cdf_buffer_individual_counts << it->second << ", ";
-    }
-    percentages_buffer << "]";
-    cdf_buffer_individual_counts << "]";
+        // Build vectors of the stats we want
+        std::cout << "dram_perf_model_disagg.cc:" << std::endl;
+        std::vector<UInt32> throttled_pages_tracker_individual_counts;  // counts for the same phys_page are separate values
+        std::map<UInt64, UInt32> throttled_pages_tracker_page_aggregated_counts_map;  // temporary variable
+        std::vector<UInt32> throttled_pages_tracker_page_aggregated_counts;  // aggregate all numbers for a particular phys_page together
+        for (std::vector<std::pair<UInt64, UInt32>>::iterator it = m_throttled_pages_tracker_values.begin(); it != m_throttled_pages_tracker_values.end(); ++it) {
+            UInt64 phys_page = it->first;
+            UInt32 count = it->second;
 
-    std::cout << "CDF X values (throttled page accesses within time frame):\n" << cdf_buffer_individual_counts.str() << std::endl;
-    std::cout << "CDF Y values (probability):\n" << percentages_buffer.str() << std::endl;
+            throttled_pages_tracker_individual_counts.push_back(count);  // update individual counts
 
-    // Compute aggregated_counts percentiles for output
-    std::cout << "Throttled pages tracker page aggregated counts:" << std::endl;
-    num_bins = 40;  // the total number of points is 1 more than num_bins, since it includes the endpoints
-    std::map<double, UInt32> page_aggregated_counts_percentiles;
-    for (UInt32 bin = 0; bin < num_bins; ++bin) {
-       percentage = (double)bin / num_bins;
-       index = (UInt64)(percentage * (throttled_pages_tracker_page_aggregated_counts.size() - 1));  // -1 so array indices don't go out of bounds
-       percentile = throttled_pages_tracker_page_aggregated_counts[index];
-       std::cout << "percentage: " << percentage << ", vector index: " << index << ", percentile: " << percentile << std::endl;
-       page_aggregated_counts_percentiles.insert(std::pair<double, UInt32>(percentage, percentile));
-    }
-    // Add the maximum
-    percentage = 1.0;
-    percentile = throttled_pages_tracker_page_aggregated_counts[throttled_pages_tracker_page_aggregated_counts.size() - 1];
-    std::cout << "percentage: " << percentage << ", vector index: " << throttled_pages_tracker_page_aggregated_counts.size() - 1 << ", percentile: " << percentile << std::endl;
-    page_aggregated_counts_percentiles.insert(std::pair<double, UInt32>(percentage, percentile));
-    // Print output in format that can easily be graphed in Python
-    std::ostringstream percentages_buffer_2;
-    std::ostringstream cdf_buffer_page_aggregated_counts;
-    percentages_buffer_2 << "[";
-    cdf_buffer_page_aggregated_counts << "[";
-    for (std::map<double, UInt32>::iterator it = page_aggregated_counts_percentiles.begin(); it != page_aggregated_counts_percentiles.end(); ++it) {
-       percentages_buffer_2 << it->first << ", ";
-       cdf_buffer_page_aggregated_counts << it->second << ", ";
-    }
-    percentages_buffer_2 << "]";
-    cdf_buffer_page_aggregated_counts << "]";
+            if (!throttled_pages_tracker_page_aggregated_counts_map.count(phys_page)) {  // update aggregated counts map
+                throttled_pages_tracker_page_aggregated_counts_map[phys_page] = 0;
+            }
+            throttled_pages_tracker_page_aggregated_counts_map[phys_page] += count;
+        }
+        // Generate aggregated counts vector
+        for (std::map<UInt64, UInt32>::iterator it = throttled_pages_tracker_page_aggregated_counts_map.begin(); it != throttled_pages_tracker_page_aggregated_counts_map.end(); ++it) {
+            throttled_pages_tracker_page_aggregated_counts.push_back(it->second);
+        }
+        std::sort(throttled_pages_tracker_individual_counts.begin(), throttled_pages_tracker_individual_counts.end());
+        std::sort(throttled_pages_tracker_page_aggregated_counts.begin(), throttled_pages_tracker_page_aggregated_counts.end());
 
-    std::cout << "CDF X values (throttled page accesses aggregated by phys_page):\n" << cdf_buffer_page_aggregated_counts.str() << std::endl;
-    std::cout << "CDF Y values (probability):\n" << percentages_buffer_2.str() << std::endl;
+        UInt64 index;
+        UInt32 percentile;
+        double percentage;
+        
+        // Compute individual_counts percentiles for output
+        std::cout << "Throttled pages tracker individual counts:" << std::endl;
+        UInt32 num_bins = 40;  // the total number of points is 1 more than num_bins, since it includes the endpoints
+        std::map<double, UInt32> individual_counts_percentiles;
+        for (UInt32 bin = 0; bin < num_bins; ++bin) {
+        percentage = (double)bin / num_bins;
+        index = (UInt64)(percentage * (throttled_pages_tracker_individual_counts.size() - 1));  // -1 so array indices don't go out of bounds
+        percentile = throttled_pages_tracker_individual_counts[index];
+        std::cout << "percentage: " << percentage << ", vector index: " << index << ", percentile: " << percentile << std::endl;
+        individual_counts_percentiles.insert(std::pair<double, UInt32>(percentage, percentile));
+        }
+        // Add the maximum
+        percentage = 1.0;
+        percentile = throttled_pages_tracker_individual_counts[throttled_pages_tracker_individual_counts.size() - 1];
+        std::cout << "percentage: " << percentage << ", vector index: " << throttled_pages_tracker_individual_counts.size() - 1 << ", percentile: " << percentile << std::endl;
+        individual_counts_percentiles.insert(std::pair<double, UInt32>(percentage, percentile));
+        // Print output in format that can easily be graphed in Python
+        std::ostringstream percentages_buffer;
+        std::ostringstream cdf_buffer_individual_counts;
+        percentages_buffer << "[";
+        cdf_buffer_individual_counts << "[";
+        for (std::map<double, UInt32>::iterator it = individual_counts_percentiles.begin(); it != individual_counts_percentiles.end(); ++it) {
+        percentages_buffer << it->first << ", ";
+        cdf_buffer_individual_counts << it->second << ", ";
+        }
+        percentages_buffer << "]";
+        cdf_buffer_individual_counts << "]";
 
+        std::cout << "CDF X values (throttled page accesses within time frame):\n" << cdf_buffer_individual_counts.str() << std::endl;
+        std::cout << "CDF Y values (probability):\n" << percentages_buffer.str() << std::endl;
 
-    // // Print stats for m_page_usage_map (total # cacheline accesses by phys_page)
-    // // Generate counts vector
-    // std::vector<std::pair<UInt32, UInt64>> page_usage_counts;  // first is access count, second is the phys_page
-    // for (std::map<UInt64, UInt32>::iterator it = m_page_usage_map.begin(); it != m_page_usage_map.end(); ++it) {
-    //     page_usage_counts.push_back(std::pair<UInt32, UInt64>(it->second, it->first));
-    // }
-    // std::sort(page_usage_counts.begin(), page_usage_counts.end());  // sort by access count
+        // Compute aggregated_counts percentiles for output
+        std::cout << "Throttled pages tracker page aggregated counts:" << std::endl;
+        num_bins = 40;  // the total number of points is 1 more than num_bins, since it includes the endpoints
+        std::map<double, UInt32> page_aggregated_counts_percentiles;
+        for (UInt32 bin = 0; bin < num_bins; ++bin) {
+        percentage = (double)bin / num_bins;
+        index = (UInt64)(percentage * (throttled_pages_tracker_page_aggregated_counts.size() - 1));  // -1 so array indices don't go out of bounds
+        percentile = throttled_pages_tracker_page_aggregated_counts[index];
+        std::cout << "percentage: " << percentage << ", vector index: " << index << ", percentile: " << percentile << std::endl;
+        page_aggregated_counts_percentiles.insert(std::pair<double, UInt32>(percentage, percentile));
+        }
+        // Add the maximum
+        percentage = 1.0;
+        percentile = throttled_pages_tracker_page_aggregated_counts[throttled_pages_tracker_page_aggregated_counts.size() - 1];
+        std::cout << "percentage: " << percentage << ", vector index: " << throttled_pages_tracker_page_aggregated_counts.size() - 1 << ", percentile: " << percentile << std::endl;
+        page_aggregated_counts_percentiles.insert(std::pair<double, UInt32>(percentage, percentile));
+        // Print output in format that can easily be graphed in Python
+        std::ostringstream percentages_buffer_2;
+        std::ostringstream cdf_buffer_page_aggregated_counts;
+        percentages_buffer_2 << "[";
+        cdf_buffer_page_aggregated_counts << "[";
+        for (std::map<double, UInt32>::iterator it = page_aggregated_counts_percentiles.begin(); it != page_aggregated_counts_percentiles.end(); ++it) {
+        percentages_buffer_2 << it->first << ", ";
+        cdf_buffer_page_aggregated_counts << it->second << ", ";
+        }
+        percentages_buffer_2 << "]";
+        cdf_buffer_page_aggregated_counts << "]";
 
-    // // Compute phys_page access count percentiles for output
-    // std::cout << "m_page_usage_map page total access counts:" << std::endl;
-    // num_bins = 40;  // the total number of points is 1 more than num_bins, since it includes the endpoints
-    // std::map<double, UInt32> page_usage_counts_percentiles;
-    // for (UInt32 bin = 0; bin < num_bins; ++bin) {
-    //    percentage = (double)bin / num_bins;
-    //    index = (UInt64)(percentage * (page_usage_counts.size() - 1));  // -1 so array indices don't go out of bounds
-    //    percentile = page_usage_counts[index].first;
-    //    std::cout << "percentage: " << percentage << ", vector index: " << index << ", percentile: " << percentile << std::endl;
-    //    page_usage_counts_percentiles.insert(std::pair<double, UInt32>(percentage, percentile));
-    // }
-    // // Add the maximum
-    // percentage = 1.0;
-    // percentile = page_usage_counts[page_usage_counts.size() - 1].first;
-    // std::cout << "percentage: " << percentage << ", vector index: " << page_usage_counts.size() - 1 << ", percentile: " << percentile << std::endl;
-    // page_usage_counts_percentiles.insert(std::pair<double, UInt32>(percentage, percentile));
-    // // Print output in format that can easily be graphed in Python
-    // std::ostringstream percentages_buffer_3;
-    // std::ostringstream cdf_buffer_page_usage_counts;
-    // percentages_buffer_3 << "[";
-    // cdf_buffer_page_usage_counts << "[";
-    // for (std::map<double, UInt32>::iterator it = page_usage_counts_percentiles.begin(); it != page_usage_counts_percentiles.end(); ++it) {
-    //    percentages_buffer_3 << it->first << ", ";
-    //    cdf_buffer_page_usage_counts << it->second << ", ";
-    // }
-    // percentages_buffer_3 << "]";
-    // cdf_buffer_page_usage_counts << "]";
-
-    // std::cout << "CDF X values (phys_page total access counts):\n" << cdf_buffer_page_usage_counts.str() << std::endl;
-    // std::cout << "CDF Y values (probability):\n" << percentages_buffer_3.str() << std::endl;
-
-    // // Print the least accessed phys_pages
-    // std::ostringstream least_accessed_phys_pages_buffer;
-    // least_accessed_phys_pages_buffer << "{ ";
-    // std::vector<std::pair<UInt32, UInt64>>::iterator it = page_usage_counts.begin();
-    // for (UInt64 i = 0; i < page_usage_counts.size() / 3; ++i) {
-    //     least_accessed_phys_pages_buffer << it->second << ", ";
-    //     ++it;
-    // }
-    // least_accessed_phys_pages_buffer << " }";
-    // std::cout << "Least accessed phys_pages:\n" << least_accessed_phys_pages_buffer.str() << std::endl;
+        std::cout << "CDF X values (throttled page accesses aggregated by phys_page):\n" << cdf_buffer_page_aggregated_counts.str() << std::endl;
+        std::cout << "CDF Y values (probability):\n" << percentages_buffer_2.str() << std::endl;
+    }   
 }
 
 UInt64
@@ -635,19 +672,31 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     UInt64 phys_page = address & ~((UInt64(1) << floorLog2(m_page_size)) - 1);
     UInt32 size = pkt_size;
     SubsecondTime cacheline_compression_latency = SubsecondTime::Zero();  // when cacheline compression is not enabled, this is always 0
-    if (m_use_compression && m_r_cacheline_gran)
+    if (m_use_compression)
     {
-        UInt32 compressed_cache_lines;
-        cacheline_compression_latency = m_compression_model->compress(phys_page, m_cache_line_size, m_core_id, &size, &compressed_cache_lines);
-        if (m_cache_line_size > size)
-            bytes_saved += m_cache_line_size - size;
-        else
-            bytes_saved -= size - m_cache_line_size;
+        if (m_r_cacheline_gran) {
+            UInt32 compressed_cache_lines;
+            cacheline_compression_latency = m_compression_model->compress(phys_page, m_cache_line_size, m_core_id, &size, &compressed_cache_lines);
+            if (m_cache_line_size > size)
+                bytes_saved += m_cache_line_size - size;
+            else
+                bytes_saved -= size - m_cache_line_size;
 
-        address_to_compressed_size[phys_page] = size;
-        address_to_num_cache_lines[phys_page] = compressed_cache_lines;
-        m_total_compression_latency += cacheline_compression_latency;
-        t_now += cacheline_compression_latency;
+            address_to_compressed_size[phys_page] = size;
+            address_to_num_cache_lines[phys_page] = compressed_cache_lines;
+            m_total_compression_latency += cacheline_compression_latency;
+            t_now += cacheline_compression_latency;
+        } else if (m_use_cacheline_compression) {
+            UInt32 compressed_cache_lines;
+            cacheline_compression_latency = m_cacheline_compression_model->compress(phys_page, m_cache_line_size, m_core_id, &size, &compressed_cache_lines);
+            if (m_cache_line_size > size)
+                cacheline_bytes_saved += m_cache_line_size - size;
+            else
+                cacheline_bytes_saved -= size - m_cache_line_size;
+            address_to_num_cache_lines[phys_page] = compressed_cache_lines;
+            m_total_cacheline_compression_latency += cacheline_compression_latency;
+            t_now += cacheline_compression_latency;
+        }
     }
 
     SubsecondTime cacheline_delay;
@@ -661,11 +710,15 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     SubsecondTime datamovement_queue_delay = cacheline_delay;
 
     // TODO: Currently model decompression by adding decompression latency to inflight page time
-    if (m_use_compression && m_r_cacheline_gran)
+    if (m_use_compression && (m_r_cacheline_gran || m_use_cacheline_compression))
     {
-        SubsecondTime decompression_latency = m_compression_model->decompress(phys_page, address_to_num_cache_lines[phys_page], m_core_id);
+        CompressionModel *compression_model = m_r_cacheline_gran ? m_compression_model : m_cacheline_compression_model;
+        SubsecondTime decompression_latency = compression_model->decompress(phys_page, address_to_num_cache_lines[phys_page], m_core_id);
         datamovement_queue_delay += decompression_latency;
-        m_total_decompression_latency += decompression_latency;
+        if (m_r_cacheline_gran)
+            m_total_decompression_latency += decompression_latency;
+        else
+            m_total_cacheline_decompression_latency += decompression_latency;
     }
 
     //std::cout << "Packet size: " << pkt_size << "  Cacheline Processing time: " << m_r_bus_bandwidth.getRoundedLatency(8*pkt_size) << " Remote queue delay " << datamovement_queue_delay << std::endl; 

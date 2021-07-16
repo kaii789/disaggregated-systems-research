@@ -90,6 +90,8 @@ public:
    bool getEnablePinPlay() const { return m_knob_enable_pinplay; }
    bool getEnableSyscallEmulation() const { return m_knob_enable_syscall_emulation; }
 
+   String getCachingProtocolType() const { return m_knob_caching_protocol_type; }
+
    bool getBBVsEnabled() const { return m_knob_bbvs; }
    void setBBVsEnabled(bool enable) { m_knob_bbvs = enable; }
 
@@ -140,6 +142,8 @@ private:
    static bool m_circular_log_enabled;
    static bool m_knob_enable_pinplay;
    static bool m_knob_enable_syscall_emulation;
+
+   static String m_knob_caching_protocol_type;
 
    static CacheEfficiencyTracker::Callbacks m_cache_efficiency_callbacks;
 

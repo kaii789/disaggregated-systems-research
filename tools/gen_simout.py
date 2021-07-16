@@ -156,6 +156,7 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
 
   # Compression
   bytes_saved = results['compression.bytes-saved'][0] if 'compression.bytes-saved' in results else 0
+  cacheline_bytes_saved = results['compression.cacheline-bytes-saved'][0] if 'compression.cacheline-bytes-saved' in results else 0
   if bytes_saved != 0:
     data_moves = results['dram.page-moves'][0]
     total_compression_latency = results['compression.total-compression-latency'][0]
@@ -165,6 +166,16 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     results['compression.avg-compression-ratio'] = [float((data_moves * gran_size)) / float(((data_moves * gran_size) - bytes_saved))]
     results['compression.avg-compression-latency'] = [total_compression_latency / data_moves]
     results['compression.avg-decompression-latency'] = [total_decompression_latency / data_moves]
+
+    if cacheline_bytes_saved != 0:
+      data_moves = results['dram.remote-reads'][0] + results['dram.remote-writes'][0]
+      total_cacheline_compression_latency = results['compression.total-cacheline-compression-latency'][0]
+      total_cacheline_decompression_latency = results['compression.total-cacheline-decompression-latency'][0]
+
+      gran_size = 64
+      results['compression.avg-cacheline-compression-ratio'] = [float((data_moves * gran_size)) / float(((data_moves * gran_size) - cacheline_bytes_saved))]
+      results['compression.avg-cacheline-compression-latency'] = [total_cacheline_compression_latency / data_moves]
+      results['compression.avg-cacheline-decompression-latency'] = [total_cacheline_decompression_latency / data_moves]
 
     # print("bytes_saved", bytes_saved)
     # print("data moves", data_moves)
@@ -221,6 +232,13 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
       ('  avg compression latency(ns)', 'compression.avg-compression-latency', format_ns(2)),
       ('  avg decompression latency(ns)', 'compression.avg-decompression-latency', format_ns(2)),
     ]
+  if cacheline_bytes_saved != 0:
+    template += [
+      ('  cacheline bytes saved', 'compression.cacheline-bytes-saved', str),
+      ('  avg cacheline compression ratio', 'compression.avg-cacheline-compression-ratio', str),
+      ('  avg cacheline compression latency(ns)', 'compression.avg-cacheline-compression-latency', format_ns(2)),
+      ('  avg cacheline decompression latency(ns)', 'compression.avg-cacheline-decompression-latency', format_ns(2)),
+    ]
 
   if 'dram.total-read-queueing-delay' in results:
     results['dram.avgqueueread'] = map(lambda (a,b): a/(b or 1), zip(results['dram.total-read-queueing-delay'], results['dram.reads']))
@@ -266,6 +284,11 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
       ('  ideal page throttling: num swaps non-inflight', 'dram.ideal-page-throttling-num-swaps-non-inflight', str),
       ('  ideal page throttling: num swaps unavailable', 'dram.ideal-page-throttling-num-swap-unavailable', str),
   ])
+
+  # if '' in results:
+  template.append(('Page locality stats (count within phys_page, entire ROI)', '', ''))
+  for i in range(10, 101, 10):  # 10, 20, ..., 100
+    template.append(('  {}% percentile'.format(i), 'dram.page-access-count-p{}'.format(i), str))
 
   if 'ddr.page-hits' in results:
     template.extend([
