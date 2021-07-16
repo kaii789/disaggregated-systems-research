@@ -62,7 +62,9 @@ SubsecondTime
 CompressionModelLZ78::decompress(IntPtr addr, UInt32 compressed_cache_lines, core_id_t core_id)
 {
     Core *core = Sim()->getCoreManager()->getCoreFromID(core_id);
-    ComponentLatency decompress_latency(ComponentLatency(core->getDvfsDomain(), compressed_cache_lines * m_decompression_latency));
+    // Decompression algorithm works exactly the same as compression algorith.
+    // Thus, decompression latency is equal to decompression algorithm
+    ComponentLatency decompress_latency(ComponentLatency(core->getDvfsDomain(), m_decompression_latency * compressed_cache_lines));
     return decompress_latency.getLatency();
 
 }
@@ -127,9 +129,9 @@ CompressionModelLZ78::compressData(void* in, void* out, UInt32 data_size, UInt32
 
     // statistics - RemoveMe
     UInt32 max_string_size = 0;
-    UInt32 accesses = 0;
     // statistics - RemoveMe
 
+    UInt32 accesses = 0;
     UInt32 dictionary_size = 0; 
     UInt32 j, i = 0;
     UInt32 out_indx = 0;
@@ -149,10 +151,11 @@ CompressionModelLZ78::compressData(void* in, void* out, UInt32 data_size, UInt32
         it = compression_CAM.find(s); 
         accesses++;
 
-        if(it == compression_CAM.end()) { // If not found in dictionary
+        if(it == compression_CAM.end()) { // If not found in dictionary, add it 
             dictionary_size++;
             inserts++;
             compression_CAM.insert(pair<string, UInt32>(s, dictionary_size));
+            accesses++;
             writeWord(out, out_indx, cur_word, m_word_size);
             out_indx++; 
             compressed_size += m_word_size;
@@ -162,7 +165,6 @@ CompressionModelLZ78::compressData(void* in, void* out, UInt32 data_size, UInt32
                 max_string_size = s.size();
             // statistics - RemoveMe
 
-            accesses++;
             s.clear();
         }
         
@@ -172,8 +174,11 @@ CompressionModelLZ78::compressData(void* in, void* out, UInt32 data_size, UInt32
     // Metadata needed for decompression
     UInt32 dictionary_size_log2 = floorLog2(dictionary_size); // bits needed to index an entry in the dictionary
     // additional bytes need for metadata related to index the corresponding entries in the dictionary
-    UInt32 index_bytes = (inserts * dictionary_size_log2) / 8 + 1; // Convert bits to bytes
+    UInt32 index_bytes = (inserts * dictionary_size_log2) / 8; // Convert bits to bytes
+    if ((inserts * dictionary_size_log2) % 8 != 0)
+        index_bytes++;
     compressed_size += index_bytes;
+
     *total_accesses = accesses;
     compression_CAM.clear();
 
@@ -184,87 +189,31 @@ CompressionModelLZ78::compressData(void* in, void* out, UInt32 data_size, UInt32
     return compressed_size;
 } 
 
-/*
-UInt32
-CompressionModelLZ78::decompressData(void* in, void* out, UInt32 data_size)
-{
-
-    decompression_CAM.clear(); // What is the cost of flushing/clearing the dictionary?
-
-    // statistics - RemoveMe
-    UInt32 max_string_size = 0;
-    UInt32 accesses = 0;
-    // statistics - RemoveMe
-
-    UInt32 dictionary_size = 0; 
-    UInt32 j, i = 0;
-    UInt32 out_indx = 0;
-    UInt32 inserts = 0;
-    string s;
-    SInt64 cur_word;
-    SInt8 cur_byte;
-    map<string, UInt32>::iterator it;
-    while ((i * m_word_size) < data_size) {
-        // Read next word byte-by-byte
-        cur_word = readWord(in, i, m_word_size);
-        for(j = 0; j < m_word_size; j++) {     
-            cur_byte = (cur_word >> (8*j)) & 0xff; // Get j-th byte from the word
-            s.push_back(cur_byte); 
-        }
-        
-        it = compression_CAM.find(s); 
-        
-        // statistics - RemoveMe
-        accesses++;
-        // statistics - RemoveMe
-
-        if(it == compression_CAM.end()) { // If not found in dictionary
-            dictionary_size++;
-            inserts++;
-            compression_CAM.insert(pair<string, UInt32>(s, dictionary_size));
-            writeWord(out, out_indx, cur_word, m_word_size);
-            out_indx++; 
-            compressed_size += m_word_size;
-    
-            // statistics - RemoveMe
-            if (s.size() > max_string_size)
-                max_string_size = s.size();
-            accesses++;
-            // statistics - RemoveMe
-
-            s.clear();
-        }
-        
-        i++; 
-    }
-
-    // Metadata needed for decompression
-    UInt32 dictionary_size_log2 = floorLog2(dictionary_size); // bits needed to index an entry in the dictionary
-    // additional bytes need for metadata related to index the corresponding entries in the dictionary
-    UInt32 index_bytes = (inserts * dictionary_size_log2) / 8 + 1; // Convert bits to bytes
-    compressed_size += index_bytes;
-
-    decompression_CAM.clear();
-
-    // statistics - RemoveMe
-    printf("Decompressed Size %d Dictionary Table Size %d %d and Max Entry Size %d Total Size (KB) %d Accesses %d\n", compressed_size, dictionary_size, inserts, max_string_size, dictionary_size * max_string_size / 1024, accesses);
-    // statistics - RemoveMe
-
-    return 0;
-}
-*/
-
 SubsecondTime
 CompressionModelLZ78::compress_multipage(std::vector<UInt64> addr_list, UInt32 num_pages, core_id_t core_id, UInt32 *compressed_multipage_size, std::map<UInt64, UInt32> *address_to_num_cache_lines)
 {
-    // TODO
-    return SubsecondTime::Zero();
+    SubsecondTime total_compression_latency = SubsecondTime::Zero();
+    UInt32 total_compressed_size = 0;
+    for (UInt32 i = 0; i < num_pages; i++) {
+        UInt64 addr = addr_list.at(i);
+        UInt32 compressed_page_size;
+        UInt32 compressed_cache_lines;
+        total_compression_latency += CompressionModelLZ78::compress(addr, m_page_size, core_id, &compressed_page_size, &compressed_cache_lines);
+        total_compressed_size += compressed_page_size;
+        (*address_to_num_cache_lines)[addr] = compressed_cache_lines;
+    }
+    *compressed_multipage_size = total_compressed_size;
+    return total_compression_latency;
 }
 
 
 SubsecondTime
 CompressionModelLZ78::decompress_multipage(std::vector<UInt64> addr_list, UInt32 num_pages, core_id_t core_id, std::map<UInt64, UInt32> *address_to_num_cache_lines)
 {
-    // TODO
-    return SubsecondTime::Zero();
+    SubsecondTime total_compression_latency = SubsecondTime::Zero();
+    for (UInt32 i = 0; i < num_pages; i++) {
+        UInt64 addr = addr_list.at(i);
+        total_compression_latency += CompressionModelLZ78::decompress(addr, (*address_to_num_cache_lines)[addr], core_id);
+    }
+    return total_compression_latency;
 }

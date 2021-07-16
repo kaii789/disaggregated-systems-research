@@ -37,7 +37,7 @@ private:
     // Fine-grain compression granularity within the page
     UInt8 m_word_size = 1;
 
-    UInt32 m_compression_granularity; 
+    SInt32 m_compression_granularity;
     UInt8 m_cam_size = 256;
     UInt8 m_cam_size_log2 = 8;
     

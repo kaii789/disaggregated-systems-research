@@ -30,7 +30,7 @@ private:
     UInt32 m_decompression_latency = 5;
 
     double m_freq_norm;
-    UInt32 m_compression_granularity; 
+    SInt32 m_compression_granularity;
 
     char *multipage_data_buffer;
     char *multipage_compressed_buffer;
