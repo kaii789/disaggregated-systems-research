@@ -89,6 +89,9 @@ if __name__ == "__main__":
         input_to_file_path = {"roadnetPA": "{sniper_root}/test/crono/inputs/roadNet-PA.mtx".format(sniper_root=subfolder_sniper_root_relpath),
                               "roadnetCA": "{sniper_root}/test/crono/inputs/roadNet-CA.mtx".format(sniper_root=subfolder_sniper_root_relpath),
                               "bcsstk32": "{sniper_root}/test/crono/inputs/bcsstk32.mtx".format(sniper_root=subfolder_sniper_root_relpath),
+                              "citPatents": "{sniper_root}/test/crono/inputs/cit-Patents.mtx".format(sniper_root=subfolder_sniper_root_relpath),
+                              "socPokec": "{sniper_root}/test/crono/inputs/soc-Pokec.mtx".format(sniper_root=subfolder_sniper_root_relpath),
+                              "comOrkut": "{sniper_root}/test/crono/inputs/com-Orkut.mtx".format(sniper_root=subfolder_sniper_root_relpath),
                             #   "small_input": "{0}/inputs/{1}".format(ligra_home, ligra_input_to_file["small_input"]),
                               "reg_8x": "{0}/inputs/{1}".format(ligra_home, ligra_input_to_file["reg_8x"]),
                               "reg_10x": "{0}/inputs/{1}".format(ligra_home, ligra_input_to_file["reg_10x"]),
@@ -454,11 +457,24 @@ if __name__ == "__main__":
             [
                 ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
                 ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
+                ConfigEntry("perf_model/dram", "enable_remote_prefetcher", "false"),
                 ConfigEntry("perf_model/dram", "remote_memory_mode", "1"),
                 # remote_init  specified in individual experiments
             ]
         )
         pq_cacheline_combined_rmode1_configs.append(config_copy)
+
+    pq_cacheline_combined_rmode1_configs_prefetch = []
+    # Only want runs number 1-5 in partition_queue_series_experiment_run_configs
+    for config in pq_cacheline_combined_rmode1_configs:
+        config_copy = copy.deepcopy(config)
+        config_copy.replace_config_entries(
+            [
+                ConfigEntry("perf_model/dram", "enable_remote_prefetcher", "true"),
+                # remote_init  specified in individual experiments
+            ]
+        )
+        pq_cacheline_combined_rmode1_configs_prefetch.append(config_copy)
 
     pq_cacheline_combined_rmode2_configs = []
     # Only want runs number 1-5 in partition_queue_series_experiment_run_configs
@@ -468,6 +484,7 @@ if __name__ == "__main__":
             [
                 ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
                 ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
+                ConfigEntry("perf_model/dram", "enable_remote_prefetcher", "false"),
                 ConfigEntry("perf_model/dram", "remote_memory_mode", "2"),
                 # remote_init  specified in individual experiments
                 # remote_datamov_threshold  specified in individual experiments
@@ -483,6 +500,7 @@ if __name__ == "__main__":
             [
                 ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
                 ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
+                ConfigEntry("perf_model/dram", "enable_remote_prefetcher", "false"),
                 ConfigEntry("perf_model/dram", "remote_memory_mode", "5"),
                 # remote_init  specified in individual experiments
                 # remote_datamov_threshold  specified in individual experiments
@@ -499,6 +517,7 @@ if __name__ == "__main__":
         config_copy.replace_config_entries(
             [
                 ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "true"),
+                ConfigEntry("perf_model/dram", "enable_remote_prefetcher", "false"),
                 # remote_init  specified in individual experiments
             ]
         )
@@ -510,6 +529,7 @@ if __name__ == "__main__":
         config_copy.replace_config_entries(
             [
                 ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "true"),
+                ConfigEntry("perf_model/dram", "enable_remote_prefetcher", "false"),
                 # remote_init  specified in individual experiments
                 # remote_datamov_threshold  specified in individual experiments
             ]
@@ -522,6 +542,7 @@ if __name__ == "__main__":
         config_copy.replace_config_entries(
             [
                 ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "true"),
+                ConfigEntry("perf_model/dram", "enable_remote_prefetcher", "false"),
                 # remote_init  specified in individual experiments
                 # remote_datamov_threshold  specified in individual experiments
                 # r_mode_5_page_queue_utilization_mode_switch_threshold  specified in individual experiments
@@ -534,6 +555,76 @@ if __name__ == "__main__":
     #################################
 
     experiments = []
+
+
+    # SSSP, SPMV test, with larger matrices
+    spmv_new_pq_cacheline_combined_experiments_remoteinit_true_rmode1_test = []
+    net_lat = 120
+    remote_init = "true"
+    for matrix, num_MB in [("com-Orkut.mtx", 8), ("com-Orkut.mtx", 16), ("soc-Pokec.mtx", 4), ("soc-Pokec.mtx", 8), ("soc-Pokec.mtx", 12)]:
+        for bw_scalefactor in [4]:
+            localdram_size_str = "{}MB".format(num_MB)
+            command_str = spmv_base_options.format(
+                matrix,
+                sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={}".format(
+                    int(num_MB * ONE_MB_TO_BYTES),
+                    int(net_lat),
+                    int(bw_scalefactor),
+                    str(remote_init),
+                ),
+            )
+
+            spmv_new_pq_cacheline_combined_experiments_remoteinit_true_rmode1_test.append(
+                Experiment(
+                    experiment_name="spmv_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_test".format(
+                        matrix[:matrix.find(".")].replace("-", ""),
+                        localdram_size_str,
+                        net_lat,
+                        bw_scalefactor,
+                        remote_init,
+                    ),
+                    command_str=command_str,
+                    experiment_run_configs=[
+                        pq_cacheline_combined_rmode1_configs[2],
+                        pq_cacheline_combined_rmode1_configs[-3],
+                    ],  # pq=0 + pq=1 w/ 0.2 cacheline
+                    output_root_directory=".",
+                )
+            )
+    sssp_new_pq_cacheline_combined_experiments_remoteinit_true_rmode1_test = []
+    net_lat = 120
+    remote_init = "true"  # "false"
+    for matrix in ["cit-Patents.mtx"]:
+        for num_MB in [8, 16]:
+            for bw_scalefactor in [4]:
+                localdram_size_str = "{}MB".format(num_MB)
+                command_str = sssp_base_options.format(
+                    matrix,
+                    sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={}".format(
+                        int(num_MB * ONE_MB_TO_BYTES),
+                        int(net_lat),
+                        int(bw_scalefactor),
+                        str(remote_init),
+                    ),
+                )
+
+                sssp_new_pq_cacheline_combined_experiments_remoteinit_true_rmode1_test.append(
+                    Experiment(
+                        experiment_name="{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_test".format(
+                            matrix[:matrix.find(".")].replace("-", ""),
+                            localdram_size_str,
+                            net_lat,
+                            bw_scalefactor,
+                            remote_init,
+                        ),
+                        command_str=command_str,
+                        experiment_run_configs=[
+                            pq_cacheline_combined_rmode1_configs[2],
+                            pq_cacheline_combined_rmode1_configs[-3],
+                        ],  # pq=0 + pq=1 w/ 0.2 cacheline
+                        output_root_directory=".",
+                    )
+                )
 
 
     # BFS, reg_8x, 1 Billion instructions cap
@@ -2342,6 +2433,9 @@ if __name__ == "__main__":
     # experiments.extend(ligra_sym_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal)
     # experiments.extend(ligra_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal)
     # experiments.extend(ligra_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal_pagerank)
+
+    # experiments.extend(spmv_new_pq_cacheline_combined_experiments_remoteinit_true_rmode1_test)
+    # experiments.extend(sssp_new_pq_cacheline_combined_experiments_remoteinit_true_rmode1_test)
 
     ### Run Sniper experiments using ExperimentManager ###
     # Find log filename, to not overwrite previous logs
