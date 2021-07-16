@@ -193,7 +193,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     // Prefetcher
     m_r_enable_nl_prefetcher = Sim()->getCfg()->getBool("perf_model/dram/enable_remote_prefetcher");  // Enable prefetcher to prefetch pages from remote DRAM to local DRAM
     if (m_r_enable_nl_prefetcher) {
-        // Type of prefetcher checked in PrefetcherModel
+        // Type of prefetcher checked in PrefetcherModel, additional configs for specific prefetcher types are read there
         m_prefetcher_model = PrefetcherModel::createPrefetcherModel(m_page_size);
     }
 
@@ -1341,31 +1341,35 @@ DramPerfModelDisagg::possiblyPrefetch(UInt64 phys_page, SubsecondTime t_now, cor
     if (!m_r_enable_nl_prefetcher) {
         return;
     }
-    if (m_data_movement->getQueueUtilizationPercentage(t_now) > m_r_page_queue_utilization_threshold) {
-        // Cancel moving pages if the queue used for moving pages is already full
-        ++m_prefetch_page_not_done_datamovement_queue_full;
-        return;
-    }
-    UInt64 pref_page = m_prefetcher_model->pagePrefetchCandidate(phys_page);
-    if (std::find(m_local_pages.begin(), m_local_pages.end(), pref_page) == m_local_pages.end() && std::find(m_remote_pages.begin(), m_remote_pages.end(), pref_page) != m_remote_pages.end()) {
-        // pref_page is not in local_pages but in remote_pages
-        ++m_page_prefetches;
-        ++m_page_moves;
-        SubsecondTime page_datamovement_queue_delay = SubsecondTime::Zero();
-        if (m_r_simulate_datamov_overhead) { 
-            page_datamovement_queue_delay = m_data_movement->computeQueueDelayTrackBytes(t_now, m_r_bus_bandwidth.getRoundedLatency(8*m_page_size), m_page_size, requester);
-        } 
+    std::vector<UInt64> prefetch_page_candidates;
+    m_prefetcher_model->pagePrefetchCandidates(phys_page, prefetch_page_candidates);
+    for (auto it = prefetch_page_candidates.begin(); it != prefetch_page_candidates.end(); ++it) {
+        if (m_data_movement->getQueueUtilizationPercentage(t_now) > m_r_page_queue_utilization_threshold) {
+            // Cancel moving pages if the queue used for moving pages is already full
+            ++m_prefetch_page_not_done_datamovement_queue_full;
+            continue;  // could return here, but continue the loop to update stats for when prefetching was not done
+        }
+        UInt64 pref_page = *it;
+        if (std::find(m_local_pages.begin(), m_local_pages.end(), pref_page) == m_local_pages.end() && std::find(m_remote_pages.begin(), m_remote_pages.end(), pref_page) != m_remote_pages.end()) {
+        // pref_page is not in local_pages but in remote_pages, can prefetch
+            ++m_page_prefetches;
+            ++m_page_moves;
+            SubsecondTime page_datamovement_queue_delay = SubsecondTime::Zero();
+            if (m_r_simulate_datamov_overhead) { 
+                page_datamovement_queue_delay = m_data_movement->computeQueueDelayTrackBytes(t_now, m_r_bus_bandwidth.getRoundedLatency(8*m_page_size), m_page_size, requester);
+            } 
 
-        assert(std::find(m_local_pages.begin(), m_local_pages.end(), pref_page) == m_local_pages.end()); 
-        assert(std::find(m_remote_pages.begin(), m_remote_pages.end(), pref_page) != m_remote_pages.end()); 
-        m_local_pages.push_back(pref_page);
-        m_local_pages_remote_origin[pref_page] = 1;
-        if (m_r_exclusive_cache)
-            m_remote_pages.remove(pref_page);
-        m_inflight_pages.erase(pref_page);
-        m_inflight_pages[pref_page] = t_now + page_datamovement_queue_delay;
-        possiblyEvict(phys_page, t_now, requester);
-    } else {
-        ++m_prefetch_page_not_done_page_local_already;
+            assert(std::find(m_local_pages.begin(), m_local_pages.end(), pref_page) == m_local_pages.end()); 
+            assert(std::find(m_remote_pages.begin(), m_remote_pages.end(), pref_page) != m_remote_pages.end()); 
+            m_local_pages.push_back(pref_page);
+            m_local_pages_remote_origin[pref_page] = 1;
+            if (m_r_exclusive_cache)
+                m_remote_pages.remove(pref_page);
+            m_inflight_pages.erase(pref_page);
+            m_inflight_pages[pref_page] = t_now + page_datamovement_queue_delay;
+            possiblyEvict(phys_page, t_now, requester);
+        } else {
+            ++m_prefetch_page_not_done_page_local_already;
+        }
     }
 }

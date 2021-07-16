@@ -10,7 +10,7 @@ class PrefetcherModel
       PrefetcherModel() {}
       virtual ~PrefetcherModel() {}
 
-      virtual UInt64 pagePrefetchCandidate(UInt64 current_phys_page) = 0;
+      virtual void pagePrefetchCandidates(UInt64 current_phys_page, std::vector<UInt64>& prefetch_candidates) = 0;
 
       static PrefetcherModel* createPrefetcherModel(UInt32 page_size);
 };
