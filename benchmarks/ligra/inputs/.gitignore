@@ -1,5 +1,6 @@
 *
 !.gitignore
+!*.sh
 
 # Exceptions for files from original repo 
 !rMatGraph_J_5_100
