@@ -945,6 +945,29 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
     } else {
         m_page_usage_map[phys_page] += 1;
     }
+    if (m_page_access_pattern_tracker_starting_time <= pkt_time && pkt_time <= m_page_access_pattern_tracker_ending_time) {
+        // Track
+        m_page_access_pattern_tracker.push_back(phys_page);
+    } else {
+        // pkt_time > m_page_access_pattern_tracker_ending_time, dump stats and set next window to collect stats
+        std::ostringstream page_accesses_buffer;
+        // page_accesses_buffer << "[";
+        UInt32 i = 0;
+        for (auto it = m_page_access_pattern_tracker.begin(); it != m_page_access_pattern_tracker.end(); ++it) {
+            page_accesses_buffer << *it << " ";
+            i += 1;
+            if (i % 20 == 0) {
+                page_accesses_buffer << "\n";
+            }
+        }
+        // page_accesses_buffer << "]";
+
+        std::cout << "Page access pattern between " << m_page_access_pattern_tracker_starting_time.getNS() << "ns and " << m_page_access_pattern_tracker_ending_time.getNS() << "ns:\n" << page_accesses_buffer.str() << std::endl;
+        m_page_access_pattern_tracker.clear();
+
+        m_page_access_pattern_tracker_starting_time += SubsecondTime::NS(50 * 1000 * 1000);
+        m_page_access_pattern_tracker_ending_time += SubsecondTime::NS(50 * 1000 * 1000);
+    }
 
     // m_inflight_pages: tracks which pages are being moved and when the movement will complete
     // Check if the page movement is over and if so, remove from the list
