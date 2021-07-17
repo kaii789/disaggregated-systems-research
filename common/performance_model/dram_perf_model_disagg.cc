@@ -698,6 +698,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             t_now += cacheline_compression_latency;
         }
     }
+    // TODO: datamovement_queue_delay is only added to t_now if(m_r_mode != 4 && !m_r_enable_selective_moves), should we also only add cacheline compression latency if the same condition is true?
 
     SubsecondTime cacheline_delay;
     if (m_r_partition_queues == 1) {
@@ -856,30 +857,34 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
 
             // Update t_now after page_datamovement_queue_delay includes the decompression latency
             if (m_r_partition_queues == 1) {
-                if (page_compression_latency + page_datamovement_queue_delay < cacheline_compression_latency + datamovement_queue_delay) {
+                if (page_compression_latency + page_datamovement_queue_delay <= cacheline_compression_latency + datamovement_queue_delay) {
                     // If the page arrival time via the page queue is faster than the cacheline via the cacheline queue, use the page queue arrival time
                     // (and the cacheline request is not sent)
                     t_now += page_datamovement_queue_delay;
                     if (m_r_mode != 4 && !m_r_enable_selective_moves) {
                         t_now -= datamovement_queue_delay;  // only subtract if it was added earlier
                     }
-                    m_redundant_moves_type1_time_savings -= (cacheline_compression_latency + datamovement_queue_delay) - (page_compression_latency + page_datamovement_queue_delay);
+                    if (m_use_compression && (m_r_cacheline_gran || m_use_cacheline_compression))
+                        t_now -= cacheline_compression_latency;  // essentially didn't separately compress cacheline, so subtract this previously added compression latency
                     ++partition_queues_cacheline_slower_than_page;
-                    // LOG_PRINT("partition_queue=1 resulted in INCREASE of APPROX %lu ns in getAccessLatencyRemote", ((cacheline_compression_latency + datamovement_queue_delay) - (page_compression_latency + page_datamovement_queue_delay)).getNS());
                 } else {
                     // Actually put the cacheline request on the cacheline queue, since after checking the page arrival time we're sure we actually use the cacheline request
+                    // This is an ideal situation, since in real life we might not be able to compare these times, not actually send the cacheline request, avoid the cacheline compression latency, etc
                     cacheline_delay = m_data_movement_2->computeQueueDelayTrackBytes(t_remote_queue_request + cacheline_compression_latency, m_r_part2_bandwidth.getRoundedLatency(8*size), size, requester);
+                    t_now -= page_compression_latency;  // Page compression is not on critical path
                     ++m_redundant_moves;
                     ++m_redundant_moves_type1;
                     m_redundant_moves_type1_time_savings += (page_compression_latency + page_datamovement_queue_delay) - (cacheline_compression_latency + datamovement_queue_delay);
                     // LOG_PRINT("partition_queue=1 resulted in savings of APPROX %lu ns in getAccessLatencyRemote", ((page_compression_latency + page_datamovement_queue_delay) - (cacheline_compression_latency + datamovement_queue_delay)).getNS());
                 }
             } else {
-                // Default is requesting the whole page at once, so replace time of cacheline request with the time of the page request
+                // Default is requesting the whole page at once (instead of also requesting cacheline), so replace time of cacheline request with the time of the page request
                 t_now += page_datamovement_queue_delay;
                 if (m_r_mode != 4 && !m_r_enable_selective_moves) {
                     t_now -= datamovement_queue_delay;  // only subtract if it was added earlier
                 }
+                if (m_use_compression && (m_r_cacheline_gran || m_use_cacheline_compression))
+                    t_now -= cacheline_compression_latency;  // essentially didn't separately compress cacheline, so subtract this previously added compression latency
             }
         }
         else
