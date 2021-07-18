@@ -44,7 +44,7 @@ CompressionModelLZ78::compress(IntPtr addr, size_t data_size, core_id_t core_id,
     UInt32 total_bytes = 0;
     UInt32 total_accesses;
     total_bytes = compressData(m_data_buffer, m_compressed_data_buffer, data_size, &total_accesses); 
-    assert(total_bytes <= m_page_size && "[LZ78] Wrong compression!\n");
+    //assert(total_bytes <= m_page_size && "[LZ78] Wrong compression!\n");
     //printf("total accesses %d\n", total_accesses);
 
     // Use total accesses instead of compressed cache lines for decompression

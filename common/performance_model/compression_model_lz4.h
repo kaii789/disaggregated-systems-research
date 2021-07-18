@@ -23,6 +23,7 @@ private:
     char *m_data_buffer;
     char *m_compressed_data_buffer;
     UInt32 m_cacheline_count;
+    UInt32 m_max_dst_size = 0;
 
     // Compression latency per cache line
     UInt32 m_compression_latency = 3;
@@ -34,6 +35,7 @@ private:
 
     char *multipage_data_buffer;
     char *multipage_compressed_buffer;
+    UInt32 m_multipage_max_dst_size = 0;
 };
 
 #endif /* __COMPRESSION_MODEL_LZ4_H__ */
