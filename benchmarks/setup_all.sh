@@ -61,3 +61,9 @@ echo
 echo "Compiling Rodinia..."
 cd ../../rodinia
 make
+
+# Set up SLS
+echo
+echo "Compiling SLS..."
+cd ../sls/src
+make
