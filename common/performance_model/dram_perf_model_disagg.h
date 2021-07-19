@@ -123,9 +123,6 @@ class DramPerfModelDisagg : public DramPerfModel
         std::vector<UInt64> page_usage_count_stats;       // percentiles of phys_page access counts, to be registered as stats
         std::map<UInt64, UInt32> m_remote_access_tracker;  // Track remote page accesses
         std::multimap<SubsecondTime, UInt64> m_recent_remote_accesses;  // Track remote page access that are recent
-        std::vector<UInt64> m_page_access_pattern_tracker;  // Track pattern of page accesses
-        SubsecondTime m_page_access_pattern_tracker_starting_time = SubsecondTime::NS(1);  // Start of window
-        SubsecondTime m_page_access_pattern_tracker_ending_time = SubsecondTime::NS(5 * 1000 * 1000);  // Ending of window
 
         std::map<UInt64, std::pair<SubsecondTime, UInt32>> m_throttled_pages_tracker;  // keep track of pages that were throttled. The value is a (time, count) pair of the last time the page was throttled and the number of times the page was requested within the same 10^6 ns
         std::vector<std::pair<UInt64, UInt32>> m_throttled_pages_tracker_values;       // values to keep track of for stats
