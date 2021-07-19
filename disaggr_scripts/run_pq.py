@@ -44,17 +44,14 @@ if __name__ == "__main__":
     command_str1b_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -n 1 -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/test/a_disagg_test/mem_test_varied".format(
         sniper_root=subfolder_sniper_root_relpath
     )
-    # Assumes input matrices are in the {sniper_root}/test/crono/inputs directory
+    # Assumes input matrices are in the {sniper_root}/benchmarks/crono/inputs directory
     sssp_int_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/crono/apps/sssp/sssp_int {sniper_root}/benchmarks/crono/inputs/{{0}} 1".format(
-        sniper_root=subfolder_sniper_root_relpath
-    )
-    sssp_bcsstk32_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/test/crono/apps/sssp/sssp {sniper_root}/test/crono/inputs/bcsstk32.mtx 1".format(
         sniper_root=subfolder_sniper_root_relpath
     )
     stream_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/stream/stream_sniper {{0}}".format(
         sniper_root=subfolder_sniper_root_relpath
     )
-    spmv_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/spmv/bench_spdmv {sniper_root}/test/crono/inputs/{{0}} 1 1".format(
+    spmv_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/spmv/bench_spdmv {sniper_root}/benchmarks/crono/inputs/{{0}} 1 1".format(
         sniper_root=subfolder_sniper_root_relpath
     )
     nw_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/rodinia/bin/needle {{0}} 1 1".format(
@@ -703,7 +700,7 @@ if __name__ == "__main__":
     net_lat = 120
     matrix = "roadNet-CA.mtx"
     for remote_init in ["true"]:  # "false"
-        for num_MB in [2, 3]:
+        for num_MB in [2]:
             for bw_scalefactor in [4, 8, 16, 32]:
                 localdram_size_str = "{}MB".format(num_MB)
                 command_str = sssp_int_base_options.format(
@@ -734,7 +731,7 @@ if __name__ == "__main__":
     net_lat = 120
     matrix = "roadNet-CA.mtx"
     for remote_init in ["true"]:  # "false"
-        for num_MB in [2, 3]:
+        for num_MB in [2]:
             for bw_scalefactor in [4, 8, 16, 32]:
                 localdram_size_str = "{}MB".format(num_MB)
                 command_str = sssp_int_base_options.format(
@@ -766,7 +763,7 @@ if __name__ == "__main__":
     net_lat = 120
     remote_init = "true"
     matrix = "roadNet-CA.mtx"
-    for num_MB in [2, 3]:
+    for num_MB in [2]:
         for mode_switch_threshold in ["0.6", "0.7", "0.8", "0.9"]:
             for datamov_threshold in [2, 5, 10]:
                 for bw_scalefactor in [4, 8, 16, 32]:
@@ -803,7 +800,7 @@ if __name__ == "__main__":
     net_lat = 120
     remote_init = "true"
     matrix = "roadNet-CA.mtx"
-    for num_MB in [2, 3]:
+    for num_MB in [2]:
         for mode_switch_threshold in ["0.6", "0.7", "0.8", "0.9"]:
             for datamov_threshold in [2, 5, 10]:
                 for bw_scalefactor in [4, 8, 16, 32]:
@@ -1122,7 +1119,7 @@ if __name__ == "__main__":
     net_lat = 120
     remote_init = "true"
     for application_name in ["BC", "Components"]:  # Full execution: Triangle takes a long time, PageRank takes a very long time
-        for num_MB in [4, 8]:
+        for num_MB in [2, 4]:
             for bw_scalefactor in [4, 8]:
                 localdram_size_str = "{}MB".format(num_MB)
                 command_str = ligra_base_str_options_nonsym.format(
@@ -1162,7 +1159,7 @@ if __name__ == "__main__":
     net_lat = 120
     remote_init = "true"
     for application_name in ["PageRank"]:  # Full execution: Triangle takes a long time, PageRank takes a very long time
-        for num_MB in [4, 8]:
+        for num_MB in [8]:
             for bw_scalefactor in [4, 8]:
                 localdram_size_str = "{}MB".format(num_MB)
                 command_str = ligra_base_str_options_nonsym.format(
@@ -1202,7 +1199,7 @@ if __name__ == "__main__":
     net_lat = 120
     remote_init = "true"
     for application_name in ["Triangle"]:  # "BC", "Components", "Triangle" # Full execution: Triangle takes a long time, PageRank takes a very long time
-        for num_MB in [4, 8]:
+        for num_MB in [8]:  # 16
             for bw_scalefactor in [4, 8]:
                 localdram_size_str = "{}MB".format(num_MB)
                 command_str = ligra_base_str_options_sym.format(
@@ -1243,7 +1240,7 @@ if __name__ == "__main__":
     application_name = "BFS"
     net_lat = 120
     for remote_init in ["true"]:  # "false"
-        for num_MB in [8]:
+        for num_MB in [4]:
             for bw_scalefactor in [4, 8, 32]:
                 localdram_size_str = "{}MB".format(num_MB)
                 command_str = ligra_base_str_options_nonsym.format(
@@ -1282,7 +1279,7 @@ if __name__ == "__main__":
     net_lat = 120
     for remote_init in ["true"]:
         for datamov_threshold in [5, 10]:
-            for num_MB in [8]:  # 16
+            for num_MB in [4]:  # 8
                 for bw_scalefactor in [4, 32]:  # 8
                     localdram_size_str = "{}MB".format(num_MB)
                     command_str = ligra_base_str_options_nonsym.format(
@@ -1323,7 +1320,7 @@ if __name__ == "__main__":
     for remote_init in ["true"]:
         for mode_switch_threshold in ["0.7"]:
             for datamov_threshold in [5, 10]:
-                for num_MB in [8]:  # 16
+                for num_MB in [4]:  # 16
                     for bw_scalefactor in [4, 8, 32]:
                         localdram_size_str = "{}MB".format(num_MB)
                         command_str = ligra_base_str_options_nonsym.format(
@@ -1363,7 +1360,7 @@ if __name__ == "__main__":
     for remote_init in ["true"]:
         for mode_switch_threshold in ["0.6", "0.8", "0.9"]:
             for datamov_threshold in [5, 10]:
-                for num_MB in [8]:  # 16
+                for num_MB in [4]:  # 16
                     for bw_scalefactor in [4, 32]:
                         localdram_size_str = "{}MB".format(num_MB)
                         command_str = ligra_base_str_options_nonsym.format(
@@ -1709,7 +1706,7 @@ if __name__ == "__main__":
                             )
                             # 1 billion instructions cap
 
-                            darknet_tiny_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds.append(
+                            darknet_tiny_pq_cacheline_combined_experiments_remoteinit_true_rmode5_thresholds_add.append(
                                 Experiment(
                                     experiment_name="darknet_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_rmode5_threshold_{}_{}_pq_newer_series".format(
                                         model_type.lower(),
