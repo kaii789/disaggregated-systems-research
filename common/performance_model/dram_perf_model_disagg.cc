@@ -1165,10 +1165,10 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                     if (m_r_throttle_redundant_moves) {
                         // Don't request cacheline via the cacheline queue if the inflight page arrives sooner
                         // But otherwise use the earlier arrival time to determine access_latency
-                        SubsecondTime datamov_queue_delay = m_data_movement_2->computeQueueDelayNoEffect(t_remote_queue_request + cacheline_compression_latency, m_r_part2_bandwidth.getRoundedLatency(8*pkt_size), requester);
+                        SubsecondTime datamov_queue_delay = m_data_movement_2->computeQueueDelayNoEffect(t_remote_queue_request + cacheline_compression_latency, m_r_part2_bandwidth.getRoundedLatency(8*size), requester);
                         datamov_queue_delay += cacheline_decompression_latency;  // decompression latency is 0 if not using cacheline compression
                         if ((datamov_queue_delay + t_remote_queue_request + cacheline_compression_latency - pkt_time) < access_latency) {
-                            datamov_queue_delay = m_data_movement_2->computeQueueDelayTrackBytes(t_remote_queue_request + cacheline_compression_latency, m_r_part2_bandwidth.getRoundedLatency(8*pkt_size), pkt_size, requester);
+                            datamov_queue_delay = m_data_movement_2->computeQueueDelayTrackBytes(t_remote_queue_request + cacheline_compression_latency, m_r_part2_bandwidth.getRoundedLatency(8*size), size, requester);
                             datamov_queue_delay += cacheline_decompression_latency;
                             ++m_redundant_moves;
                             ++m_redundant_moves_type2;
@@ -1179,7 +1179,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                         }
                     } else {
                         // Always request cacheline via the cacheline queue, then use the earlier arrival time to determine access_latency
-                        SubsecondTime datamov_queue_delay = m_data_movement_2->computeQueueDelayTrackBytes(t_remote_queue_request + cacheline_compression_latency, m_r_part2_bandwidth.getRoundedLatency(8*pkt_size), pkt_size, requester);
+                        SubsecondTime datamov_queue_delay = m_data_movement_2->computeQueueDelayTrackBytes(t_remote_queue_request + cacheline_compression_latency, m_r_part2_bandwidth.getRoundedLatency(8*size), size, requester);
                         datamov_queue_delay += cacheline_decompression_latency;  // decompression latency is 0 if not using cacheline compression
                         ++m_redundant_moves;
                         ++m_redundant_moves_type2;
