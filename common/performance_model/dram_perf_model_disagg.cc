@@ -1102,6 +1102,8 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
     // Update Memory Counters? 
     //queue_delay = ddr_queue_delay;
 
+    SubsecondTime t_remote_queue_request = t_now;  // time of making queue request
+
     if ((m_inflight_pages.find(phys_page) == m_inflight_pages.end()) || m_r_enable_selective_moves) {
         // The phys_page is not included in m_inflight_pages or m_r_enable_selective_moves is true, then total access latency = t_now - pkt_time
         SubsecondTime access_latency = t_now - pkt_time;
@@ -1120,30 +1122,72 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
 
             if (m_r_partition_queues == 1) {
                 if (m_inflight_redundant[phys_page] < m_r_limit_redundant_moves) {
-                    // Main difference when m_r_throttle_redundant_moves is on: reduce traffic sent through cacheline queue
+                    UInt32 size = pkt_size;
+                    SubsecondTime cacheline_compression_latency = SubsecondTime::Zero();  // when cacheline compression is not enabled, this is always 0
+                    if (m_use_compression)
+                    {
+                        if (m_r_cacheline_gran) {
+                            UInt32 compressed_cache_lines;
+                            cacheline_compression_latency = m_compression_model->compress(phys_page, m_cache_line_size, m_core_id, &size, &compressed_cache_lines);
+                            if (m_cache_line_size > size)
+                                bytes_saved += m_cache_line_size - size;
+                            else
+                                bytes_saved -= size - m_cache_line_size;
+
+                            address_to_compressed_size[phys_page] = size;
+                            address_to_num_cache_lines[phys_page] = compressed_cache_lines;
+                            m_total_compression_latency += cacheline_compression_latency;
+                        } else if (m_use_cacheline_compression) {
+                            UInt32 compressed_cache_lines;
+                            cacheline_compression_latency = m_cacheline_compression_model->compress(phys_page, m_cache_line_size, m_core_id, &size, &compressed_cache_lines);
+                            if (m_cache_line_size > size)
+                                cacheline_bytes_saved += m_cache_line_size - size;
+                            else
+                                cacheline_bytes_saved -= size - m_cache_line_size;
+                            address_to_num_cache_lines[phys_page] = compressed_cache_lines;
+                            m_total_cacheline_compression_latency += cacheline_compression_latency;
+                        }
+                    }
+                    // For clearer code logic, calculate decompression latency (but not adding it to anything) before computing the queue delay
+                    SubsecondTime cacheline_decompression_latency = SubsecondTime::Zero();
+                    // TODO: Currently model decompression by adding decompression latency to inflight page time
+                    if (m_use_compression && (m_r_cacheline_gran || m_use_cacheline_compression))
+                    {
+                        CompressionModel *compression_model = m_r_cacheline_gran ? m_compression_model : m_cacheline_compression_model;
+                        cacheline_decompression_latency = compression_model->decompress(phys_page, address_to_num_cache_lines[phys_page], m_core_id);
+                        if (m_r_cacheline_gran)
+                            m_total_decompression_latency += cacheline_decompression_latency;
+                        else
+                            m_total_cacheline_decompression_latency += cacheline_decompression_latency;
+                    }
+                    
+                    // Main difference when m_r_throttle_redundant_moves is true: reduce traffic sent through cacheline queue
                     if (m_r_throttle_redundant_moves) {
                         // Don't request cacheline via the cacheline queue if the inflight page arrives sooner
                         // But otherwise use the earlier arrival time to determine access_latency
-                        SubsecondTime datamov_queue_delay = m_data_movement_2->computeQueueDelayNoEffect(t_now, m_r_part2_bandwidth.getRoundedLatency(8*pkt_size), requester);
-                        if ((datamov_queue_delay + t_now - pkt_time) < access_latency) {
-                            datamov_queue_delay = m_data_movement_2->computeQueueDelayTrackBytes(t_now, m_r_part2_bandwidth.getRoundedLatency(8*pkt_size), pkt_size, requester);
+                        SubsecondTime datamov_queue_delay = m_data_movement_2->computeQueueDelayNoEffect(t_remote_queue_request + cacheline_compression_latency, m_r_part2_bandwidth.getRoundedLatency(8*pkt_size), requester);
+                        datamov_queue_delay += cacheline_decompression_latency;  // decompression latency is 0 if not using cacheline compression
+                        if ((datamov_queue_delay + t_remote_queue_request + cacheline_compression_latency - pkt_time) < access_latency) {
+                            datamov_queue_delay = m_data_movement_2->computeQueueDelayTrackBytes(t_remote_queue_request + cacheline_compression_latency, m_r_part2_bandwidth.getRoundedLatency(8*pkt_size), pkt_size, requester);
+                            datamov_queue_delay += cacheline_decompression_latency;
                             ++m_redundant_moves;
                             ++m_redundant_moves_type2;
                             m_inflight_redundant[phys_page] = m_inflight_redundant[phys_page] + 1;
-                            // LOG_PRINT("getAccessLatency (local dram) inflight page saving of %lu ns", (access_latency-(datamov_queue_delay + t_now - pkt_time)).getNS());
-                            m_redundant_moves_type2_time_savings += (access_latency - (datamov_queue_delay + t_now - pkt_time));
-                            access_latency = datamov_queue_delay + t_now - pkt_time;
+                            // LOG_PRINT("getAccessLatency (local dram) inflight page saving of %lu ns", (access_latency-(datamov_queue_delay + t_remote_queue_request + cacheline_compression_latency - pkt_time)).getNS());
+                            m_redundant_moves_type2_time_savings += (access_latency - (datamov_queue_delay + t_remote_queue_request + cacheline_compression_latency - pkt_time));
+                            access_latency = datamov_queue_delay + t_remote_queue_request + cacheline_compression_latency - pkt_time;
                         }
                     } else {
                         // Always request cacheline via the cacheline queue, then use the earlier arrival time to determine access_latency
-                        SubsecondTime datamov_queue_delay = m_data_movement_2->computeQueueDelayTrackBytes(t_now, m_r_part2_bandwidth.getRoundedLatency(8*pkt_size), pkt_size, requester);
+                        SubsecondTime datamov_queue_delay = m_data_movement_2->computeQueueDelayTrackBytes(t_remote_queue_request + cacheline_compression_latency, m_r_part2_bandwidth.getRoundedLatency(8*pkt_size), pkt_size, requester);
+                        datamov_queue_delay += cacheline_decompression_latency;  // decompression latency is 0 if not using cacheline compression
                         ++m_redundant_moves;
                         ++m_redundant_moves_type2;
                         m_inflight_redundant[phys_page] = m_inflight_redundant[phys_page] + 1; 
-                        if ((datamov_queue_delay + t_now - pkt_time) < access_latency) {
-                            // LOG_PRINT("getAccessLatency (local dram) inflight page saving of %lu ns", (access_latency-(datamov_queue_delay + t_now - pkt_time)).getNS());
-                            m_redundant_moves_type2_time_savings += (access_latency - (datamov_queue_delay + t_now - pkt_time));
-                            access_latency = datamov_queue_delay + t_now - pkt_time;
+                        if ((datamov_queue_delay + t_remote_queue_request + cacheline_compression_latency - pkt_time) < access_latency) {
+                            // LOG_PRINT("getAccessLatency (local dram) inflight page saving of %lu ns", (access_latency-(datamov_queue_delay + t_remote_queue_request + cacheline_compression_latency - pkt_time)).getNS());
+                            m_redundant_moves_type2_time_savings += (access_latency - (datamov_queue_delay + t_remote_queue_request + cacheline_compression_latency - pkt_time));
+                            access_latency = datamov_queue_delay + t_remote_queue_request + cacheline_compression_latency - pkt_time;
                         }
                     }
                 } else {
