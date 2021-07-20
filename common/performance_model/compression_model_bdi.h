@@ -42,8 +42,7 @@ private:
     UInt32 m_compression_latency = 3; 
     // Decompression latency per cache line
     UInt32 m_decompression_latency = 3; 
-
-    int m_compression_granularity;
+    SInt32 m_compression_granularity;
 
     bool use_additional_options;
 
