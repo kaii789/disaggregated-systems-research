@@ -7,7 +7,10 @@ CompressionModelBDI::CompressionModelBDI(String name, UInt32 page_size, UInt32 c
     , m_page_size(page_size)
     , m_cache_line_size(cache_line_size)
     , m_compression_granularity(Sim()->getCfg()->getInt("perf_model/dram/compression_model/bdi/compression_granularity"))
+    , use_additional_options(Sim()->getCfg()->getBool("perf_model/dram/compression_model/bdi/use_additional_options"))
 {
+    m_options = (use_additional_options) ? 21 : 8;
+
     // Set compression/decompression cycle latencies if configured
     if (Sim()->getCfg()->getInt("perf_model/dram/compression_model/bdi/compression_latency") != -1)
         m_compression_latency = Sim()->getCfg()->getInt("perf_model/dram/compression_model/bdi/compression_latency");
@@ -129,14 +132,16 @@ CompressionModelBDI::writeWord(void *ptr, UInt32 idx, SInt64 word, UInt32 word_s
     }      
 }
 
-bool 
+bool
 CompressionModelBDI::checkDeltaLimits(SInt64 delta, UInt32 delta_size)
 {
     bool within_limits = true;
     switch (delta_size)
-    {          
-        case 4:   
+    {
+        case 4:
             if ((delta < INT_MIN) || (delta > INT_MAX)) within_limits = false;
+            break;
+        case 3:
             break;
         case 2:
             if ((delta < SHRT_MIN) || (delta > SHRT_MAX)) within_limits = false;
@@ -147,7 +152,7 @@ CompressionModelBDI::checkDeltaLimits(SInt64 delta, UInt32 delta_size)
         default:
             fprintf(stderr,"Unknown Delta Size\n");
             exit(1);
-    }      
+    }
     return within_limits;
 }
 
@@ -256,10 +261,10 @@ CompressionModelBDI::specializedCompress(void *in, m_compress_info *res, void *o
        delta = base - word;
 
        within_limits = checkDeltaLimits(delta, delta_size);
-       if (within_limits == false) 
+       if (within_limits == false)
            break;
-       else 
-           writeWord((void*) (((char*)out) + k * sizeof(char)), i, delta, delta_size);
+    //    else
+    //        writeWord((void*) (((char*)out) + k * sizeof(char)), i, delta, delta_size);
     }
     
     if(within_limits == true) {
@@ -279,8 +284,8 @@ CompressionModelBDI::compressCacheLine(void* in, void* out)
 
     m_compress_info *m_options_compress_info;
     char **m_options_data_buffer;
-    m_options_compress_info = new m_compress_info[8];
-    m_options_data_buffer = new char*[8];
+    m_options_compress_info = new m_compress_info[m_options];
+    m_options_data_buffer = new char*[m_options];
     for(i = 0; i < m_options; i++) {
         m_options_compress_info[i].is_compressible = false;
         m_options_compress_info[i].compressed_size = m_cache_line_size;
@@ -296,19 +301,45 @@ CompressionModelBDI::compressCacheLine(void* in, void* out)
     repeatedValues(in, &(m_options_compress_info[cur_option]), (void*) m_options_data_buffer[cur_option]);
     cur_option++;
 
-    for (b = 8; b >= 2; b /= 2) {
-        for(d = 1; d <= (b/2); d *= 2){
-            // Option 2: base_size = 8 bytes, delta_size = 1 byte
-            // Option 3: base_size = 8 bytes, delta_size = 2 bytes
-            // Option 4: base_size = 8 bytes, delta_size = 4 bytes
-            // Option 5: base_size = 4 bytes, delta_size = 1 byte
-            // Option 6: base_size = 4 bytes, delta_size = 2 bytes
-            // Option 7: base_size = 2 bytes, delta_size = 1 byte
-            specializedCompress(in, &(m_options_compress_info[cur_option]), (void*)m_options_data_buffer[cur_option], b, d);
-            cur_option++;
+    if (use_additional_options) {
+        // Additional Options:
+        // Option 2: base_size = 8 bytes, delta_size = 1 byte
+        // Option 3: base_size = 8 bytes, delta_size = 2 bytes
+        // Option 4: base_size = 8 bytes, delta_size = 3 bytes
+        // Option 5: base_size = 8 bytes, delta_size = 4 bytes
+        // Option 6: base_size = 4 bytes, delta_size = 1 byte
+        // Option 7: base_size = 4 bytes, delta_size = 2 bytes
+        // Option 8: base_size = 4 bytes, delta_size = 3 bytes
+        // Option 9: base_size = 2 bytes, delta_size = 1 byte
+        for (b = 8; b >= 2; b /= 2) {
+            if (b > 4) {
+                for(d = 1; d <= 4; d++){
+                    specializedCompress(in, &(m_options_compress_info[cur_option]), (void*)m_options_data_buffer[cur_option], b, d);
+                    cur_option++;
+                }
+            } else {
+                for(d = 1; d < b; d++){
+                    specializedCompress(in, &(m_options_compress_info[cur_option]), (void*)m_options_data_buffer[cur_option], b, d);
+                    cur_option++;
+                }
+            }
+        }
+    } else {
+        // Original Options:
+        // Option 2: base_size = 8 bytes, delta_size = 1 byte
+        // Option 3: base_size = 8 bytes, delta_size = 2 bytes
+        // Option 4: base_size = 8 bytes, delta_size = 4 bytes
+        // Option 5: base_size = 4 bytes, delta_size = 1 byte
+        // Option 6: base_size = 4 bytes, delta_size = 2 bytes
+        // Option 7: base_size = 2 bytes, delta_size = 1 byte
+        for (b = 8; b >= 2; b /= 2) {
+            for(d = 1; d <= (b/2); d *= 2){
+                specializedCompress(in, &(m_options_compress_info[cur_option]), (void*)m_options_data_buffer[cur_option], b, d);
+                cur_option++;
+            }
         }
     }
-    
+
     UInt32 compressed_size = (UInt32) m_cache_line_size;
     UInt8 chosen_option = 42; // If chosen_option == 42, cache line is not compressible (leave it uncompressed)
     for(i = 0; i < m_options; i++) {
@@ -316,7 +347,7 @@ CompressionModelBDI::compressCacheLine(void* in, void* out)
             if(m_options_compress_info[i].compressed_size < compressed_size){
                 compressed_size = m_options_compress_info[i].compressed_size;
                 chosen_option = i; // Update chosen option
-            }            
+            }
         }
     }
 
@@ -338,115 +369,115 @@ CompressionModelBDI::compressCacheLine(void* in, void* out)
 
 
 
-UInt32 
-CompressionModelBDI::decompressCacheLine(void *in, void *out)
-{
-    char chosen_option;
-    UInt32 i;
-    SInt64 base, delta, word;
+// UInt32 
+// CompressionModelBDI::decompressCacheLine(void *in, void *out)
+// {
+//     char chosen_option;
+//     UInt32 i;
+//     SInt64 base, delta, word;
 
-    chosen_option = ((char*)in)[0];
-    in = (void*)(((char*)in)+1);
+//     chosen_option = ((char*)in)[0];
+//     in = (void*)(((char*)in)+1);
 
-    switch (chosen_option)
-    {
-        case 0:
-            // Option 0: all bytes within the cache line are equal to 0
-            base = readWord(in, 0, sizeof(char));
-            memset(out, base, m_cache_line_size);       
-            break;
-        case 1:
-            // Option 1: a single value repeated multiple times within the cache line (8-byte granularity) 
-            UInt32 k;
-            k = ((char*)in)[0];
-            in = (void*)(((char*)in)+1);
-            base = readWord(in, 0, k * sizeof(char));
-            for (i = 0; i < (m_cache_line_size / k); i++) {
-                writeWord(out, i, base, k * sizeof(char));   
-            }
-            break;
-       case 2:
-            // Option 2: base_size = 8 bytes, delta_size = 1 byte
-            base = readWord(in, 0, sizeof(SInt64));
-            writeWord(out, 0, base, sizeof(SInt64));
-            in = (void*) (((char*)in) + sizeof(SInt64));
-            out = (void*) (((char*)out) + sizeof(SInt64));
-            for (i = 1; i < (m_cache_line_size / sizeof(SInt64)); i++) {
-                delta = readWord(in, i, sizeof(SInt8));
-                word = base - delta;
-                writeWord(out, i, word, sizeof(SInt64));   
-            }
-            break;
-        case 3:
-            // Option 3: base_size = 8 bytes, delta_size = 2 bytes
-            base = readWord(in, 0, sizeof(SInt64));
-            writeWord(out, 0, base, sizeof(SInt64));
-            in = (void*) (((char*)in) + sizeof(SInt64));
-            out = (void*)(((char*)out) + sizeof(SInt64));
-            for (i = 1; i < (m_cache_line_size / sizeof(SInt64)); i++){
-                delta = readWord(in, i, sizeof(SInt16));
-                word = base - delta;
-                writeWord(out, i, word, sizeof(SInt64));   
-            }
-            break;
-        case 4:
-            // Option 4: base_size = 8 bytes, delta_size = 4 bytes
-            base = readWord(in, 0, sizeof(SInt64));
-            writeWord(out, 0, base, sizeof(SInt64));
-            in = (void*) (((char*)in) + sizeof(SInt64));
-            out = (void*) (((char*)out) + sizeof(SInt64));
-            for (i=1; i< (m_cache_line_size / sizeof(SInt64)); i++){
-                delta = readWord(in, i, sizeof(SInt32));
-                word = base - delta;
-                writeWord(out, i, word, sizeof(SInt64));   
-            }
-            break;
-        case 5:
-            // Option 5: base_size = 4 bytes, delta_size = 1 byte
-            base = readWord(in, 0, sizeof(SInt32));
-            writeWord(out, 0, base, sizeof(SInt32));
-            in = (void*)(((char*)in) + sizeof(SInt32));
-            out = (void*)(((char*)out) + sizeof(SInt32));
-            for (i = 0; i < (m_cache_line_size / sizeof(SInt32)); i++){
-                delta = readWord(in, i, sizeof(SInt8));
-                word = base - delta;
-                writeWord(out, i, word, sizeof(SInt32));   
-            }
-            break;
-        case 6:
-            // Option 6: base_size = 4 bytes, delta_size = 2 bytes
-            base = readWord(in, 0, sizeof(SInt32));
-            writeWord(out, 0, base, sizeof(SInt32));
-            in = (void*) (((char*)in) + sizeof(SInt32));
-            out = (void*) (((char*)out) + sizeof(SInt32));
-            for(i = 0; i < (m_cache_line_size / sizeof(SInt32)); i++){
-                delta = readWord(in, i, sizeof(SInt16));
-                word = base - delta;
-                writeWord(out, i, word, sizeof(SInt32));   
-            }
-            break;
-        case 7:
-            // Option 7: base_size = 2 bytes, delta_size = 1 byte
-            base = readWord(in, 0, sizeof(SInt16));
-            writeWord(out, 0, base, sizeof(SInt16));
-            in = (void*) (((char*)in) + sizeof(SInt16));
-            out = (void*)(((char*)out) + sizeof(SInt16));
-            for (i = 0; i < (m_cache_line_size / sizeof(SInt16)); i++){
-                delta = readWord(in, i, sizeof(SInt8));
-                word = base - delta;
-                writeWord(out, i, word, sizeof(SInt16));   
-            }
-            break;
-        case 42: // Uncompressed cache line
-            memcpy(out, in, m_cache_line_size);
-            break;
-        default:
-            fprintf(stderr,"Unknown code\n");
-            exit(1);
-    }
-    return 0;
+//     switch (chosen_option)
+//     {
+//         case 0:
+//             // Option 0: all bytes within the cache line are equal to 0
+//             base = readWord(in, 0, sizeof(char));
+//             memset(out, base, m_cache_line_size);       
+//             break;
+//         case 1:
+//             // Option 1: a single value repeated multiple times within the cache line (8-byte granularity) 
+//             UInt32 k;
+//             k = ((char*)in)[0];
+//             in = (void*)(((char*)in)+1);
+//             base = readWord(in, 0, k * sizeof(char));
+//             for (i = 0; i < (m_cache_line_size / k); i++) {
+//                 writeWord(out, i, base, k * sizeof(char));   
+//             }
+//             break;
+//        case 2:
+//             // Option 2: base_size = 8 bytes, delta_size = 1 byte
+//             base = readWord(in, 0, sizeof(SInt64));
+//             writeWord(out, 0, base, sizeof(SInt64));
+//             in = (void*) (((char*)in) + sizeof(SInt64));
+//             out = (void*) (((char*)out) + sizeof(SInt64));
+//             for (i = 1; i < (m_cache_line_size / sizeof(SInt64)); i++) {
+//                 delta = readWord(in, i, sizeof(SInt8));
+//                 word = base - delta;
+//                 writeWord(out, i, word, sizeof(SInt64));   
+//             }
+//             break;
+//         case 3:
+//             // Option 3: base_size = 8 bytes, delta_size = 2 bytes
+//             base = readWord(in, 0, sizeof(SInt64));
+//             writeWord(out, 0, base, sizeof(SInt64));
+//             in = (void*) (((char*)in) + sizeof(SInt64));
+//             out = (void*)(((char*)out) + sizeof(SInt64));
+//             for (i = 1; i < (m_cache_line_size / sizeof(SInt64)); i++){
+//                 delta = readWord(in, i, sizeof(SInt16));
+//                 word = base - delta;
+//                 writeWord(out, i, word, sizeof(SInt64));   
+//             }
+//             break;
+//         case 4:
+//             // Option 4: base_size = 8 bytes, delta_size = 4 bytes
+//             base = readWord(in, 0, sizeof(SInt64));
+//             writeWord(out, 0, base, sizeof(SInt64));
+//             in = (void*) (((char*)in) + sizeof(SInt64));
+//             out = (void*) (((char*)out) + sizeof(SInt64));
+//             for (i=1; i< (m_cache_line_size / sizeof(SInt64)); i++){
+//                 delta = readWord(in, i, sizeof(SInt32));
+//                 word = base - delta;
+//                 writeWord(out, i, word, sizeof(SInt64));   
+//             }
+//             break;
+//         case 5:
+//             // Option 5: base_size = 4 bytes, delta_size = 1 byte
+//             base = readWord(in, 0, sizeof(SInt32));
+//             writeWord(out, 0, base, sizeof(SInt32));
+//             in = (void*)(((char*)in) + sizeof(SInt32));
+//             out = (void*)(((char*)out) + sizeof(SInt32));
+//             for (i = 0; i < (m_cache_line_size / sizeof(SInt32)); i++){
+//                 delta = readWord(in, i, sizeof(SInt8));
+//                 word = base - delta;
+//                 writeWord(out, i, word, sizeof(SInt32));   
+//             }
+//             break;
+//         case 6:
+//             // Option 6: base_size = 4 bytes, delta_size = 2 bytes
+//             base = readWord(in, 0, sizeof(SInt32));
+//             writeWord(out, 0, base, sizeof(SInt32));
+//             in = (void*) (((char*)in) + sizeof(SInt32));
+//             out = (void*) (((char*)out) + sizeof(SInt32));
+//             for(i = 0; i < (m_cache_line_size / sizeof(SInt32)); i++){
+//                 delta = readWord(in, i, sizeof(SInt16));
+//                 word = base - delta;
+//                 writeWord(out, i, word, sizeof(SInt32));   
+//             }
+//             break;
+//         case 7:
+//             // Option 7: base_size = 2 bytes, delta_size = 1 byte
+//             base = readWord(in, 0, sizeof(SInt16));
+//             writeWord(out, 0, base, sizeof(SInt16));
+//             in = (void*) (((char*)in) + sizeof(SInt16));
+//             out = (void*)(((char*)out) + sizeof(SInt16));
+//             for (i = 0; i < (m_cache_line_size / sizeof(SInt16)); i++){
+//                 delta = readWord(in, i, sizeof(SInt8));
+//                 word = base - delta;
+//                 writeWord(out, i, word, sizeof(SInt16));   
+//             }
+//             break;
+//         case 42: // Uncompressed cache line
+//             memcpy(out, in, m_cache_line_size);
+//             break;
+//         default:
+//             fprintf(stderr,"Unknown code\n");
+//             exit(1);
+//     }
+//     return 0;
 
-}
+// }
 
 
 SubsecondTime

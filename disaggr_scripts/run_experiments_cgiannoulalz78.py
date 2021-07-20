@@ -269,7 +269,99 @@ if __name__ == "__main__":
             ]
         ),
 
+        # 17) Remote on, PQ = 0, compression = 'lz4', compression_latency = 0
+        ExperimentRunConfig(
+            [
+                ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
+                ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+                ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+                ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+                ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lz78"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "compression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "decompression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "word_size" , "1"),
+            ]
+        ),
+
+        # 18) Remote on, PQ = 1, cache_line_fraction = 0.15, compression = 'lz4', compression_latency = 0
+        ExperimentRunConfig(
+            [
+                ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
+                ConfigEntry("perf_model/dram", "remote_partitioned_queues", "1"),
+                ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.15"),
+                ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+                ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+                ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lz78"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "compression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "decompression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "word_size" , "1"),
+            ]
+        ),
+
+        # 19) Remote on, PQ = 1, cache_line_fraction = 0.15, cache_line_compression = 'bdi', compression = 'lz4'
+        ExperimentRunConfig(
+            [
+                ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
+                ConfigEntry("perf_model/dram", "remote_partitioned_queues", "1"),
+                ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.15"),
+                ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "true"),
+                ConfigEntry("perf_model/dram/compression_model/cacheline", "compression_scheme", "bdi"),
+                ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+                ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lz78"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "compression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "decompression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "word_size" , "1"),
+            ]
+        ),
+
  
+        # 18) Remote on, PQ = 0, compression = 'lz4', compression_latency = 0
+        ExperimentRunConfig(
+            [
+                ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
+                ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+                ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+                ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+                ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lz78"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "compression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "decompression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "word_size" , "2"),
+            ]
+        ),
+
+        # 19) Remote on, PQ = 1, cache_line_fraction = 0.15, compression = 'lz4', compression_latency = 0
+        ExperimentRunConfig(
+            [
+                ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
+                ConfigEntry("perf_model/dram", "remote_partitioned_queues", "1"),
+                ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.15"),
+                ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+                ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+                ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lz78"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "compression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "decompression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "word_size" , "2"),
+            ]
+        ),
+
+        # 20) Remote on, PQ = 1, cache_line_fraction = 0.15, cache_line_compression = 'bdi', compression = 'lz4'
+        ExperimentRunConfig(
+            [
+                ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
+                ConfigEntry("perf_model/dram", "remote_partitioned_queues", "1"),
+                ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.15"),
+                ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "true"),
+                ConfigEntry("perf_model/dram/compression_model/cacheline", "compression_scheme", "bdi"),
+                ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+                ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lz78"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "compression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "decompression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "word_size" , "2"),
+            ]
+        ),
+
+ 
+
 
 
     ]
@@ -284,7 +376,7 @@ if __name__ == "__main__":
     for remote_init in ["true"]:  # "false"
         for bw_scalefactor in [4, 16]:
             command_str = sssp_int_base_options.format(
-                "roadNet-PA.mtx",
+                "roadNet-CA.mtx",
                 sniper_options="-g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -s stop-by-icount:{}".format(
                     int(bw_scalefactor),
                     str(remote_init),
@@ -294,7 +386,7 @@ if __name__ == "__main__":
 
             sssp_roadNet_compression_experiments_remoteinit_true.append(
                 Experiment(
-                    experiment_name="sssp_roadNet_bw_scalefactor_{}_remoteinit_{}_compression_series".format(
+                    experiment_name="sssp_roadNetCA_bw_scalefactor_{}_remoteinit_{}_compression_series".format(
                         bw_scalefactor,
                         remote_init,
                     ),
@@ -334,7 +426,7 @@ if __name__ == "__main__":
     for remote_init in ["true"]:  # "false"
         for bw_scalefactor in [4, 16]:
             command_str = nw_base_options.format(
-                "6144",
+                "2048",
                 sniper_options="-g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -s stop-by-icount:{}".format(
                     int(bw_scalefactor),
                     str(remote_init),
@@ -573,7 +665,8 @@ if __name__ == "__main__":
 
 
     ## add configs to experiment list
-    #experiments.extend(sssp_roadNet_compression_experiments_remoteinit_true)
+    experiments.extend(sssp_roadNet_compression_experiments_remoteinit_true)
+    experiments.extend(nw_compression_experiments_remoteinit_true)
 
 
     ### Run Sniper experiments using ExperimentManager ###
