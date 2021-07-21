@@ -1,6 +1,7 @@
-#include "compression_model_lzW.h"
+#include "compression_model_lzw.h"
 #include "utils.h"
 #include "config.hpp"
+#include <math.h>
 
 CompressionModelLZW::CompressionModelLZW(String name, UInt32 id, UInt32 page_size, UInt32 cache_line_size)
     : m_name(name)
@@ -129,21 +130,32 @@ CompressionModelLZW::writeWord(void *ptr, UInt32 idx, SInt64 word, UInt32 word_s
 UInt32 
 CompressionModelLZW::compressData(void* in, void* out, UInt32 data_size, UInt32 *total_accesses)
 {
+    UInt32 j;
+    UInt32 dictionary_size = 0; 
     UInt32 compressed_size = 0;
+    string s;
+    UInt8 cur_byte;
     compression_CAM.clear(); // What is the cost of flushing/clearing the dictionary?
+     
+    for(j = 0; j < pow(2, m_word_size * 8); j++) {
+        dictionary_size++;
+        cur_byte = (UInt8) j; 
+        s.push_back(cur_byte); 
+        compression_CAM.insert(pair<string, UInt32>(s, dictionary_size));
+        s.clear();
+    }
 
     // statistics - RemoveMe
     UInt32 max_string_size = 0;
     // statistics - RemoveMe
 
     UInt32 accesses = 0;
-    UInt32 dictionary_size = 0; 
-    UInt32 j, i = 0;
+    UInt32 i = 0;
     UInt32 out_indx = 0;
-    UInt32 inserts = 0;
-    string s;
+    UInt32 inserts = pow(2, m_word_size * 8);
+    UInt8 last_byte;
+    compression_CAM.clear(); // What is the cost of flushing/clearing the dictionary?
     SInt64 cur_word;
-    SInt8 cur_byte;
     map<string, UInt32>::iterator it;
     while ((i * m_word_size) < data_size) {
         // Read next word byte-by-byte
@@ -161,18 +173,20 @@ CompressionModelLZW::compressData(void* in, void* out, UInt32 data_size, UInt32 
             inserts++;
             compression_CAM.insert(pair<string, UInt32>(s, dictionary_size));
             accesses++;
-            writeWord(out, out_indx, cur_word, m_word_size);
-            out_indx++; 
-            compressed_size += m_word_size;
-    
+            //writeIndex to output
+
             // statistics - RemoveMe
             if (s.size() > max_string_size)
                 max_string_size = s.size();
             // statistics - RemoveMe
 
             s.clear();
+            for(j = 0; j < m_word_size; j++) {     
+                cur_byte = (cur_word >> (8*j)) & 0xff; // Get j-th byte from the word
+                s.push_back(cur_byte); 
+            }
         }
-        
+
         i++; 
     }
 
