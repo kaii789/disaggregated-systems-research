@@ -480,7 +480,6 @@ if __name__ == "__main__":
     #                                      ]
 
     pq_cacheline_combined_rmode1_configs = []
-    # Only want runs number 1-5 in partition_queue_series_experiment_run_configs
     for config in pq_cacheline_combined_base_configs:
         config_copy = copy.deepcopy(config)
         config_copy.add_config_entries(
@@ -495,7 +494,6 @@ if __name__ == "__main__":
         pq_cacheline_combined_rmode1_configs.append(config_copy)
 
     pq_cacheline_combined_rmode1_configs_prefetch = []
-    # Only want runs number 1-5 in partition_queue_series_experiment_run_configs
     for config in pq_cacheline_combined_rmode1_configs:
         config_copy = copy.deepcopy(config)
         config_copy.replace_config_entries(
@@ -507,7 +505,6 @@ if __name__ == "__main__":
         pq_cacheline_combined_rmode1_configs_prefetch.append(config_copy)
 
     pq_cacheline_combined_rmode2_configs = []
-    # Only want runs number 1-5 in partition_queue_series_experiment_run_configs
     for config in pq_cacheline_combined_base_configs:
         config_copy = copy.deepcopy(config)
         config_copy.add_config_entries(
@@ -523,7 +520,6 @@ if __name__ == "__main__":
         pq_cacheline_combined_rmode2_configs.append(config_copy)
 
     pq_cacheline_combined_rmode5_configs = []
-    # Only want runs number 1-5 in partition_queue_series_experiment_run_configs
     for config in pq_cacheline_combined_base_configs:
         config_copy = copy.deepcopy(config)
         config_copy.add_config_entries(
@@ -541,7 +537,6 @@ if __name__ == "__main__":
         pq_cacheline_combined_rmode5_configs.append(config_copy)
 
     pq_cacheline_combined_rmode1_configs_ideal_page_throttling = []
-    # Only want runs number 1-5 in partition_queue_series_experiment_run_configs
     for config in pq_cacheline_combined_rmode1_configs:
         config_copy = copy.deepcopy(config)
         config_copy.replace_config_entries(

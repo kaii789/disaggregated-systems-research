@@ -4,6 +4,7 @@ import os
 import time
 import subprocess
 import getopt
+import natsort
 import numpy as np
 import matplotlib
 
@@ -355,7 +356,7 @@ def check_config(
                     if line.startswith(config_line_beginning):
                         x_value_line_no = line_no
                         # The entry after the equals sign
-                        config_param_values.append(float(line.split()[2]))
+                        config_param_values.append(str(line.split()[2]))
                 if x_value_line_no is None:
                     raise ValueError(
                         "Error: didn't find desired line starting with '{}' in .cfg file".format(
@@ -371,7 +372,7 @@ def check_config(
                         )
                     )
                 # The entry after the equals sign
-                config_param_values.append(float(line.split()[2]))
+                config_param_values.append(str(line.split()[2]))
         first_file = False
         file_num += 1
         out_file_path = os.path.join(
@@ -402,8 +403,25 @@ if __name__ == "__main__":
         run_from_cmdline_cacheline_queue_ratio(".")
     elif type == "print_only":
         directory_path = "."  # current directory of the calling terminal
-        check_config(directory_path, "localdram_size")
-        check_config(directory_path, "remote_mem_add_lat")
-        check_config(directory_path, "remote_mem_bw_scalefactor")
-        check_config(directory_path, "remote_partitioned_queues")
-        check_config(directory_path, "remote_cacheline_queue_fraction")
+        # check_config(directory_path, "localdram_size")
+        # check_config(directory_path, "remote_mem_add_lat")
+        # check_config(directory_path, "remote_mem_bw_scalefactor")
+        # check_config(directory_path, "remote_partitioned_queues")
+        # check_config(directory_path, "remote_cacheline_queue_fraction")
+    elif type == "print_only_parent_dir":
+        directory_path = "."
+        passed_over_directories = []
+        for filename in natsort.os_sorted(os.listdir(directory_path)):
+            filename_path = os.path.join(directory_path, filename)
+            if not os.path.isdir(filename_path):
+                continue
+            if "test" not in filename.lower():
+                check_config(filename_path, "pages_to_prefetch")
+                check_config(filename_path, "prefetch_unencountered_pages")
+            else:
+                passed_over_directories.append(filename)
+        if len(passed_over_directories) > 0:
+            print("\nPassed over {} directories:".format(len(passed_over_directories)))
+            for dirname in passed_over_directories:
+                print("  {}".format(dirname))
+        

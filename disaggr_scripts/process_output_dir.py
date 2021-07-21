@@ -268,6 +268,7 @@ def process_and_graph_experiment_series(
     graph_experiment_folders: bool = True,
     graphing_function: Optional[Callable[[str, Optional[TextIO]], bool]] = None,
     first_experiment_no: int = 1,
+    stat_settings: Optional[List[StatSetting]] = None,
 ):
     """Run this script in the directory containing experiment folders, ie the
     containing folder of the run.py file.
@@ -294,14 +295,8 @@ def process_and_graph_experiment_series(
                                 shutil.copy2(src_path, dst_path)
 
                 # Record some stats
-                # print(filename)
-                print(filename, file=log_file)
-                get_and_print_stats(
-                    filename_path,
-                    print_to_terminal=False,
-                    log_file=log_file,
-                    first_experiment_no=first_experiment_no,
-                    stat_settings=[
+                if stat_settings is None:
+                    stat_settings = [
                         StatSetting("IPC", float),
                         StatSetting(
                             "remote dram avg access latency",
@@ -339,6 +334,11 @@ def process_and_graph_experiment_series(
                             name_for_legend="datamovement utilization full (%)",
                         ),
                         StatSetting(
+                            "remote datamovement max effective bandwidth (GB/s)",
+                            float,
+                            name_for_legend="datamovement max effective bw (GB/s)",
+                        ),
+                        StatSetting(
                             "remote datamovement2 % capped by window size",
                             float,
                             name_for_legend="datamovement2 capped by window size (%)",
@@ -349,11 +349,24 @@ def process_and_graph_experiment_series(
                             name_for_legend="datamovement2 utilization full (%)",
                         ),
                         StatSetting(
+                            "remote datamovement2 max effective bandwidth (GB/s)",
+                            float,
+                            name_for_legend="datamovement2 max effective bw (GB/s)",
+                        ),
+                        StatSetting(
                             "remote page move cancelled due to full queue",
                             int,
                             name_for_legend="remote page moves cancelled due to full queue",
                         ),
-                    ],
+                    ]
+                # print(filename)
+                print(filename, file=log_file)
+                get_and_print_stats(
+                    filename_path,
+                    print_to_terminal=False,
+                    log_file=log_file,
+                    first_experiment_no=first_experiment_no,
+                    stat_settings=stat_settings,
                 )
                 # print()
                 print(file=log_file)
