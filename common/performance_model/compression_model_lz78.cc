@@ -29,6 +29,11 @@ CompressionModelLZ78::~CompressionModelLZ78()
 {
 }
 
+void
+CompressionModelLZ78::finalizeStats()
+{
+}
+
 SubsecondTime
 CompressionModelLZ78::compress(IntPtr addr, size_t data_size, core_id_t core_id, UInt32 *compressed_page_size, UInt32 *compressed_cache_lines)
 {

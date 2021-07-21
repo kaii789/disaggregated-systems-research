@@ -446,6 +446,11 @@ DramPerfModelDisagg::finalizeStats()
         std::cout << "CDF X values (throttled page accesses aggregated by phys_page):\n" << cdf_buffer_page_aggregated_counts.str() << std::endl;
         std::cout << "CDF Y values (probability):\n" << percentages_buffer_2.str() << std::endl;
     }   
+
+
+    // Compression Stats
+    m_compression_model->finalizeStats();
+
 }
 
 UInt64

@@ -35,6 +35,12 @@ CompressionModelBDI::~CompressionModelBDI()
     delete [] m_compressed_cache_line_sizes;
 }
 
+void
+CompressionModelBDI::finalizeStats()
+{
+
+}
+
 SubsecondTime
 CompressionModelBDI::compress(IntPtr addr, size_t data_size, core_id_t core_id, UInt32 *compressed_page_size, UInt32 *compressed_cache_lines)
 {

@@ -22,6 +22,11 @@ CompressionModelIdeal::~CompressionModelIdeal()
 {
 }
 
+void
+CompressionModelIdeal::finalizeStats()
+{
+}
+
 SubsecondTime
 CompressionModelIdeal::compress(IntPtr addr, size_t data_size, core_id_t core_id, UInt32 *compressed_page_size, UInt32 *compressed_cache_lines)
 {

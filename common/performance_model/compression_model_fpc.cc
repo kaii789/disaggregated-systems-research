@@ -37,6 +37,18 @@ CompressionModelFPC::CompressionModelFPC(String name, UInt32 page_size, UInt32 c
     m_compressed_cache_line_sizes = new UInt32[m_cacheline_count];
 }
 
+CompressionModelFPC::~CompressionModelFPC()
+{
+    delete [] m_data_buffer;
+    delete [] m_compressed_data_buffer;
+    delete [] m_compressed_cache_line_sizes;
+}
+
+void CompressionModelFPC::finalizeStats()
+{
+
+}
+
 SubsecondTime
 CompressionModelFPC::compress(IntPtr addr, size_t data_size, core_id_t core_id, UInt32 *compressed_page_size, UInt32 *compressed_cache_lines)
 {
@@ -72,13 +84,6 @@ CompressionModelFPC::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
     // Return compression latency
     ComponentLatency compress_latency(ComponentLatency(core->getDvfsDomain(), m_cacheline_count * m_compression_latency));
     return compress_latency.getLatency();
-}
-
-CompressionModelFPC::~CompressionModelFPC()
-{
-    delete [] m_data_buffer;
-    delete [] m_compressed_data_buffer;
-    delete [] m_compressed_cache_line_sizes;
 }
 
 UInt32 CompressionModelFPC::compressCacheLine(void* _inbuf, void* _outbuf)

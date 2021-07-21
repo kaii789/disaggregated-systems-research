@@ -21,6 +21,16 @@ CompressionModelLCP::CompressionModelLCP(String name, UInt32 page_size, UInt32 c
 
 }
 
+CompressionModelLCP::~CompressionModelLCP()
+{
+    delete [] m_compressed_cache_line_sizes;
+}
+
+void
+CompressionModelLCP::finalizeStats()
+{
+}
+
 SubsecondTime
 CompressionModelLCP::compress(IntPtr addr, size_t data_size, core_id_t core_id, UInt32 *compressed_page_size, UInt32 *compressed_cache_lines)
 {
@@ -81,10 +91,6 @@ CompressionModelLCP::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
     return total_compression_latency;
 }
 
-CompressionModelLCP::~CompressionModelLCP()
-{
-    delete [] m_compressed_cache_line_sizes;
-}
 
 SubsecondTime
 CompressionModelLCP::decompress(IntPtr addr, UInt32 compressed_cache_lines, core_id_t core_id)

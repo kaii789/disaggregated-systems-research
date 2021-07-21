@@ -32,6 +32,18 @@ CompressionModelFVE::CompressionModelFVE(String name, UInt32 page_size, UInt32 c
     decompression_CAM = new CAM(m_cam_size);
 }
 
+CompressionModelFVE::~CompressionModelFVE()
+{
+    delete compression_CAM;
+    delete decompression_CAM;
+}
+
+void CompressionModelFVE::finalizeStats()
+{
+
+}
+
+
 SubsecondTime
 CompressionModelFVE::compress(IntPtr addr, size_t data_size, core_id_t core_id, UInt32 *compressed_page_size, UInt32 *compressed_cache_lines)
 {
@@ -68,11 +80,6 @@ CompressionModelFVE::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
     return compress_latency.getLatency();
 }
 
-CompressionModelFVE::~CompressionModelFVE()
-{
-    delete compression_CAM;
-    delete decompression_CAM;
-}
 
 SubsecondTime
 CompressionModelFVE::decompress(IntPtr addr, UInt32 compressed_cache_lines, core_id_t core_id)

@@ -25,6 +25,15 @@ CompressionModelLZ4::CompressionModelLZ4(String name, UInt32 page_size, UInt32 c
     m_compressed_data_buffer = new char[m_max_dst_size * (m_page_size / m_compression_granularity)];
 }
 
+CompressionModelLZ4::~CompressionModelLZ4()
+{
+}
+
+void
+CompressionModelLZ4::finalizeStats()
+{
+}
+
 SubsecondTime
 CompressionModelLZ4::compress(IntPtr addr, size_t data_size, core_id_t core_id, UInt32 *compressed_page_size, UInt32 *compressed_cache_lines)
 {
@@ -71,9 +80,6 @@ CompressionModelLZ4::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
     return SubsecondTime::NS(compression_latency * 1000000000);
 }
 
-CompressionModelLZ4::~CompressionModelLZ4()
-{
-}
 
 SubsecondTime
 CompressionModelLZ4::decompress(IntPtr addr, UInt32 compressed_cache_lines, core_id_t core_id)
