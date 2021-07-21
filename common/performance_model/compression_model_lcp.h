@@ -6,7 +6,7 @@
 class CompressionModelLCP : public CompressionModel
 {
 public:
-   CompressionModelLCP(String name, UInt32 page_size, UInt32 cache_line_size);
+   CompressionModelLCP(String name, UInt32 id, UInt32 page_size, UInt32 cache_line_size);
    ~CompressionModelLCP();
 
    SubsecondTime compress(IntPtr addr, size_t data_size, core_id_t core_id, UInt32 *compressed_page_size, UInt32 *compressed_cache_lines);

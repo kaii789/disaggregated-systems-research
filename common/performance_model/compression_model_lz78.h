@@ -10,7 +10,7 @@ using namespace std;
 class CompressionModelLZ78 : public CompressionModel
 {
 public:
-   CompressionModelLZ78(String name, UInt32 page_size, UInt32 cache_line_size);
+   CompressionModelLZ78(String name, UInt32 id, UInt32 page_size, UInt32 cache_line_size);
    ~CompressionModelLZ78();
 
    SubsecondTime compress(IntPtr addr, size_t data_size, core_id_t core_id, UInt32 *compressed_page_size, UInt32 *compressed_cache_lines);

@@ -179,7 +179,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
         String compression_scheme = Sim()->getCfg()->getString("perf_model/dram/compression_model/compression_scheme");
         UInt32 gran_size = m_r_cacheline_gran ? m_cache_line_size : m_page_size;
 
-        m_compression_model = CompressionModel::create("Link Compression Model", gran_size, m_cache_line_size, compression_scheme);
+        m_compression_model = CompressionModel::create("Link Compression Model", core_id, gran_size, m_cache_line_size, compression_scheme);
         registerStatsMetric("compression", core_id, "bytes-saved", &bytes_saved);
         registerStatsMetric("compression", core_id, "total-compression-latency", &m_total_compression_latency);
         registerStatsMetric("compression", core_id, "total-decompression-latency", &m_total_decompression_latency);
@@ -187,7 +187,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
         // Cacheline Compression
         if (m_use_cacheline_compression) {
             String cacheline_compression_scheme = Sim()->getCfg()->getString("perf_model/dram/compression_model/cacheline/compression_scheme");
-            m_cacheline_compression_model = CompressionModel::create("Cacheline Link Compression Model", m_cache_line_size, m_cache_line_size, cacheline_compression_scheme);
+            m_cacheline_compression_model = CompressionModel::create("Cacheline Link Compression Model", core_id, m_cache_line_size, m_cache_line_size, cacheline_compression_scheme);
             registerStatsMetric("compression", core_id, "cacheline-bytes-saved", &cacheline_bytes_saved);
             registerStatsMetric("compression", core_id, "total-cacheline-compression-latency", &m_total_cacheline_compression_latency);
             registerStatsMetric("compression", core_id, "total-cacheline-decompression-latency", &m_total_cacheline_decompression_latency);

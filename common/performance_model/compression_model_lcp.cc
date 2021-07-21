@@ -2,7 +2,7 @@
 #include "utils.h"
 #include "config.hpp"
 
-CompressionModelLCP::CompressionModelLCP(String name, UInt32 page_size, UInt32 cache_line_size)
+CompressionModelLCP::CompressionModelLCP(String name, UInt32 id, UInt32 page_size, UInt32 cache_line_size)
     : m_name(name)
     , m_page_size(page_size)
     , m_cache_line_size(cache_line_size)
@@ -14,7 +14,7 @@ CompressionModelLCP::CompressionModelLCP(String name, UInt32 page_size, UInt32 c
         m_decompression_latency = Sim()->getCfg()->getInt("perf_model/dram/compression_model/fpc/decompression_latency");
 
     String compression_scheme = Sim()->getCfg()->getString("perf_model/dram/compression_model/lcp/compression_scheme");
-    m_compression_model = CompressionModel::create("Cacheline Compression Model", m_cache_line_size, m_cache_line_size, compression_scheme);
+    m_compression_model = CompressionModel::create("Cacheline Compression Model", id, m_cache_line_size, m_cache_line_size, compression_scheme);
 
     m_cacheline_count = m_page_size / m_cache_line_size;
     m_compressed_cache_line_sizes = new UInt32[m_cacheline_count];

@@ -19,7 +19,7 @@ const UInt32 CompressionModelFPC::neg_check[6]=
         0xffffffff, // N/A
         0xff80ff80}; // Two halfwords, each a byte
 
-CompressionModelFPC::CompressionModelFPC(String name, UInt32 page_size, UInt32 cache_line_size)
+CompressionModelFPC::CompressionModelFPC(String name, UInt32 id, UInt32 page_size, UInt32 cache_line_size)
     : m_name(name)
     , m_page_size(page_size)
     , m_cache_line_size(cache_line_size)

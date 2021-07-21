@@ -2,7 +2,7 @@
 #include "utils.h"
 #include "config.hpp"
 
-CompressionModelBDI::CompressionModelBDI(String name, UInt32 page_size, UInt32 cache_line_size)
+CompressionModelBDI::CompressionModelBDI(String name, UInt32 id, UInt32 page_size, UInt32 cache_line_size)
     : m_name(name)
     , m_page_size(page_size)
     , m_cache_line_size(cache_line_size)

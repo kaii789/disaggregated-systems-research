@@ -12,35 +12,35 @@
 #include "compression_model_lz78.h"
 
 CompressionModel*
-CompressionModel::create(String name, UInt32 page_size, UInt32 cache_line_size, String compression_type)
+CompressionModel::create(String name, UInt32 id, UInt32 page_size, UInt32 cache_line_size, String compression_type)
 {
     if (compression_type == "ideal")
     {
-        return new CompressionModelIdeal(name, page_size, cache_line_size);
+        return new CompressionModelIdeal(name, id, page_size, cache_line_size);
     }
     else if (compression_type == "bdi")
     {
-        return new CompressionModelBDI(name, page_size, cache_line_size);
+        return new CompressionModelBDI(name, id, page_size, cache_line_size);
     }
     else if (compression_type == "fpc")
     {
-        return new CompressionModelFPC(name, page_size, cache_line_size);
+        return new CompressionModelFPC(name, id, page_size, cache_line_size);
     }
     else if (compression_type == "lcp")
     {
-        return new CompressionModelLCP(name, page_size, cache_line_size);
+        return new CompressionModelLCP(name, id, page_size, cache_line_size);
     }
     else if (compression_type == "fve")
     {
-        return new CompressionModelFVE(name, page_size, cache_line_size);
+        return new CompressionModelFVE(name, id, page_size, cache_line_size);
     }
     else if (compression_type == "lz4")
     {
-        return new CompressionModelLZ4(name, page_size, cache_line_size);
+        return new CompressionModelLZ4(name, id, page_size, cache_line_size);
     }
     else if (compression_type == "lz78")
     {
-        return new CompressionModelLZ78(name, page_size, cache_line_size);
+        return new CompressionModelLZ78(name, id, page_size, cache_line_size);
     }
     else
     {

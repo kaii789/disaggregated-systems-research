@@ -22,7 +22,7 @@ class CompressionModel
         virtual SubsecondTime decompress_multipage(std::vector<UInt64> addr_list, UInt32 num_pages, core_id_t core_id, std::map<UInt64, UInt32> *address_to_num_cache_lines) = 0;
         virtual void finalizeStats() = 0;
 
-        static CompressionModel* create(String name, UInt32 page_size, UInt32 cache_line_size, String compression_type);
+        static CompressionModel* create(String name, UInt32 id, UInt32 page_size, UInt32 cache_line_size, String compression_type);
 };
 
 #endif /* __COMPRESSION_MODEL_H__ */
