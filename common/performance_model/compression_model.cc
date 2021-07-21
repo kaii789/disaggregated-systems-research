@@ -42,6 +42,10 @@ CompressionModel::create(String name, UInt32 id, UInt32 page_size, UInt32 cache_
     {
         return new CompressionModelLZ78(name, id, page_size, cache_line_size);
     }
+    else if (compression_type == "lzw")
+    {
+        return new CompressionModelLZW(name, id, page_size, cache_line_size);
+    }
     else
     {
         LOG_PRINT_ERROR("Unrecognized Compression Model(%s)", compression_type.c_str());
