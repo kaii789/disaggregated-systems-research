@@ -58,6 +58,10 @@ private:
     UInt32 compressCacheLine(void *in, void *out);
     //UInt32 decompressCacheLine(void *in, void *out);
 
+    // Statistics
+    UInt64 m_total_compressed;
+    UInt64 m_compress_options[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
 };
 
 #endif /* __COMPRESSION_MODEL_BDI_H__ */

@@ -1,5 +1,6 @@
 #include "compression_model_bdi.h"
 #include "utils.h"
+#include "stats.h"
 #include "config.hpp"
 
 CompressionModelBDI::CompressionModelBDI(String name, UInt32 id, UInt32 page_size, UInt32 cache_line_size)
@@ -8,6 +9,7 @@ CompressionModelBDI::CompressionModelBDI(String name, UInt32 id, UInt32 page_siz
     , m_cache_line_size(cache_line_size)
     , m_compression_granularity(Sim()->getCfg()->getInt("perf_model/dram/compression_model/bdi/compression_granularity"))
     , use_additional_options(Sim()->getCfg()->getBool("perf_model/dram/compression_model/bdi/use_additional_options"))
+    , m_total_compressed(0)
 {
     m_options = (use_additional_options) ? 21 : 8;
 
@@ -26,6 +28,14 @@ CompressionModelBDI::CompressionModelBDI(String name, UInt32 id, UInt32 page_siz
     m_compressed_data_buffer = new char[m_page_size + m_cacheline_count];
     m_compressed_cache_line_sizes = new UInt32[m_cacheline_count];
 
+    // Register stats for compression_options
+    registerStatsMetric("compression", id, "bdi_total_compressed", &(m_total_compressed));
+    for (UInt32 i = 0; i < 12; i++) {
+        String stat_name = "bdi_usage_option-";
+        stat_name += std::to_string(i).c_str();
+        registerStatsMetric("compression", id, stat_name, &(m_compress_options[i]));
+    }
+
 }
 
 CompressionModelBDI::~CompressionModelBDI()
@@ -38,7 +48,9 @@ CompressionModelBDI::~CompressionModelBDI()
 void
 CompressionModelBDI::finalizeStats()
 {
-
+    for (UInt32 i = 0; i < 12; i++) {
+        m_total_compressed += m_compress_options[i];
+    }
 }
 
 SubsecondTime
@@ -355,6 +367,11 @@ CompressionModelBDI::compressCacheLine(void* in, void* out)
                 chosen_option = i; // Update chosen option
             }
         }
+    }
+
+    // Statistics
+    if(chosen_option != 42) {
+        m_compress_options[chosen_option]++;
     }
 
     ((char*)out)[0] = (char) chosen_option; // Store chosen_option in the first byte of out data buffer

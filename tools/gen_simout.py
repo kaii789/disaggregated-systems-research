@@ -248,6 +248,15 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
             ('  max_dictionary_entry', 'compression.max_dictionary_entry', str),
         ]
 
+  bdi_total_compressed = results['compression.bdi_total_compressed'][0] if 'compression.bdi_total_compressed' in results else 0
+  if bdi_total_compressed != 0:
+    for i in range(0, 12): 
+      bdi_option = float(results['compression.bdi_usage_option-{}'.format(i)][0]) / float(bdi_total_compressed) * 100
+      bdi_option_format = "{:.2f}".format(bdi_option)
+      results['compression.bdi_usage_option-{}'.format(i)] = [bdi_option_format]
+      template.append(('  bdi_usage(%)_option-{}'.format(i), 'compression.bdi_usage_option-{}'.format(i), str))
+
+
   if 'dram.total-read-queueing-delay' in results:
     results['dram.avgqueueread'] = map(lambda (a,b): a/(b or 1), zip(results['dram.total-read-queueing-delay'], results['dram.reads']))
     results['dram.avgqueuewrite'] = map(lambda (a,b): a/(b or 1), zip(results['dram.total-write-queueing-delay'], results['dram.writes']))
