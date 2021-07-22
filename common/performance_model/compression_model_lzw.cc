@@ -1,6 +1,7 @@
 #include "compression_model_lzw.h"
 #include "utils.h"
 #include "config.hpp"
+#include "stats.h"
 #include <math.h>
 
 CompressionModelLZW::CompressionModelLZW(String name, UInt32 id, UInt32 page_size, UInt32 cache_line_size)
@@ -8,6 +9,12 @@ CompressionModelLZW::CompressionModelLZW(String name, UInt32 id, UInt32 page_siz
     , m_page_size(page_size)
     , m_cache_line_size(cache_line_size)
     , m_compression_granularity(Sim()->getCfg()->getInt("perf_model/dram/compression_model/lzW/compression_granularity"))
+    , m_num_compress_pages(0)
+    , m_sum_dict_size(0)
+    , m_max_dict_size(0)
+    , m_sum_max_dict_entry(0)
+    , m_sum_avg_dict_entry(0)
+    , m_max_dict_entry(0)
 {
     // Set compression/decompression cycle latencies if configured
     if (Sim()->getCfg()->getInt("perf_model/dram/compression_model/lzW/compression_latency") != -1)
@@ -24,6 +31,13 @@ CompressionModelLZW::CompressionModelLZW(String name, UInt32 id, UInt32 page_siz
     m_cacheline_count = m_page_size / m_cache_line_size;
     m_data_buffer = new char[m_page_size];
     m_compressed_data_buffer = new char[m_page_size + m_cacheline_count];
+
+    // Compression Statistics
+    registerStatsMetric("compression", id, "avg_dictionary_size", &m_avg_dict_size);
+    registerStatsMetric("compression", id, "max_dictionary_size", &m_max_dict_size);
+    registerStatsMetric("compression", id, "avg_max_dictionary_entry", &m_avg_max_dict_entry);
+    registerStatsMetric("compression", id, "avg_avg_dictionary_entry", &m_avg_avg_dict_entry);
+    registerStatsMetric("compression", id, "max_dictionary_entry", &m_max_dict_entry);
 }
 
 CompressionModelLZW::~CompressionModelLZW()
@@ -33,6 +47,9 @@ CompressionModelLZW::~CompressionModelLZW()
 void
 CompressionModelLZW::finalizeStats()
 {
+    m_avg_dict_size = m_sum_dict_size / m_num_compress_pages;
+    m_avg_max_dict_entry = m_sum_max_dict_entry / m_num_compress_pages;
+    m_avg_avg_dict_entry = m_sum_avg_dict_entry / m_num_compress_pages;
 }
 
 SubsecondTime
@@ -131,30 +148,45 @@ UInt32
 CompressionModelLZW::compressData(void* in, void* out, UInt32 data_size, UInt32 *total_accesses)
 {
     UInt32 j;
+    SInt64 k;
     UInt32 dictionary_size = 0; 
     UInt32 compressed_size = 0;
     string s;
     UInt8 cur_byte;
     compression_CAM.clear(); // What is the cost of flushing/clearing the dictionary?
-     
-    for(j = 0; j < pow(2, m_word_size * 8); j++) {
-        dictionary_size++;
-        cur_byte = (UInt8) j; 
-        s.push_back(cur_byte); 
-        compression_CAM.insert(pair<string, UInt32>(s, dictionary_size));
-        s.clear();
-    }
 
-    // statistics - RemoveMe
-    UInt32 max_string_size = 0;
-    // statistics - RemoveMe
+    if (m_word_size == 1) { 
+        for(j = 0; j < pow(2, m_word_size * 8); j++) {
+            dictionary_size++;
+            cur_byte = (UInt8) j; 
+            s.push_back(cur_byte); 
+            compression_CAM.insert(pair<string, UInt32>(s, dictionary_size));
+            s.clear();
+        }
+    } else if (m_word_size == 2) {
+        for(k = 0; k < pow(2, m_word_size * 8); k++) {
+            dictionary_size++;
+            for(j = 0; j < m_word_size; j++) {     
+                cur_byte = (k >> (8*j)) & 0xff; // Get j-th byte from the word
+                s.push_back(cur_byte); 
+            }
+            compression_CAM.insert(pair<string, UInt32>(s, dictionary_size));
+            s.clear();
+        }
+    } else {
+        assert("[LZW] Not supported compression configuration\n");
+    }   
+
+    // statistics
+    m_num_compress_pages++; 
+    UInt64 max_entry = 0;
+    UInt64 sum_entry = 0;
+
 
     UInt32 accesses = 0;
     UInt32 i = 0;
     UInt32 out_indx = 0;
-    UInt32 inserts = pow(2, m_word_size * 8);
-    UInt8 last_byte;
-    compression_CAM.clear(); // What is the cost of flushing/clearing the dictionary?
+    UInt32 inserts = 0;
     SInt64 cur_word;
     map<string, UInt32>::iterator it;
     while ((i * m_word_size) < data_size) {
@@ -175,16 +207,20 @@ CompressionModelLZW::compressData(void* in, void* out, UInt32 data_size, UInt32 
             accesses++;
             //writeIndex to output
 
-            // statistics - RemoveMe
-            if (s.size() > max_string_size)
-                max_string_size = s.size();
-            // statistics - RemoveMe
+            // statistics 
+            if (s.size() > m_max_dict_entry)
+                m_max_dict_entry = s.size();
+            if (s.size() > max_entry)
+                max_entry = s.size();
+            sum_entry += s.size();
+            // statistics 
 
             s.clear();
             for(j = 0; j < m_word_size; j++) {     
                 cur_byte = (cur_word >> (8*j)) & 0xff; // Get j-th byte from the word
                 s.push_back(cur_byte); 
             }
+
         }
 
         i++; 
@@ -201,7 +237,14 @@ CompressionModelLZW::compressData(void* in, void* out, UInt32 data_size, UInt32 
     *total_accesses = accesses;
     compression_CAM.clear();
 
-    // statistics - RemoveMe
+
+    // statistics 
+    if(dictionary_size > m_max_dict_size)
+        m_max_dict_size = dictionary_size;
+    m_sum_dict_size += dictionary_size;
+    m_sum_max_dict_entry += max_entry;
+    m_sum_avg_dict_entry += (sum_entry / inserts);
+
     //printf("Compressed Size %d Dictionary Table Size %d %d and Max Entry Size %d Total Size (KB) %d Accesses %d\n", compressed_size, dictionary_size, inserts, max_string_size, dictionary_size * max_string_size / 1024, accesses);
     // statistics - RemoveMe
 

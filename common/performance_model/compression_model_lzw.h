@@ -37,16 +37,26 @@ private:
     UInt32 m_decompression_latency = 0;
     // Fine-grain compression granularity within the page
     UInt8 m_word_size = 1;
-
     SInt32 m_compression_granularity;
     UInt8 m_cam_size = 256;
     UInt8 m_cam_size_log2 = 8;
-    
+
     std::map<string, UInt32> compression_CAM; 
 
     SInt64 readWord(void*, UInt32, UInt32);
     void writeWord(void*, UInt32, SInt64, UInt32);
     UInt32 compressData(void *, void *, UInt32, UInt32 *);
+
+    // Statistics
+    UInt64 m_num_compress_pages;
+    UInt64 m_sum_dict_size;
+    UInt64 m_avg_dict_size = 0;
+    UInt64 m_max_dict_size;
+    UInt64 m_sum_max_dict_entry;
+    UInt64 m_avg_max_dict_entry = 0;
+    UInt64 m_sum_avg_dict_entry;
+    UInt64 m_avg_avg_dict_entry = 0;
+    UInt64 m_max_dict_entry;
 };
 
 #endif /* __COMPRESSION_MODEL_LZW_H__ */

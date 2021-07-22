@@ -221,6 +221,7 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     ('  remote page moved due to exceeding threshold in rmode5', 'dram.rmode5-page-moved-due-to-threshold', str),
   ]
 
+
   # Compression
   if bytes_saved != 0:
     template += [
@@ -236,6 +237,16 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
       ('  avg cacheline compression latency(ns)', 'compression.avg-cacheline-compression-latency', format_ns(2)),
       ('  avg cacheline decompression latency(ns)', 'compression.avg-cacheline-decompression-latency', format_ns(2)),
     ]
+
+  max_dict_size = results['compression.max_dictionary_size'][0] if 'compression.max_dictionary_size' in results else 0
+  if max_dict_size != 0:
+    template += [
+            ('  avg_dictionary_size', 'compression.avg_dictionary_size', str),
+            ('  max_dictionary_size', 'compression.max_dictionary_size', str),
+            ('  avg_max_dictionary_entry', 'compression.avg_max_dictionary_entry', str),
+            ('  avg_avg_dictionary_entry', 'compression.avg_avg_dictionary_entry', str),
+            ('  max_dictionary_entry', 'compression.max_dictionary_entry', str),
+        ]
 
   if 'dram.total-read-queueing-delay' in results:
     results['dram.avgqueueread'] = map(lambda (a,b): a/(b or 1), zip(results['dram.total-read-queueing-delay'], results['dram.reads']))

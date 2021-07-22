@@ -295,6 +295,10 @@ DramPerfModelDisagg::finalizeStats()
     bool process_and_print_page_locality_stats = true;
     bool process_and_print_throttled_pages_stats = true;
 
+    // Compression Stats
+    m_compression_model->finalizeStats();
+
+
     if (process_and_print_page_locality_stats && m_page_usage_map.size() > 0) {
         // Put values in a vector and sort
         std::vector<UInt32> page_usage_counts;
@@ -446,10 +450,6 @@ DramPerfModelDisagg::finalizeStats()
         std::cout << "CDF X values (throttled page accesses aggregated by phys_page):\n" << cdf_buffer_page_aggregated_counts.str() << std::endl;
         std::cout << "CDF Y values (probability):\n" << percentages_buffer_2.str() << std::endl;
     }   
-
-
-    // Compression Stats
-    m_compression_model->finalizeStats();
 
 }
 

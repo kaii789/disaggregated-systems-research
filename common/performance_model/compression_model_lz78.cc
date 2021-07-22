@@ -1,12 +1,19 @@
 #include "compression_model_lz78.h"
 #include "utils.h"
 #include "config.hpp"
+#include "stats.h"
 
 CompressionModelLZ78::CompressionModelLZ78(String name, UInt32 id, UInt32 page_size, UInt32 cache_line_size)
     : m_name(name)
     , m_page_size(page_size)
     , m_cache_line_size(cache_line_size)
     , m_compression_granularity(Sim()->getCfg()->getInt("perf_model/dram/compression_model/lz78/compression_granularity"))
+    , m_num_compress_pages(0)
+    , m_sum_dict_size(0)
+    , m_max_dict_size(0)
+    , m_sum_max_dict_entry(0)
+    , m_sum_avg_dict_entry(0)
+    , m_max_dict_entry(0)
 {
     // Set compression/decompression cycle latencies if configured
     if (Sim()->getCfg()->getInt("perf_model/dram/compression_model/lz78/compression_latency") != -1)
@@ -23,6 +30,13 @@ CompressionModelLZ78::CompressionModelLZ78(String name, UInt32 id, UInt32 page_s
     m_cacheline_count = m_page_size / m_cache_line_size;
     m_data_buffer = new char[m_page_size];
     m_compressed_data_buffer = new char[m_page_size + m_cacheline_count];
+
+    // Compression Statistics
+    registerStatsMetric("compression", id, "avg_dictionary_size", &m_avg_dict_size);
+    registerStatsMetric("compression", id, "max_dictionary_size", &m_max_dict_size);
+    registerStatsMetric("compression", id, "avg_max_dictionary_entry", &m_avg_max_dict_entry);
+    registerStatsMetric("compression", id, "avg_avg_dictionary_entry", &m_avg_avg_dict_entry);
+    registerStatsMetric("compression", id, "max_dictionary_entry", &m_max_dict_entry);
 }
 
 CompressionModelLZ78::~CompressionModelLZ78()
@@ -32,6 +46,9 @@ CompressionModelLZ78::~CompressionModelLZ78()
 void
 CompressionModelLZ78::finalizeStats()
 {
+    m_avg_dict_size = m_sum_dict_size / m_num_compress_pages;
+    m_avg_max_dict_entry = m_sum_max_dict_entry / m_num_compress_pages;
+    m_avg_avg_dict_entry = m_sum_avg_dict_entry / m_num_compress_pages;
 }
 
 SubsecondTime
@@ -132,9 +149,11 @@ CompressionModelLZ78::compressData(void* in, void* out, UInt32 data_size, UInt32
     UInt32 compressed_size = 0;
     compression_CAM.clear(); // What is the cost of flushing/clearing the dictionary?
 
-    // statistics - RemoveMe
-    UInt32 max_string_size = 0;
-    // statistics - RemoveMe
+    // statistics
+    m_num_compress_pages++; 
+    UInt64 max_entry = 0;
+    UInt64 sum_entry = 0;
+
 
     UInt32 accesses = 0;
     UInt32 dictionary_size = 0; 
@@ -161,14 +180,18 @@ CompressionModelLZ78::compressData(void* in, void* out, UInt32 data_size, UInt32
             inserts++;
             compression_CAM.insert(pair<string, UInt32>(s, dictionary_size));
             accesses++;
-            writeWord(out, out_indx, cur_word, m_word_size);
-            out_indx++; 
+            //writeWord(out, out_indx, cur_word, m_word_size);
+            //out_indx++; 
             compressed_size += m_word_size;
     
-            // statistics - RemoveMe
-            if (s.size() > max_string_size)
-                max_string_size = s.size();
-            // statistics - RemoveMe
+            // statistics 
+            if (s.size() > m_max_dict_entry)
+                m_max_dict_entry = s.size();
+            if (s.size() > max_entry)
+                max_entry = s.size();
+            sum_entry += s.size();
+            // statistics 
+
 
             s.clear();
         }
@@ -187,7 +210,13 @@ CompressionModelLZ78::compressData(void* in, void* out, UInt32 data_size, UInt32
     *total_accesses = accesses;
     compression_CAM.clear();
 
-    // statistics - RemoveMe
+    // statistics 
+    if(dictionary_size > m_max_dict_size)
+        m_max_dict_size = dictionary_size;
+    m_sum_dict_size += dictionary_size;
+    m_sum_max_dict_entry += max_entry;
+    m_sum_avg_dict_entry += (sum_entry / inserts);
+
     //printf("Compressed Size %d Dictionary Table Size %d %d and Max Entry Size %d Total Size (KB) %d Accesses %d\n", compressed_size, dictionary_size, inserts, max_string_size, dictionary_size * max_string_size / 1024, accesses);
     // statistics - RemoveMe
 
