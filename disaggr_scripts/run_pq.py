@@ -479,6 +479,68 @@ if __name__ == "__main__":
     #                                       cacheline_queue_ratio_configs[0],
     #                                      ]
 
+    compression_modes_additional_configs = [
+        # 1) Page Compression (ideal)
+        [
+            ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+            ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+            ConfigEntry("perf_model/dram/compression_model/lz4", "compression_latency", "0"),
+            ConfigEntry("perf_model/dram/compression_model/lz4", "decompression_latency", "0"),
+        ],
+        # 2) Cacheline + Page Compression(ideal)
+        [
+            ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+            ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "true"),
+            ConfigEntry("perf_model/dram/compression_model/lz4", "compression_latency", "0"),
+            ConfigEntry("perf_model/dram/compression_model/lz4", "decompression_latency", "0"),
+        ],
+        # # 3) Page Compression
+        [
+            ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+            ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+        ],
+        # 4) Cacheline + Page Compression
+        [
+            ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+            ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "true"),
+        ],
+    ]
+
+    compression_modes_additional_configs_disable_stats = [
+        # 1) Page Compression (ideal)
+        [
+            ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+            ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+            ConfigEntry("perf_model/dram/compression_model/lz4", "compression_latency", "0"),
+            ConfigEntry("perf_model/dram/compression_model/lz4", "decompression_latency", "0"),
+            ConfigEntry("perf_model/dram/compression_model", "use_throttled_pages_tracker", "false"),
+            ConfigEntry("perf_model/dram/compression_model", "process_page_locality_stats", "false"),
+        ],
+        # 2) Cacheline + Page Compression(ideal)
+        [
+            ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+            ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "true"),
+            ConfigEntry("perf_model/dram/compression_model/lz4", "compression_latency", "0"),
+            ConfigEntry("perf_model/dram/compression_model/lz4", "decompression_latency", "0"),
+            ConfigEntry("perf_model/dram/compression_model", "use_throttled_pages_tracker", "false"),
+            ConfigEntry("perf_model/dram/compression_model", "process_page_locality_stats", "false"),
+        ],
+        # # 3) Page Compression
+        [
+            ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+            ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+            ConfigEntry("perf_model/dram/compression_model", "use_throttled_pages_tracker", "false"),
+            ConfigEntry("perf_model/dram/compression_model", "process_page_locality_stats", "false"),
+        ],
+        # 4) Cacheline + Page Compression
+        [
+            ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+            ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "true"),
+            ConfigEntry("perf_model/dram/compression_model", "use_throttled_pages_tracker", "false"),
+            ConfigEntry("perf_model/dram/compression_model", "process_page_locality_stats", "false"),
+        ],
+    ]
+
     pq_cacheline_combined_rmode1_configs = []
     for config in pq_cacheline_combined_base_configs:
         config_copy = copy.deepcopy(config)
@@ -493,6 +555,48 @@ if __name__ == "__main__":
         )
         pq_cacheline_combined_rmode1_configs.append(config_copy)
 
+    # New partition queues implementation
+    new_pq_implementation_rmode1_configs = []
+    for i, config in enumerate(pq_cacheline_combined_rmode1_configs):
+        config_copy = copy.deepcopy(config)
+        if i >= 3:
+            config_copy.replace_config_entries(
+                [
+                    ConfigEntry("perf_model/dram", "remote_partitioned_queues", "2"),
+                    # remote_init  specified in individual experiments
+                ]
+            )
+        new_pq_implementation_rmode1_configs.append(config_copy)
+
+    # Compression
+    pq_cacheline_combined_rmode1_configs_compression_4modes = []
+    for additional_configs_list in compression_modes_additional_configs:
+        compression_mode_configs = []
+        for config in pq_cacheline_combined_rmode1_configs:
+            config_copy = copy.deepcopy(config)
+            config_copy.replace_config_entries(additional_configs_list)
+            compression_mode_configs.append(config_copy)
+        pq_cacheline_combined_rmode1_configs_compression_4modes.append(compression_mode_configs)
+
+    pq_cacheline_combined_rmode1_configs_compression_4modes_disable_stats = []
+    for additional_configs_list in compression_modes_additional_configs_disable_stats:
+        compression_mode_configs = []
+        for config in pq_cacheline_combined_rmode1_configs:
+            config_copy = copy.deepcopy(config)
+            config_copy.replace_config_entries(additional_configs_list)
+            compression_mode_configs.append(config_copy)
+        pq_cacheline_combined_rmode1_configs_compression_4modes_disable_stats.append(compression_mode_configs)
+
+    pq_cacheline_combined_rmode1_configs_prefetch_compression_4modes = []
+    for additional_configs_list in compression_modes_additional_configs:
+        compression_mode_configs = []
+        for config in pq_cacheline_combined_rmode1_configs:
+            config_copy = copy.deepcopy(config)
+            config_copy.replace_config_entries(additional_configs_list)
+            compression_mode_configs.append(config_copy)
+        pq_cacheline_combined_rmode1_configs_prefetch_compression_4modes.append(compression_mode_configs)
+
+    # Prefetching
     pq_cacheline_combined_rmode1_configs_prefetch = []
     for config in pq_cacheline_combined_rmode1_configs:
         config_copy = copy.deepcopy(config)
@@ -536,6 +640,7 @@ if __name__ == "__main__":
         )
         pq_cacheline_combined_rmode5_configs.append(config_copy)
 
+    # Ideal page move throttling
     pq_cacheline_combined_rmode1_configs_ideal_page_throttling = []
     for config in pq_cacheline_combined_rmode1_configs:
         config_copy = copy.deepcopy(config)
@@ -696,7 +801,7 @@ if __name__ == "__main__":
     matrix = "roadNet-CA.mtx"
     for remote_init in ["true"]:  # "false"
         for num_MB in [2]:
-            for bw_scalefactor in [4, 8, 16, 32]:
+            for bw_scalefactor in [4, 16]:
                 localdram_size_str = "{}MB".format(num_MB)
                 command_str = sssp_int_base_options.format(
                     matrix,
@@ -727,7 +832,7 @@ if __name__ == "__main__":
     matrix = "roadNet-CA.mtx"
     for remote_init in ["true"]:  # "false"
         for num_MB in [2]:
-            for bw_scalefactor in [4, 8, 16, 32]:
+            for bw_scalefactor in [4, 16]:
                 localdram_size_str = "{}MB".format(num_MB)
                 command_str = sssp_int_base_options.format(
                     matrix,
@@ -761,7 +866,7 @@ if __name__ == "__main__":
     for num_MB in [2]:
         for mode_switch_threshold in ["0.6", "0.7", "0.8", "0.9"]:
             for datamov_threshold in [2, 5, 10]:
-                for bw_scalefactor in [4, 8, 16, 32]:
+                for bw_scalefactor in [4, 16]:
                     localdram_size_str = "{}MB".format(num_MB)
                     command_str = sssp_int_base_options.format(
                         matrix,
@@ -798,7 +903,7 @@ if __name__ == "__main__":
     for num_MB in [2]:
         for mode_switch_threshold in ["0.6", "0.7", "0.8", "0.9"]:
             for datamov_threshold in [2, 5, 10]:
-                for bw_scalefactor in [4, 8, 16, 32]:
+                for bw_scalefactor in [4, 16]:
                     localdram_size_str = "{}MB".format(num_MB)
                     command_str = sssp_int_base_options.format(
                         matrix,
@@ -839,7 +944,7 @@ if __name__ == "__main__":
     for num_MB in [1, 2]:
         for mode_switch_threshold in ["0.6", "0.7", "0.8", "0.9"]:
             for datamov_threshold in [2, 5, 10]:
-                for bw_scalefactor in [4, 8, 16, 32]:
+                for bw_scalefactor in [4, 16]:
                     localdram_size_str = "{}MB".format(num_MB)
                     command_str = sssp_int_base_options.format(
                         matrix,
@@ -874,8 +979,8 @@ if __name__ == "__main__":
     net_lat = 120
     matrix = "roadNet-PA.mtx"
     for remote_init in ["true"]:  # "false"
-        for num_MB in [0.5, 1, 2]:
-            for bw_scalefactor in [8, 16, 32]:
+        for num_MB in [1]:
+            for bw_scalefactor in [4, 16]:
                 localdram_size_str = "{}MB".format(num_MB)
                 command_str = sssp_int_base_options.format(
                     matrix,
@@ -1047,13 +1152,13 @@ if __name__ == "__main__":
     net_lat = 120
     remote_init = "true"
     for matrix in ["roadNet-PA.mtx"]:
-        for num_B in [524288]:
+        for num_MB in [0.5]:
             for bw_scalefactor in [4, 8, 16, 32]:
-                localdram_size_str = "{}B".format(num_B)
+                localdram_size_str = "{}MB".format(num_MB)
                 command_str = spmv_base_options.format(
                     matrix,
                     sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={}".format(
-                        int(num_B),
+                        int(num_MB * ONE_MB_TO_BYTES),
                         int(net_lat),
                         int(bw_scalefactor),
                         str(remote_init),
@@ -1078,13 +1183,13 @@ if __name__ == "__main__":
     net_lat = 120
     remote_init = "true"
     for matrix in ["roadNet-PA.mtx"]:
-        for num_B in [524288]:
+        for num_MB in [0.5]:
             for bw_scalefactor in [4, 8, 16, 32]:
-                localdram_size_str = "{}B".format(num_B)
+                localdram_size_str = "{}MB".format(num_MB)
                 command_str = spmv_base_options.format(
                     matrix,
                     sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={}".format(
-                        int(num_B),
+                        int(num_MB * ONE_MB_TO_BYTES),
                         int(net_lat),
                         int(bw_scalefactor),
                         str(remote_init),
@@ -1114,8 +1219,8 @@ if __name__ == "__main__":
     net_lat = 120
     remote_init = "true"
     for application_name in ["BC", "Components"]:  # Full execution: Triangle takes a long time, PageRank takes a very long time
-        for num_MB in [2, 4]:
-            for bw_scalefactor in [4, 8]:
+        for num_MB in [2]:
+            for bw_scalefactor in [4, 16]:
                 localdram_size_str = "{}MB".format(num_MB)
                 command_str = ligra_base_str_options_nonsym.format(
                     application_name,
@@ -1155,7 +1260,7 @@ if __name__ == "__main__":
     remote_init = "true"
     for application_name in ["PageRank"]:  # Full execution: Triangle takes a long time, PageRank takes a very long time
         for num_MB in [8]:
-            for bw_scalefactor in [4, 8]:
+            for bw_scalefactor in [4, 16]:
                 localdram_size_str = "{}MB".format(num_MB)
                 command_str = ligra_base_str_options_nonsym.format(
                     application_name,
@@ -1195,7 +1300,7 @@ if __name__ == "__main__":
     remote_init = "true"
     for application_name in ["Triangle"]:  # "BC", "Components", "Triangle" # Full execution: Triangle takes a long time, PageRank takes a very long time
         for num_MB in [8]:  # 16
-            for bw_scalefactor in [4, 8]:
+            for bw_scalefactor in [4, 16]:
                 localdram_size_str = "{}MB".format(num_MB)
                 command_str = ligra_base_str_options_sym.format(
                     application_name,
@@ -1228,7 +1333,7 @@ if __name__ == "__main__":
                     )
                 )
 
-    # BFS, 8 MB
+    # BFS, 4 MB
     bfs_pq_cacheline_combined_experiments_remoteinit_true_rmode1 = []
     ligra_input_selection = "regular_input"  # "regular_input" OR "small_input"
     ligra_input_file = ligra_input_to_file[ligra_input_selection]
@@ -1236,7 +1341,7 @@ if __name__ == "__main__":
     net_lat = 120
     for remote_init in ["true"]:  # "false"
         for num_MB in [4]:
-            for bw_scalefactor in [4, 8, 32]:
+            for bw_scalefactor in [4, 16]:
                 localdram_size_str = "{}MB".format(num_MB)
                 command_str = ligra_base_str_options_nonsym.format(
                     application_name,
@@ -1275,7 +1380,7 @@ if __name__ == "__main__":
     for remote_init in ["true"]:
         for datamov_threshold in [5, 10]:
             for num_MB in [4]:  # 8
-                for bw_scalefactor in [4, 32]:  # 8
+                for bw_scalefactor in [4, 16]:
                     localdram_size_str = "{}MB".format(num_MB)
                     command_str = ligra_base_str_options_nonsym.format(
                         application_name,
@@ -1316,7 +1421,7 @@ if __name__ == "__main__":
         for mode_switch_threshold in ["0.7"]:
             for datamov_threshold in [5, 10]:
                 for num_MB in [4]:  # 16
-                    for bw_scalefactor in [4, 8, 32]:
+                    for bw_scalefactor in [4, 16]:
                         localdram_size_str = "{}MB".format(num_MB)
                         command_str = ligra_base_str_options_nonsym.format(
                             application_name,
@@ -1356,7 +1461,7 @@ if __name__ == "__main__":
         for mode_switch_threshold in ["0.6", "0.8", "0.9"]:
             for datamov_threshold in [5, 10]:
                 for num_MB in [4]:  # 16
-                    for bw_scalefactor in [4, 32]:
+                    for bw_scalefactor in [4, 16]:
                         localdram_size_str = "{}MB".format(num_MB)
                         command_str = ligra_base_str_options_nonsym.format(
                             application_name,
@@ -1398,7 +1503,7 @@ if __name__ == "__main__":
     for model_type in ["darknet19", "resnet50", "vgg-16"]:
         for remote_init in ["true"]:  # "false"
             for num_MB in [4]:
-                for bw_scalefactor in [32]: # 32
+                for bw_scalefactor in [4, 16]:
                     localdram_size_str = "{}MB".format(num_MB)
                     command_str = darknet_base_str_options.format(
                         model_type,
@@ -1431,7 +1536,7 @@ if __name__ == "__main__":
     for model_type in ["darknet19", "resnet50", "vgg-16"]:
         for remote_init in ["true"]:  # "false"
             for num_MB in [4]:
-                for bw_scalefactor in [8, 32]:
+                for bw_scalefactor in [4, 16]:
                     localdram_size_str = "{}MB".format(num_MB)
                     command_str = darknet_base_str_options.format(
                         model_type,
@@ -1468,7 +1573,7 @@ if __name__ == "__main__":
         for remote_init in ["true"]:  # "false"
             for redundant_moves_limit in [2, 5, 10, 40]:
                 for num_MB in [2]:
-                    for bw_scalefactor in [4, 8, 32]:
+                    for bw_scalefactor in [4, 16]:
                         localdram_size_str = "{}MB".format(num_MB)
                         command_str = darknet_base_str_options.format(
                             model_type,
@@ -1504,7 +1609,7 @@ if __name__ == "__main__":
         for remote_init in ["true"]:  # "false"
             for redundant_moves_limit in [2, 5, 10, 40]:
                 for num_MB in [2]:
-                    for bw_scalefactor in [4, 8, 32]:
+                    for bw_scalefactor in [4, 16]:
                         localdram_size_str = "{}MB".format(num_MB)
                         command_str = darknet_base_str_options.format(
                             model_type,
@@ -1540,7 +1645,7 @@ if __name__ == "__main__":
     for model_type in ["tiny"]:
         for remote_init in ["true"]:  # "false"
             for num_MB in [2]:
-                for bw_scalefactor in [4]:
+                for bw_scalefactor in [4, 16]:
                     localdram_size_str = "{}MB".format(num_MB)
                     command_str = darknet_base_str_options.format(
                         model_type,
@@ -1573,7 +1678,7 @@ if __name__ == "__main__":
     for model_type in ["tiny"]:
         for remote_init in ["true"]:  # "false"
             for num_MB in [2]:
-                for bw_scalefactor in [4]:
+                for bw_scalefactor in [4, 16]:
                     localdram_size_str = "{}MB".format(num_MB)
                     command_str = darknet_base_str_options.format(
                         model_type,
@@ -1609,7 +1714,7 @@ if __name__ == "__main__":
         for remote_init in ["true"]:
             for datamov_threshold in [2, 5]:
                 for num_MB in [2]:
-                    for bw_scalefactor in [4, 8, 32]:
+                    for bw_scalefactor in [4, 16]:
                         localdram_size_str = "{}MB".format(num_MB)
                         command_str = darknet_base_str_options.format(
                             model_type,
@@ -1646,7 +1751,7 @@ if __name__ == "__main__":
             for mode_switch_threshold in ["0.7", "0.8", "0.9"]:
                 for datamov_threshold in [2, 5]:
                     for num_MB in [2]:
-                        for bw_scalefactor in [4, 8, 32]:
+                        for bw_scalefactor in [4, 16]:
                             localdram_size_str = "{}MB".format(num_MB)
                             command_str = darknet_base_str_options.format(
                                 model_type,
@@ -1685,7 +1790,7 @@ if __name__ == "__main__":
             for mode_switch_threshold in ["0.6", "0.8", "0.9"]:
                 for datamov_threshold in [5, 10]:
                     for num_MB in [2]:
-                        for bw_scalefactor in [4, 32]:
+                        for bw_scalefactor in [4, 16]:
                             localdram_size_str = "{}MB".format(num_MB)
                             command_str = darknet_base_str_options.format(
                                 model_type,
@@ -1739,7 +1844,7 @@ if __name__ == "__main__":
 
                 stream_modes_pq_cacheline_combined_experiments_remoteinit_true_rmode1.append(
                     Experiment(
-                        experiment_name="stream_mode{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_pq_cacheline_newer_series".format(
+                        experiment_name="stream_mode{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_pq_newer_series".format(
                             mode,
                             localdram_size_str,
                             net_lat,
@@ -1770,7 +1875,7 @@ if __name__ == "__main__":
 
                 stream_modes_pq_cacheline_combined_experiments_remoteinit_true_rmode1_ideal_page_throttling.append(
                     Experiment(
-                        experiment_name="stream_mode{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_idealwinsize_{}_pq_cacheline_newer_series".format(
+                        experiment_name="stream_mode{}_localdram_{}_netlat_{}_bw_scalefactor_{}_remoteinit_{}_idealwinsize_{}_pq_newer_series".format(
                             mode,
                             localdram_size_str,
                             net_lat,

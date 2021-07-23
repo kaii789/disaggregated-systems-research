@@ -1214,6 +1214,7 @@ def general_experiment_combining(output_directory_path: PathLike):
     ligra_dir = "/home/jonathan/Desktop/experiment_results/experimentrun_D7/experimentrun_D7 (ligra)"
     spmv_dir = "/home/jonathan/Desktop/experiment_results/experimentrun_D7/experimentrun_D7 (spmv)"
     sssp_dir = "/home/jonathan/Desktop/experiment_results/experimentrun_D7/experimentrun_D7 (sssp)"
+    stream_dir = "/home/jonathan/Desktop/experiment_results/experimentrun_D7/experimentrun_D7 (stream)"
     new_experiments_dir = darknet_compression_dir
     fcfs_baseline_throttling_dir = darknet_dir
     ideal_baseline_throttling_dir = darknet_dir
