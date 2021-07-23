@@ -14,12 +14,15 @@ public:
    ~QueueModelWindowedMG1Remote();
 
    SubsecondTime computeQueueDelay(SubsecondTime pkt_time, SubsecondTime processing_time, core_id_t requester = INVALID_CORE_ID);
-   SubsecondTime computeQueueDelayNoEffect(SubsecondTime pkt_time, SubsecondTime processing_time, core_id_t requester = INVALID_CORE_ID);
+   SubsecondTime computeQueueDelayNoEffect(SubsecondTime pkt_time, SubsecondTime processing_time, request_t request_type, core_id_t requester = INVALID_CORE_ID);
 
-   SubsecondTime computeQueueDelayTrackBytes(SubsecondTime pkt_time, SubsecondTime processing_time, UInt64 num_bytes, core_id_t requester = INVALID_CORE_ID);
+   SubsecondTime computeQueueDelayTrackBytes(SubsecondTime pkt_time, SubsecondTime processing_time, UInt64 num_bytes, request_t request_type, core_id_t requester = INVALID_CORE_ID);
 
-   // bool isQueueFull(SubsecondTime pkt_time);
-   double getQueueUtilizationPercentage(SubsecondTime pkt_time);
+   double getTotalQueueUtilizationPercentage(SubsecondTime pkt_time);
+   double getPageQueueUtilizationPercentage(SubsecondTime pkt_time) {
+      // For windowed_mg1_remote, when called on the correct QueueModel the page queue takes up the whole queue
+      return getTotalQueueUtilizationPercentage(pkt_time);
+   }
 
 private:
    const SubsecondTime m_window_size;
