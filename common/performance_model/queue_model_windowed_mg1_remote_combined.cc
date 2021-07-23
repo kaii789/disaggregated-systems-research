@@ -71,6 +71,8 @@ QueueModelWindowedMG1RemoteCombined::QueueModelWindowedMG1RemoteCombined(String 
    
    registerStatsMetric(name, id, "total-page-utilization-injected-time", &m_total_page_request_injected_time);
    registerStatsMetric(name, id, "total-cacheline-utilization-injected-time", &m_total_cacheline_request_injected_time);
+   registerStatsMetric(name, id, "max-imbalanced-page-requests", &m_max_imbalanced_page_requests);
+   registerStatsMetric(name, id, "max-imbalanced-cacheline-requests", &m_max_imbalanced_cacheline_requests_rounded);
    
    registerStatsMetric(name, id, "num-requests-queue-full", &m_total_requests_queue_full);
    registerStatsMetric(name, id, "num-requests-capped-by-window-size", &m_total_requests_capped_by_window_size);
@@ -90,6 +92,8 @@ QueueModelWindowedMG1RemoteCombined::QueueModelWindowedMG1RemoteCombined(String 
    registerStatsMetric(name, id, "num-effective-bandwidth-exceeded-allowable-max", &m_effective_bandwidth_exceeded_allowable_max);
    registerStatsMetric(name, id, "num-page-effective-bandwidth-exceeded-allowable-max", &m_page_effective_bandwidth_exceeded_allowable_max);
    registerStatsMetric(name, id, "num-cacheline-effective-bandwidth-exceeded-allowable-max", &m_cacheline_effective_bandwidth_exceeded_allowable_max);
+
+   std::cout << "m_page_processing_time = " << m_page_processing_time.getNS() << " ns, m_cacheline_processing_time = " << m_cacheline_processing_time.getNS() << " ns" << std::endl;
 }
 
 QueueModelWindowedMG1RemoteCombined::~QueueModelWindowedMG1RemoteCombined()
@@ -178,7 +182,7 @@ double QueueModelWindowedMG1RemoteCombined::getCachelineQueueUtilizationPercenta
    removeItemsUpdateBytes(time_point, pkt_time, false);
 
    // Use queue utilization as measure to determine whether the queue is full
-   double utilization = (double)m_page_service_time_sum / (m_r_cacheline_queue_fraction * m_window_size.getPS());
+   double utilization = (double)m_cacheline_service_time_sum / (m_r_cacheline_queue_fraction * m_window_size.getPS());
    return utilization;
 }
 
@@ -243,10 +247,6 @@ QueueModelWindowedMG1RemoteCombined::computeQueueDelayNoEffect(SubsecondTime pkt
          UInt64 utilization_inject_ps = (UInt64)(max_additional_cacheline_requests_before_this * m_cacheline_processing_time.getPS());
          adjusted_utilization = (double)(service_time_sum + utilization_inject_ps) / m_window_size.getPS();
          adjusted_service_time_sum2 = m_service_time_sum2 + m_imbalanced_cacheline_requests * (m_cacheline_processing_time.getPS() * m_cacheline_processing_time.getPS());
-
-         ++m_total_page_requests;
-         m_total_page_request_injected_time += max_additional_cacheline_requests_before_this * m_cacheline_processing_time;
-         m_imbalanced_page_requests += 1;
       } else {  // request_type == QueueModelWindowedMG1RemoteCombined::CACHELINE
          UInt64 max_additional_page_requests_before_this = 0;
          if (m_imbalanced_cacheline_requests >= bw_one_page_to_cachelines) {
@@ -256,20 +256,14 @@ QueueModelWindowedMG1RemoteCombined::computeQueueDelayNoEffect(SubsecondTime pkt
          }
          UInt64 utilization_inject_ps = max_additional_page_requests_before_this * m_page_processing_time.getPS();
          adjusted_utilization = (double)(service_time_sum + utilization_inject_ps) / m_window_size.getPS();
-         adjusted_service_time_sum2 = m_service_time_sum2 + m_imbalanced_page_requests * m_page_processing_time.getPS() * m_page_processing_time.getPS();
-
-         ++m_total_cacheline_requests;
-         m_total_page_request_injected_time += max_additional_page_requests_before_this * m_page_processing_time;
-         m_imbalanced_cacheline_requests += 1;
+         adjusted_service_time_sum2 = m_service_time_sum2 + m_imbalanced_page_requests * (m_page_processing_time.getPS() * m_page_processing_time.getPS());
       }
-      ++m_total_requests;
 
       double service_time_Es2 = adjusted_service_time_sum2 / m_num_arrivals;
       double arrival_rate = (double)m_num_arrivals / m_window_size.getPS();
       
       // If requesters do not throttle based on returned latency, it's their problem, not ours
       if (adjusted_utilization > .9999) { // number here changed from .99 to .9999; still needed?
-         ++m_total_requests_queue_full;
          adjusted_utilization = .9999;
       }
 
@@ -341,6 +335,9 @@ QueueModelWindowedMG1RemoteCombined::computeQueueDelayTrackBytes(SubsecondTime p
          ++m_total_page_requests;
          m_total_page_request_injected_time += max_additional_cacheline_requests_before_this * m_cacheline_processing_time;
          m_imbalanced_page_requests += 1;
+         if (m_imbalanced_page_requests > m_max_imbalanced_page_requests) {
+            m_max_imbalanced_page_requests = m_imbalanced_page_requests;
+         }
       } else {  // request_type == QueueModelWindowedMG1RemoteCombined::CACHELINE
          UInt64 max_additional_page_requests_before_this = 0;
          if (m_imbalanced_cacheline_requests >= bw_one_page_to_cachelines) {
@@ -350,11 +347,14 @@ QueueModelWindowedMG1RemoteCombined::computeQueueDelayTrackBytes(SubsecondTime p
          }
          UInt64 utilization_inject_ps = max_additional_page_requests_before_this * m_page_processing_time.getPS();
          adjusted_utilization = (double)(service_time_sum + utilization_inject_ps) / m_window_size.getPS();
-         adjusted_service_time_sum2 = m_service_time_sum2 + m_imbalanced_page_requests * m_page_processing_time.getPS() * m_page_processing_time.getPS();
+         adjusted_service_time_sum2 = m_service_time_sum2 + m_imbalanced_page_requests * (m_page_processing_time.getPS() * m_page_processing_time.getPS());
 
          ++m_total_cacheline_requests;
-         m_total_page_request_injected_time += max_additional_page_requests_before_this * m_page_processing_time;
+         m_total_cacheline_request_injected_time += max_additional_page_requests_before_this * m_page_processing_time;
          m_imbalanced_cacheline_requests += 1;
+         if (m_imbalanced_cacheline_requests > m_max_imbalanced_cacheline_requests_rounded) {
+            m_max_imbalanced_cacheline_requests_rounded = (UInt64)m_imbalanced_cacheline_requests + 1;  // truncate then add 1
+         }
       }
       ++m_total_requests;
 

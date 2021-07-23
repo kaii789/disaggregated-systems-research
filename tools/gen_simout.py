@@ -149,10 +149,35 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     results['dram.remoteavglatency'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.total-remote-access-latency'], results['dram.remote-accesses']))
   results['dram.avglatency'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.total-access-latency'], results['dram.accesses']))
 
-  if 'dram-datamovement-queue.num-requests' in results and sum(results['dram-datamovement-queue.num-requests']) > 0:
-    results['dram.remotequeuemodel_datamovement_avgdelay'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram-datamovement-queue.total-queue-delay'], results['dram-datamovement-queue.num-requests']))
-  if 'dram-datamovement-queue-2.num-requests' in results and sum(results['dram-datamovement-queue-2.num-requests']) > 0:
-    results['dram.remotequeuemodel_datamovement2_avgdelay'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram-datamovement-queue-2.total-queue-delay'], results['dram-datamovement-queue-2.num-requests']))
+  if 'dram-datamovement-queue.num-cacheline-requests' in results and sum(results['dram-datamovement-queue.num-requests']) > 0:
+    # New combined partition queues implementation
+    results['dram.page_queue_avgdelay'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram-datamovement-queue.total-page-queue-delay'], results['dram-datamovement-queue.num-page-requests']))
+    if sum(results['dram-datamovement-queue.num-cacheline-requests']) > 0:
+      results['dram.cacheline_queue_avgdelay'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram-datamovement-queue.total-cacheline-queue-delay'], results['dram-datamovement-queue.num-cacheline-requests']))
+    results['dram.both_queues_total_avgdelay'] = map(lambda (a,b,c): (a+b)/c if c else float('inf'), zip(results['dram-datamovement-queue.total-page-queue-delay'], results['dram-datamovement-queue.total-cacheline-queue-delay'], results['dram-datamovement-queue.num-requests']))
+    
+    if 'dram-datamovement-queue.max-effective-bandwidth-ps' in results and sum(results['dram-datamovement-queue.max-effective-bandwidth-ps']) > 0:
+      results['dram.both_queues_total_max_effective_bandwidth'] = map(lambda (a,b): 1000*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue.max-effective-bandwidth-bytes'], results['dram-datamovement-queue.max-effective-bandwidth-ps']))
+    if 'dram-datamovement-queue.page-max-effective-bandwidth-ps' in results and sum(results['dram-datamovement-queue.page-max-effective-bandwidth-ps']) > 0:
+      results['dram.page_queue_max_effective_bandwidth'] = map(lambda (a,b): 1000*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue.page-max-effective-bandwidth-bytes'], results['dram-datamovement-queue.page-max-effective-bandwidth-ps']))
+    if 'dram-datamovement-queue.cacheline-max-effective-bandwidth-ps' in results and sum(results['dram-datamovement-queue.cacheline-max-effective-bandwidth-ps']) > 0:
+      results['dram.cacheline_queue_max_effective_bandwidth'] = map(lambda (a,b): 1000*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue.cacheline-max-effective-bandwidth-bytes'], results['dram-datamovement-queue.cacheline-max-effective-bandwidth-ps']))
+  
+    if 'dram-datamovement-queue.total-page-utilization-injected-time' in results:
+      results['dram.page_queue_avg_injected_time'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram-datamovement-queue.total-page-utilization-injected-time'], results['dram-datamovement-queue.num-page-requests']))
+    if 'dram-datamovement-queue.total-cacheline-utilization-injected-time' in results and sum(results['dram-datamovement-queue.num-cacheline-requests']) > 0:
+      results['dram.cacheline_queue_avg_injected_time'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram-datamovement-queue.total-cacheline-utilization-injected-time'], results['dram-datamovement-queue.num-cacheline-requests']))
+    
+  else:
+    if 'dram-datamovement-queue.num-requests' in results and sum(results['dram-datamovement-queue.num-requests']) > 0:
+      results['dram.page_queue_avgdelay'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram-datamovement-queue.total-queue-delay'], results['dram-datamovement-queue.num-requests']))
+    if 'dram-datamovement-queue-2.num-requests' in results and sum(results['dram-datamovement-queue-2.num-requests']) > 0:
+      results['dram.cacheline_queue_avgdelay'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram-datamovement-queue-2.total-queue-delay'], results['dram-datamovement-queue-2.num-requests']))
+    
+    if 'dram-datamovement-queue.max-effective-bandwidth-ps' in results and sum(results['dram-datamovement-queue.max-effective-bandwidth-ps']) > 0:
+      results['dram.page_queue_max_effective_bandwidth'] = map(lambda (a,b): 1000*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue.max-effective-bandwidth-bytes'], results['dram-datamovement-queue.max-effective-bandwidth-ps']))
+    if 'dram-datamovement-queue-2.max-effective-bandwidth-ps' in results and sum(results['dram-datamovement-queue-2.max-effective-bandwidth-ps']) > 0:
+      results['dram.cacheline_queue_max_effective_bandwidth'] = map(lambda (a,b): 1000*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue-2.max-effective-bandwidth-bytes'], results['dram-datamovement-queue-2.max-effective-bandwidth-ps']))
 
   # Compression
   bytes_saved = results['compression.bytes-saved'][0] if 'compression.bytes-saved' in results else 0
@@ -202,8 +227,9 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     ('  average dram access latency (ns)', 'dram.avglatency', format_ns(2)),
     ('    local dram avg access latency (ns)', 'dram.localavglatency', format_ns(2)),
     ('    remote dram avg access latency (ns)', 'dram.remoteavglatency', format_ns(2)),
-    ('      remote datamovement queue model avg access latency (ns)', 'dram.remotequeuemodel_datamovement_avgdelay', format_ns(2)),
-    ('      remote datamovement2 queue model avg access latency (ns)', 'dram.remotequeuemodel_datamovement2_avgdelay', format_ns(2)),
+    ('      remote both queues total avg access latency (ns)', 'dram.both_queues_total_avgdelay', format_ns(2)),
+    ('        remote datamovement queue model avg access latency (ns)', 'dram.page_queue_avgdelay', format_ns(2)),
+    ('        remote datamovement2 queue model avg access latency (ns)', 'dram.cacheline_queue_avgdelay', format_ns(2)),
     ('  num page moves', 'dram.page-moves', str),
     ('  num page prefetches', 'dram.page-prefetches', str),
     ('  page prefetch not done due to full queue', 'dram.queue-full-page-prefetch-not-done', str),
@@ -252,11 +278,6 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     results['dram.bandwidth'] = map(lambda a: 100*a/time0 if time0 else float('inf'), results['dram-queue.total-time-used'])
     template.append(('  average dram bandwidth utilization', 'dram.bandwidth', lambda v: '%.2f%%' % v))
 
-  if 'dram-datamovement-queue.max-effective-bandwidth-ps' in results and sum(results['dram-datamovement-queue.max-effective-bandwidth-ps']) > 0:
-    results['dram.remotequeuemodel_datamovement_max_effective_bandwidth'] = map(lambda (a,b): 1000*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue.max-effective-bandwidth-bytes'], results['dram-datamovement-queue.max-effective-bandwidth-ps']))
-  if 'dram-datamovement-queue-2.max-effective-bandwidth-ps' in results and sum(results['dram-datamovement-queue-2.max-effective-bandwidth-ps']) > 0:
-    results['dram.remotequeuemodel_datamovement2_max_effective_bandwidth'] = map(lambda (a,b): 1000*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue-2.max-effective-bandwidth-bytes'], results['dram-datamovement-queue-2.max-effective-bandwidth-ps']))
-
   if 'dram-datamovement-queue.num-requests-capped-by-window-size' in results and sum(results['dram-datamovement-queue.num-requests']) > 0:
     results['dram.remotequeuemodel_datamovement_percent_capped_by_window_size'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue.num-requests-capped-by-window-size'], results['dram-datamovement-queue.num-requests']))
     results['dram.remotequeuemodel_datamovement_percent_queue_full'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue.num-requests-queue-full'], results['dram-datamovement-queue.num-requests']))
@@ -271,9 +292,14 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
       ('Experiment stats', '', ''),
       ('  PQ=1 type1 time savings (ns)', 'dram.redundant-moves-type1-time-savings', format_ns(2)),
       ('  PQ=1 type2 time savings (ns)', 'dram.redundant-moves-type2-time-savings', format_ns(2)),
+      ('  PQ=1 page queue avg injected time (ns)', 'dram.page_queue_avg_injected_time', format_ns(2)),
+      ('  PQ=1 cacheline queue avg injected time (ns)', 'dram.cacheline_queue_avg_injected_time', format_ns(2)),
+      ('  PQ=1 max imbalanced page requests', 'dram-datamovement-queue.max-imbalanced-page-requests', str),
+      ('  PQ=1 max imbalanced cacheline requests', 'dram-datamovement-queue.max-imbalanced-cacheline-requests', str),
       ('  num unique pages accessed', 'dram.unique-pages-accessed', str),
-      ('  remote datamovement max effective bandwidth (GB/s)', 'dram.remotequeuemodel_datamovement_max_effective_bandwidth', format_float(4)),
-      ('  remote datamovement2 max effective bandwidth (GB/s)', 'dram.remotequeuemodel_datamovement2_max_effective_bandwidth', format_float(4)),
+      ('  remote datamovement max effective bandwidth (GB/s)', 'dram.both_queues_total_max_effective_bandwidth', format_float(4)),
+      ('    page queue max effective bandwidth (GB/s)', 'dram.page_queue_max_effective_bandwidth', format_float(4)),
+      ('    cacheline queue max effective bandwidth (GB/s)', 'dram.cacheline_queue_max_effective_bandwidth', format_float(4)),
       ('  remote datamovement % capped by window size', 'dram.remotequeuemodel_datamovement_percent_capped_by_window_size', format_float(2)),
       ('  remote datamovement % queue utilization full', 'dram.remotequeuemodel_datamovement_percent_queue_full', format_float(2)),
       ('  remote datamovement % queue capped by custom cap', 'dram.remotequeuemodel_datamovement_percent_capped_by_custom_cap', format_float(2)),

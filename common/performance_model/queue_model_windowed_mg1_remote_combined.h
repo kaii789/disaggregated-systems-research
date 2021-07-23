@@ -46,6 +46,8 @@ private:
    SubsecondTime m_cacheline_processing_time;       // For injecting requests to calculate more accurate queuing delays
    UInt64 m_imbalanced_page_requests;       // Number of page requests not yet "cancelled out" by cacheline requests according to cacheline queue ratio   
    double m_imbalanced_cacheline_requests;  // Number of cacheline requests not yet "cancelled out" by page requests according to cacheline queue ratio
+   UInt64 m_max_imbalanced_page_requests;
+   UInt64 m_max_imbalanced_cacheline_requests_rounded;
 
    String m_name;  // temporary, for debugging
    
