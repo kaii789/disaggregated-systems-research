@@ -1066,7 +1066,7 @@ def get_stats_from_files_custom(
                                     stat_settings[index].line_beginning
                                 )
                             )
-                        y_values[index].append(np.nan)  # ignore missing stats
+                            y_values[index].append(np.nan)  # ignore missing stats
                     # raise ValueError("\n".join(error_strs))
                     print("\n".join(error_strs))
             else:
@@ -1357,3 +1357,18 @@ if __name__ == "__main__":
     # prefetcher_combining("/home/jonathan/Desktop/experiment_results/prefetcher (next page)")
 
     # general_experiment_combining("/home/jonathan/Desktop/experiment_results/prefetcher_D7")
+
+    # passed_over_directories = []
+    # directories_not_graphed = []
+    # for filename in natsort.os_sorted(os.listdir(output_directory_path)):
+    #     filename_path = os.path.join(output_directory_path, filename)
+    #     if os.path.isdir(filename_path) and "output_files" in filename:
+    #         for sub_filename in natsort.os_sorted(os.listdir(filename_path)):
+    #             sub_filename_path = os.path.join(filename_path, sub_filename)
+    #             if (
+    #                 os.path.isfile(sub_filename_path)
+    #                 and sub_filename.endswith(".png")
+    #             ):
+    #                 src_path = sub_filename_path
+    #                 dst_path = os.path.join(output_directory_path, sub_filename)
+    #                 shutil.copy2(src_path, dst_path)

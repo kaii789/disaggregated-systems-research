@@ -38,7 +38,7 @@ def run_from_cmdline(
     first_experiment_no: int = 1,
     log_file: Optional[TextIO] = None,
 ):
-    # Run without stats_settings list
+    # Run without stat_settings list
     run_from_experiment(output_directory_path, first_experiment_no, log_file)
 
 
@@ -46,14 +46,13 @@ def run_from_experiment(
     output_directory_path: PathLike,
     first_experiment_no: int = 1,
     log_file: Optional[TextIO] = None,
-    stats_settings: Optional[List[StatSetting]] = None,
+    stat_settings: Optional[List[StatSetting]] = None,
 ):
     ipc_line_no = 3  # Indexing start from 0, not 1
-    if stats_settings is None:
+    if stat_settings is None:
         # StatSetting line_beginning's: case sensitive, not sensitive to leading whitespace
-        stat_settings = [
+        stat_settings_prefetch_and_ideal_throttling = [
             StatSetting("IPC", float),
-            #  StatSetting("Idle time (%)", lambda s: float(s.strip("%"))),
             StatSetting(
                 "remote dram avg access latency",
                 float,
@@ -117,12 +116,12 @@ def run_from_experiment(
                 name_for_legend="local evictions (1000s)",
             ),
             StatSetting("num page prefetches", int),
-            StatSetting("page prefetch not done due to full queue", int,
-                        name_for_legend="prefetch not done: full queue"),
-            StatSetting("page prefetch not done since page local already", int,
-                        name_for_legend="prefetch not done: page local already"),
-            StatSetting("page prefetch not done since page uninitialized/not seen yet", int,
-                        name_for_legend="prefetch not done: page uninitialized/not seen yet"),
+            # StatSetting("page prefetch not done due to full queue", int,
+            #             name_for_legend="prefetch not done: full queue"),
+            # StatSetting("page prefetch not done since page local already", int,
+            #             name_for_legend="prefetch not done: page local already"),
+            # StatSetting("page prefetch not done since page uninitialized/not seen yet", int,
+            #             name_for_legend="prefetch not done: page uninitialized/not seen yet"),
             # StatSetting("num redundant moves", int, name_for_legend="num redundant moves total"),
             StatSetting(
                 "num redundant moves total",
@@ -154,21 +153,21 @@ def run_from_experiment(
                 float,
                 name_for_legend="PQ=1 type2 approx latency savings (ns)",
             ),
-            StatSetting(
-                "ideal page throttling: num swaps inflight",
-                int,
-                name_for_legend="ideal page throttling: # swaps inflight",
-            ),
-            StatSetting(
-                "ideal page throttling: num swaps non-inflight",
-                int,
-                name_for_legend="ideal page throttling: # swaps non-inflight",
-            ),
-            StatSetting(
-                "ideal page throttling: num swaps unavailable",
-                int,
-                name_for_legend="ideal page throttling: # swaps unavailable",
-            ),
+            # StatSetting(
+            #     "ideal page throttling: num swaps inflight",
+            #     int,
+            #     name_for_legend="ideal page throttling: # swaps inflight",
+            # ),
+            # StatSetting(
+            #     "ideal page throttling: num swaps non-inflight",
+            #     int,
+            #     name_for_legend="ideal page throttling: # swaps non-inflight",
+            # ),
+            # StatSetting(
+            #     "ideal page throttling: num swaps unavailable",
+            #     int,
+            #     name_for_legend="ideal page throttling: # swaps unavailable",
+            # ),
             StatSetting(
                 "remote page move cancelled due to full bufferspace",
                 int,
@@ -182,6 +181,142 @@ def run_from_experiment(
             #  StatSetting("DDR page hits", int),
             #  StatSetting("DDR page misses", int),
         ]
+        stat_settings_new_pq_implementation = [
+            StatSetting("IPC", float),
+            StatSetting(
+                "remote dram avg access latency",
+                float,
+                name_for_legend="remote dram avg access latency (ns)",
+            ),
+            StatSetting(
+                "remote both queues total avg access latency",
+                float,
+                name_for_legend="  both queues total avg access latency (ns)",
+            ),
+            StatSetting(
+                "remote datamovement queue model avg access latency",
+                float,
+                name_for_legend="    page queue avg access latency (ns)",
+            ),
+            StatSetting(
+                "remote datamovement2 queue model avg access latency",
+                float,
+                name_for_legend="    cacheline queue avg access latency (ns)",
+            ),
+            StatSetting(
+                "local dram avg access latency",
+                float,
+                name_for_legend="local dram avg access latency (ns)",
+            ),
+            StatSetting(
+                "average dram access latency",
+                float,
+                name_for_legend="avg dram access latency (ns)",
+            ),
+            StatSetting(
+                "remote datamovement max effective bandwidth (GB/s)",
+                float,
+                name_for_legend="remote datamovement max effective bw (GB/s)",
+            ),
+            StatSetting(
+                "page queue max effective bandwidth (GB/s)",
+                float,
+                name_for_legend="  page queue max effective bandwidth (GB/s)",
+            ),
+            StatSetting(
+                "cacheline queue max effective bandwidth (GB/s)",
+                float,
+                name_for_legend="  cl queue max effective bandwidth (GB/s)",
+            ),
+            StatSetting(
+                "remote datamovement % capped by window size",
+                float,
+                name_for_legend="remote datamovement capped by window size (%)",
+            ),
+            StatSetting(
+                "remote datamovement % queue utilization full",
+                float,
+                name_for_legend="remote datamovement utilization full (%)",
+            ),
+            StatSetting("PQ=1 page queue avg injected time (ns)", float),
+            StatSetting("PQ=1 cacheline queue avg injected time (ns)", float),
+            StatSetting("PQ=1 max imbalanced page requests", float),
+            StatSetting("PQ=1 max imbalanced cacheline requests", float),
+            StatSetting("num page moves", int, name_for_legend="num page moves"),
+            StatSetting("num inflight hits", int, name_for_legend="num inflight hits"),
+            StatSetting(
+                "num local evictions",
+                lambda s: int(s) / 1000,
+                name_for_legend="local evictions (1000s)",
+            ),
+            StatSetting("num page prefetches", int),
+            # StatSetting("page prefetch not done due to full queue", int,
+            #             name_for_legend="prefetch not done: full queue"),
+            # StatSetting("page prefetch not done since page local already", int,
+            #             name_for_legend="prefetch not done: page local already"),
+            # StatSetting("page prefetch not done since page uninitialized/not seen yet", int,
+            #             name_for_legend="prefetch not done: page uninitialized/not seen yet"),
+            # StatSetting("num redundant moves", int, name_for_legend="num redundant moves total"),
+            StatSetting(
+                "num redundant moves total",
+                int,
+                name_for_legend="num redundant moves total",
+            ),
+            StatSetting(
+                "num redundant moves type1",
+                int,
+                name_for_legend="  num redundant moves type1",
+            ),
+            StatSetting(
+                "num type1 cache slower than page",
+                int,
+                name_for_legend="    num type1 cache slower than page",
+            ),
+            StatSetting(
+                "num redundant moves type2",
+                int,
+                name_for_legend="  num redundant moves type2",
+            ),
+            StatSetting(
+                "PQ=1 type1 time savings (ns)",
+                float,
+                name_for_legend="PQ=1 type1 approx latency savings (ns)",
+            ),
+            StatSetting(
+                "PQ=1 type2 time savings (ns)",
+                float,
+                name_for_legend="PQ=1 type2 approx latency savings (ns)",
+            ),
+            # StatSetting(
+            #     "ideal page throttling: num swaps inflight",
+            #     int,
+            #     name_for_legend="ideal page throttling: # swaps inflight",
+            # ),
+            # StatSetting(
+            #     "ideal page throttling: num swaps non-inflight",
+            #     int,
+            #     name_for_legend="ideal page throttling: # swaps non-inflight",
+            # ),
+            # StatSetting(
+            #     "ideal page throttling: num swaps unavailable",
+            #     int,
+            #     name_for_legend="ideal page throttling: # swaps unavailable",
+            # ),
+            StatSetting(
+                "remote page move cancelled due to full bufferspace",
+                int,
+                name_for_legend="remote move cancelled, full bufferspace",
+            ),
+            StatSetting(
+                "remote page move cancelled due to full queue",
+                int,
+                name_for_legend="remote move cancelled, full queue",
+            ), 
+            #  StatSetting("DDR page hits", int),
+            #  StatSetting("DDR page misses", int),
+        ]
+        # stat_settings = stat_settings_prefetch_and_ideal_throttling
+        stat_settings = stat_settings_new_pq_implementation
 
     y_value_line_nos = [None for _ in range(len(stat_settings))]
     y_values = [[] for _ in range(len(stat_settings))]
