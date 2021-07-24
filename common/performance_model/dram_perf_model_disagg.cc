@@ -918,7 +918,8 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         m_inflight_redundant[phys_page] = 0; 
         if (m_inflight_pages.size() > m_max_bufferspace)
             m_max_bufferspace++; 
-    } else {  // move_page == false
+    }
+    if (!move_page || !m_r_simulate_datamov_overhead || m_r_cacheline_gran) {  // move_page == false, or earlier condition (m_r_simulate_datamov_overhead && !m_r_cacheline_gran) is false
         // Actually put the cacheline request on the queue, since after now we're sure we actually use the cacheline request
         // This actual cacheline request probably has a similar delay value as the earlier computeQueueDelayNoEffect value, no need to update t_now
         if (m_r_partition_queues == 1) {
