@@ -29,6 +29,8 @@ QueueModelWindowedMG1RemoteCombined::QueueModelWindowedMG1RemoteCombined(String 
    , m_imbalanced_cacheline_requests(0)
    , m_max_imbalanced_page_requests(0)
    , m_max_imbalanced_cacheline_requests_rounded(0)
+   , m_request_tracking_window_size(SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("queue_model/windowed_mg1_remote_combined/request_tracking_window_size")))
+   , m_cacheline_tracking_fractional_part(0.0)
    , m_name(name)
    , m_specified_bw_GB_per_s((double)bw_bits_per_us / 8 / 1000)  // convert bits/us to GB/s
    , m_max_bandwidth_allowable_excess_ratio(Sim()->getCfg()->getFloat("queue_model/windowed_mg1_remote_combined/bandwidth_allowable_excess_ratio"))
@@ -239,10 +241,34 @@ QueueModelWindowedMG1RemoteCombined::computeQueueDelayNoEffect(SubsecondTime pkt
       while (m_imbalanced_page_requests > 0 && m_imbalanced_cacheline_requests >= bw_one_page_to_cachelines) {
          m_imbalanced_page_requests -= 1;
          m_imbalanced_cacheline_requests -= bw_one_page_to_cachelines;
+         // Can empty requests map for each request cancelled out here
+         if (!m_page_requests.empty())
+            m_page_requests.erase(m_page_requests.begin());
+         UInt32 i = 0;
+         while (!m_cacheline_requests.empty() && i < (UInt32)(bw_one_page_to_cachelines + m_cacheline_tracking_fractional_part)) {
+            m_cacheline_requests.erase(m_cacheline_requests.begin());
+            ++i;
+         }
+         // use truncation behaviour to get integer part
+         m_cacheline_tracking_fractional_part += (bw_one_page_to_cachelines + m_cacheline_tracking_fractional_part - i) - (UInt32)(bw_one_page_to_cachelines + m_cacheline_tracking_fractional_part - i);
+         m_cacheline_tracking_fractional_part -= (UInt32)m_cacheline_tracking_fractional_part;
       }
       // After this, m_imbalanced_page_requests is nonzero if m_imbalanced_cacheline_requests < bw_one_page_to_cachelines;
       // m_imbalanced_cacheline_requests is nonzero if m_imbalanced_page_requests == 0  OR  m_imbalanced_cacheline_requests < bw_one_page_to_cachelines
 
+      // Don't keep track of requests earlier than the window size
+      while(!m_page_requests.empty() && *(m_page_requests.begin()) + m_request_tracking_window_size < Sim()->getClockSkewMinimizationServer()->getGlobalTime())
+      {
+         auto map_entry = m_page_requests.begin();
+         m_imbalanced_page_requests -= 1;
+         m_page_requests.erase(map_entry);
+      }
+      while(!m_cacheline_requests.empty() && *(m_cacheline_requests.begin()) + m_request_tracking_window_size < Sim()->getClockSkewMinimizationServer()->getGlobalTime())
+      {
+         auto map_entry = m_cacheline_requests.begin();
+         m_imbalanced_cacheline_requests -= 1;
+         m_cacheline_requests.erase(map_entry);
+      }
       // Process differently whether this is a page or cacheline access
       if (request_type == QueueModel::PAGE) {
          double max_additional_cacheline_requests_before_this = 0;
@@ -323,10 +349,34 @@ QueueModelWindowedMG1RemoteCombined::computeQueueDelayTrackBytes(SubsecondTime p
       while (m_imbalanced_page_requests > 0 && m_imbalanced_cacheline_requests >= bw_one_page_to_cachelines) {
          m_imbalanced_page_requests -= 1;
          m_imbalanced_cacheline_requests -= bw_one_page_to_cachelines;
+         // Can empty requests map for each request cancelled out here
+         if (!m_page_requests.empty())
+            m_page_requests.erase(m_page_requests.begin());
+         UInt32 i = 0;
+         while (!m_cacheline_requests.empty() && i < (UInt32)(bw_one_page_to_cachelines + m_cacheline_tracking_fractional_part)) {
+            m_cacheline_requests.erase(m_cacheline_requests.begin());
+            ++i;
+         }
+         // use truncation behaviour to get integer part
+         m_cacheline_tracking_fractional_part += (bw_one_page_to_cachelines + m_cacheline_tracking_fractional_part - i) - (UInt32)(bw_one_page_to_cachelines + m_cacheline_tracking_fractional_part - i);
+         m_cacheline_tracking_fractional_part -= (UInt32)m_cacheline_tracking_fractional_part;
       }
       // After this, m_imbalanced_page_requests is nonzero if m_imbalanced_cacheline_requests < bw_one_page_to_cachelines;
       // m_imbalanced_cacheline_requests is nonzero if m_imbalanced_page_requests == 0  OR  m_imbalanced_cacheline_requests < bw_one_page_to_cachelines
 
+      // Don't keep track of requests earlier than the window size
+      while(!m_page_requests.empty() && *(m_page_requests.begin()) + m_request_tracking_window_size < Sim()->getClockSkewMinimizationServer()->getGlobalTime())
+      {
+         auto map_entry = m_page_requests.begin();
+         m_imbalanced_page_requests -= 1;
+         m_page_requests.erase(map_entry);
+      }
+      while(!m_cacheline_requests.empty() && *(m_cacheline_requests.begin()) + m_request_tracking_window_size < Sim()->getClockSkewMinimizationServer()->getGlobalTime())
+      {
+         auto map_entry = m_cacheline_requests.begin();
+         m_imbalanced_cacheline_requests -= 1;
+         m_cacheline_requests.erase(map_entry);
+      }
       // Process differently whether this is a page or cacheline access
       if (request_type == QueueModel::PAGE) {
          double max_additional_cacheline_requests_before_this = 0;

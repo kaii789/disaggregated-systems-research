@@ -6,6 +6,7 @@
 #include "contention_model.h"
 
 #include <map>
+#include <set>
 
 class QueueModelWindowedMG1RemoteCombined : public QueueModel
 {
@@ -48,6 +49,10 @@ private:
    double m_imbalanced_cacheline_requests;  // Number of cacheline requests not yet "cancelled out" by page requests according to cacheline queue ratio
    UInt64 m_max_imbalanced_page_requests;
    UInt64 m_max_imbalanced_cacheline_requests_rounded;
+   std::multiset<SubsecondTime> m_page_requests;       // Map to keep track of requests made within a window size
+   std::multiset<SubsecondTime> m_cacheline_requests;  // Map to keep track of requests made within a window size
+   SubsecondTime m_request_tracking_window_size;       // Window size for maps tracking requests
+   double m_cacheline_tracking_fractional_part;
 
    String m_name;  // temporary, for debugging
    
