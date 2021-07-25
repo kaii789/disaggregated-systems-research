@@ -19,7 +19,7 @@ QueueModelWindowedMG1RemoteCombined::QueueModelWindowedMG1RemoteCombined(String 
    , m_service_time_sum2(0)
    , m_page_service_time_sum(0)
    , m_cacheline_service_time_sum(0)
-   , m_r_added_latency() // Network latency for remote DRAM access 
+   , m_r_added_latency(SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/remote_mem_add_lat"))) // Network latency for remote DRAM access 
    , m_r_cacheline_queue_fraction(Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_fraction"))
    // , m_page_processing_time(SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("queue_model/windowed_mg1_remote_combined/page_processing_time")))
    // , m_cacheline_processing_time(SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("queue_model/windowed_mg1_remote_combined/cacheline_processing_time")))
@@ -27,6 +27,8 @@ QueueModelWindowedMG1RemoteCombined::QueueModelWindowedMG1RemoteCombined(String 
    , m_cacheline_processing_time(baseline_cacheline_processing_time)
    , m_imbalanced_page_requests(0)
    , m_imbalanced_cacheline_requests(0)
+   , m_max_imbalanced_page_requests(0)
+   , m_max_imbalanced_cacheline_requests_rounded(0)
    , m_name(name)
    , m_specified_bw_GB_per_s((double)bw_bits_per_us / 8 / 1000)  // convert bits/us to GB/s
    , m_max_bandwidth_allowable_excess_ratio(Sim()->getCfg()->getFloat("queue_model/windowed_mg1_remote_combined/bandwidth_allowable_excess_ratio"))
@@ -53,6 +55,10 @@ QueueModelWindowedMG1RemoteCombined::QueueModelWindowedMG1RemoteCombined(String 
    , m_total_requests_capped_by_queue_delay_cap(0)
    , m_total_utilized_time(SubsecondTime::Zero())
    , m_total_queue_delay(SubsecondTime::Zero())
+   , m_total_page_queue_delay(SubsecondTime::Zero())
+   , m_total_cacheline_queue_delay(SubsecondTime::Zero())
+   , m_total_page_request_injected_time(SubsecondTime::Zero())
+   , m_total_cacheline_request_injected_time(SubsecondTime::Zero())
 {  
    if (m_use_separate_queue_delay_cap) {
       m_queue_delay_cap = SubsecondTime::NS(Sim()->getCfg()->getInt("queue_model/windowed_mg1_remote_combined/queue_delay_cap"));
@@ -247,7 +253,7 @@ QueueModelWindowedMG1RemoteCombined::computeQueueDelayNoEffect(SubsecondTime pkt
          UInt64 utilization_inject_ps = (UInt64)(max_additional_cacheline_requests_before_this * m_cacheline_processing_time.getPS());
          adjusted_utilization = (double)(service_time_sum + utilization_inject_ps) / m_window_size.getPS();
          adjusted_service_time_sum2 = m_service_time_sum2 + m_imbalanced_cacheline_requests * (m_cacheline_processing_time.getPS() * m_cacheline_processing_time.getPS());
-      } else {  // request_type == QueueModelWindowedMG1RemoteCombined::CACHELINE
+      } else {  // request_type == QueueModel::CACHELINE
          UInt64 max_additional_page_requests_before_this = 0;
          if (m_imbalanced_cacheline_requests >= bw_one_page_to_cachelines) {
             // From earlier processing, m_imbalanced_page_requests must be 0
@@ -332,13 +338,12 @@ QueueModelWindowedMG1RemoteCombined::computeQueueDelayTrackBytes(SubsecondTime p
          adjusted_utilization = (double)(service_time_sum + utilization_inject_ps) / m_window_size.getPS();
          adjusted_service_time_sum2 = m_service_time_sum2 + m_imbalanced_cacheline_requests * (m_cacheline_processing_time.getPS() * m_cacheline_processing_time.getPS());
 
-         ++m_total_page_requests;
          m_total_page_request_injected_time += max_additional_cacheline_requests_before_this * m_cacheline_processing_time;
          m_imbalanced_page_requests += 1;
          if (m_imbalanced_page_requests > m_max_imbalanced_page_requests) {
             m_max_imbalanced_page_requests = m_imbalanced_page_requests;
          }
-      } else {  // request_type == QueueModelWindowedMG1RemoteCombined::CACHELINE
+      } else {  // request_type == QueueModel::CACHELINE
          UInt64 max_additional_page_requests_before_this = 0;
          if (m_imbalanced_cacheline_requests >= bw_one_page_to_cachelines) {
             // From earlier processing, m_imbalanced_page_requests must be 0
@@ -356,7 +361,6 @@ QueueModelWindowedMG1RemoteCombined::computeQueueDelayTrackBytes(SubsecondTime p
             m_max_imbalanced_cacheline_requests_rounded = (UInt64)m_imbalanced_cacheline_requests + 1;  // truncate then add 1
          }
       }
-      ++m_total_requests;
 
       double service_time_Es2 = adjusted_service_time_sum2 / m_num_arrivals;
       double arrival_rate = (double)m_num_arrivals / m_window_size.getPS();
@@ -395,10 +399,13 @@ QueueModelWindowedMG1RemoteCombined::computeQueueDelayTrackBytes(SubsecondTime p
    addItemUpdateBytes(pkt_time, num_bytes, t_queue, request_type);
 
    m_total_utilized_time += processing_time;
+   ++m_total_requests;
    m_total_queue_delay += t_queue;
    if (request_type == QueueModel::PAGE) {
+      ++m_total_page_requests;
       m_total_page_queue_delay += t_queue;
-   } else {  // request_type == QueueModelWindowedMG1RemoteCombined::CACHELINE
+   } else {  // request_type == QueueModel::CACHELINE
+      ++m_total_cacheline_requests;
       m_total_cacheline_queue_delay += t_queue;
    }
 
@@ -414,7 +421,7 @@ QueueModelWindowedMG1RemoteCombined::addItemUpdateBytes(SubsecondTime pkt_time, 
    if (request_type == QueueModel::PAGE) {
       m_page_packet_bytes.insert(std::pair<SubsecondTime, UInt64>(pkt_time + pkt_queue_delay, num_bytes));
       m_page_bytes_tracking += num_bytes;
-   } else {  // request_type == QueueModelWindowedMG1RemoteCombined::CACHELINE
+   } else {  // request_type == QueueModel::CACHELINE
       m_cacheline_packet_bytes.insert(std::pair<SubsecondTime, UInt64>(pkt_time + pkt_queue_delay, num_bytes));
       m_cacheline_bytes_tracking += num_bytes;
    }
@@ -504,7 +511,7 @@ QueueModelWindowedMG1RemoteCombined::addItem(SubsecondTime pkt_time, SubsecondTi
    if (request_type == QueueModel::PAGE) {
       m_window_page_requests.insert(std::pair<SubsecondTime, SubsecondTime>(pkt_time, service_time));
       m_page_service_time_sum += service_time.getPS();
-   } else {  // request_type == QueueModelWindowedMG1RemoteCombined::CACHELINE
+   } else {  // request_type == QueueModel::CACHELINE
       m_window_cacheline_requests.insert(std::pair<SubsecondTime, SubsecondTime>(pkt_time, service_time));
       m_cacheline_service_time_sum += service_time.getPS();
    }
