@@ -34,14 +34,18 @@ class StatSetting:
 
 
 def run_from_experiment(
-    output_directory_path: PathLike, log_file: Optional[TextIO] = None
+    output_directory_path: PathLike,
+    first_experiment_no: int = 1,
+    log_file: Optional[TextIO] = None,
 ):
     # in this case, the two functions are the same
-    run_from_cmdline(output_directory_path, log_file)
+    run_from_cmdline(output_directory_path, first_experiment_no, log_file)
 
 
 def run_from_cmdline(
-    output_directory_path: PathLike, log_file: Optional[TextIO] = None
+    output_directory_path: PathLike,
+    first_experiment_no: int = 1,
+    log_file: Optional[TextIO] = None,
 ):
     ipc_line_no = 3  # Indexing start from 0, not 1
     # StatSetting line_beginning's: case sensitive, not sensitive to leading whitespace
@@ -147,12 +151,22 @@ def run_from_cmdline(
     # config_param_values = []
 
     first_file = True
-    file_num = 1
+    file_num = first_experiment_no
     out_file_path = os.path.join(output_directory_path, "{}_sim.out".format(file_num))
     # Read all the output files, starting from 1 and going up
     while os.path.isfile(out_file_path):
         with open(out_file_path, "r") as out_file:
             out_file_lines = out_file.readlines()
+            if len(out_file_lines) == 0:
+                # The file is empty...
+                print("{} is an empty file!".format(out_file_path))
+                for index in range(len(y_values)):
+                    y_values[index].append(np.nan)
+                file_num += 1
+                out_file_path = os.path.join(
+                    output_directory_path, "{}_sim.out".format(file_num)
+                )
+                continue
             if first_file:
                 # Get line numbers of relevant lines
                 for line_no, line in enumerate(out_file_lines):
@@ -179,12 +193,20 @@ def run_from_cmdline(
                                     stat_settings[index].line_beginning
                                 )
                             )
+                            y_values[index].append(np.nan)  # ignore missing stats
                     # raise ValueError("\n".join(error_strs))
                     print("\n".join(error_strs))
             else:
                 # Read the lines of pertinant information
                 for index in range(len(y_values)):
-                    if y_value_line_nos[index] is None:
+                    if y_value_line_nos[index] is None or not out_file_lines[y_value_line_nos[index]].strip().startswith(stat_settings[index].line_beginning):
+                        # Couldn't find the line where it was in the previous file, try looking again for the line in this file
+                        y_value_line_nos[index] = None
+                        for line_no, line in enumerate(out_file_lines):
+                            if line.strip().startswith(stat_settings[index].line_beginning):
+                                y_value_line_nos[index] = line_no  # found it
+                                break
+                    if y_value_line_nos[index] is None:  # Still didn't find the line
                         y_values[index].append(np.nan)  # ignore missing stats
                         continue
                     line = out_file_lines[y_value_line_nos[index]]
@@ -230,6 +252,7 @@ def save_graph_pq(
     log_file: Optional[TextIO] = None,
 ):
     plt.clf()
+    plt.close("all")
 
     if len(y_values[0]) == 7:
         x_axis = [
@@ -241,6 +264,7 @@ def save_graph_pq(
             "pq1",
             "page\nmove\n120ns net lat\nonly",
         ]
+        pq0_index = 4
     elif len(y_values[0]) == 6:
         x_axis = [
             "no\nremote\nmem\n",
@@ -250,9 +274,11 @@ def save_graph_pq(
             "pq0",
             "pq1",
         ]
+        pq0_index = 4
     elif len(y_values[0]) == 4:  # Older experiment config setup
         x_axis = ["no\nremote\nmem\n", "pq0\n0 network\nlatency", "pq0", "pq1"]
-    elif len(y_values[0]) == 16:  # PQ and cacheline combined series
+        pq0_index = 2
+    elif len(y_values[0]) == 16:  # PQ and cacheline combined series (pq_cacheline_combined_series)
         x_axis = [
             "no\nremote\nmem\n",
             "page\nmove\ninstant",
@@ -272,7 +298,8 @@ def save_graph_pq(
             "pq1\ncl=\n0.6",
         ]
         plt.figure(figsize=(10, 4.8))  # (width, height) in inches
-    elif len(y_values[0]) == 13:  # PQ and cacheline combined series, edited
+        pq0_index = 4
+    elif len(y_values[0]) == 13:  # PQ and cacheline combined series, edited (pq_new_series)
         x_axis = [
             "no\nremote\nmem\n",
             "page\nmove\ninstant",
@@ -289,8 +316,52 @@ def save_graph_pq(
             "pq1\ncl=\n0.5",
         ]
         plt.figure(figsize=(9, 4.8))  # (width, height) in inches
+        pq0_index = 2
+    elif len(y_values[0]) == 12:  # PQ and cacheline combined series, edited (pq_newer_series)
+        x_axis = [
+            "no\nremote\nmem\n",
+            "page\nmove\ninstant",
+            "pq0",
+            "pq1\ncl=\n0.01",
+            "pq1\ncl=\n0.025",
+            "pq1\ncl=\n0.05",
+            "pq1\ncl=\n0.075",
+            "pq1\ncl=\n0.1",
+            "pq1\ncl=\n0.15",
+            "pq1\ncl=\n0.2",
+            "pq1\ncl=\n0.3",
+            "pq1\ncl=\n0.5",
+        ]
+        plt.figure(figsize=(9, 4.8))  # (width, height) in inches
+        pq0_index = 2
+    elif len(y_values[0]) == 11:  # PQ and cacheline combined series, edited (pq_newer_series), TEMP
+        x_axis = [
+            "no\nremote\nmem\n",
+            "page\nmove\ninstant",
+            "pq0",
+            "pq1\ncl=\n0.01",
+            "pq1\ncl=\n0.025",
+            "pq1\ncl=\n0.05",
+            "pq1\ncl=\n0.075",
+            "pq1\ncl=\n0.1",
+            "pq1\ncl=\n0.15",
+            "pq1\ncl=\n0.2",
+            "pq1\ncl=\n0.3",
+        ]
+        plt.figure(figsize=(9, 4.8))  # (width, height) in inches
+        pq0_index = 2
+    elif len(y_values[0]) == 2 or len(y_values[0]) == 3:  # TEMP
+        x_axis = [
+            "pq0",
+            "pq1\ncl=\n0.2",
+            "pq1\ncl=\n0.5",
+        ]
+        if len(y_values[0]) == 2:
+            x_axis = x_axis[0:2]
+        pq0_index = 0
     else:
         raise ValueError("number of experiment runs={}, inaccurate?".format(len(y_values[0])))
+    plt.axhline(y=y_values[0][pq0_index])  # horizontal line at pq0 IPC for easier comparison
 
     print("{}:".format(os.path.basename(os.path.normpath(output_directory_path))))
     print("X values:\n", [s.replace("\n", " ") for s in x_axis])

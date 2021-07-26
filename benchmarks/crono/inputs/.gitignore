@@ -1,0 +1,4 @@
+# Avoid commiting large matrices to the repo
+cit-Patents.mtx
+soc-Pokec.mtx
+com-Orkut.mtx

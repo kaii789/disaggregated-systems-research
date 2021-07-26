@@ -22,11 +22,12 @@ echo
 echo "Compiling Ligra..."
 cd ../ligra/apps
 make
-# Create graph input file we'll use
+# Create graph input file we'll use: 1 Mil vertices, a non-symmetric and a symmetric one
 echo
-echo "Creating graph input file..."
+echo "Creating graph input files..."
 cd ../inputs
 ./create_rMat_1000000.sh
+./create_rMat_1000000sym.sh
 
 # Set up SpMV
 # Compile SpMV
@@ -59,4 +60,10 @@ make
 echo
 echo "Compiling Rodinia..."
 cd ../../rodinia
+make
+
+# Set up SLS
+echo
+echo "Compiling SLS..."
+cd ../sls/src
 make

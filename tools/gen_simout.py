@@ -206,13 +206,16 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     ('      remote datamovement2 queue model avg access latency (ns)', 'dram.remotequeuemodel_datamovement2_avgdelay', format_ns(2)),
     ('  num page moves', 'dram.page-moves', str),
     ('  num page prefetches', 'dram.page-prefetches', str),
+    ('  page prefetch not done due to full queue', 'dram.queue-full-page-prefetch-not-done', str),
+    ('  page prefetch not done since page local already', 'dram.page-local-already-page-prefetch-not-done', str),
+    ('  page prefetch not done since page uninitialized/not seen yet', 'dram.page-not-initialized-page-prefetch-not-done', str),
     ('  num inflight hits', 'dram.inflight-hits', str),
     ('  num writeback pages', 'dram.writeback-pages', str),
     ('  num local evictions', 'dram.local-evictions', str),
     ('  num pages disturbed by extra traffic', 'dram.extra-traffic', str),
     ('  num redundant moves total', 'dram.redundant-moves', str),
     ('    num redundant moves type1', 'dram.redundant-moves-type1', str),
-    ('      num type1 cache slower than page', 'dram.redundant-moves-type1-cache-slower-than-page', str),
+    ('      num type1 cache slower than page', 'dram.pq-cacheline-slower-than-page', str),
     ('    num redundant moves type2', 'dram.redundant-moves-type2', str),
     ('  max simultaneous # inflight pages (bufferspace)', 'dram.max-bufferspace', str),
     ('  remote page move cancelled due to full bufferspace', 'dram.bufferspace-full-move-page-cancelled', str),
@@ -297,6 +300,9 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
       ('  remote datamovement2 % capped by window size', 'dram.remotequeuemodel_datamovement2_percent_capped_by_window_size', format_float(2)),
       ('  remote datamovement2 % queue utilization full', 'dram.remotequeuemodel_datamovement2_percent_queue_full', format_float(2)),
       ('  remote datamovement2 % queue capped by custom cap', 'dram.remotequeuemodel_datamovement2_percent_capped_by_custom_cap', format_float(2)),
+      ('  ideal page throttling: num swaps inflight', 'dram.ideal-page-throttling-num-swaps-inflight', str),
+      ('  ideal page throttling: num swaps non-inflight', 'dram.ideal-page-throttling-num-swaps-non-inflight', str),
+      ('  ideal page throttling: num swaps unavailable', 'dram.ideal-page-throttling-num-swap-unavailable', str),
   ])
 
   # if '' in results:

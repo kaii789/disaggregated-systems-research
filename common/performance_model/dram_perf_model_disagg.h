@@ -4,6 +4,7 @@
 #include "dram_perf_model.h"
 #include "queue_model.h"
 #include "compression_model.h"
+#include "prefetcher_model.h"
 #include "fixed_types.h"
 #include "subsecond_time.h"
 #include "dram_cntlr_interface.h"
@@ -70,7 +71,6 @@ class DramPerfModelDisagg : public DramPerfModel
         const bool m_r_simulate_sw_pagereclaim_overhead; // Simulate tlb overhead
         const bool m_r_exclusive_cache; // Simulate tlb overhead
         const bool m_remote_init; // All pages are initially allocated to remote memory
-        const bool m_r_enable_nl_prefetcher; // Enable prefetcher to prefetch pages from remote DRAM to local DRAM
         const UInt32 m_r_disturbance_factor; // Other systems using the remote memory and creating disturbance
         const bool m_r_dontevictdirty; // Do not evict dirty data
         const bool m_r_enable_selective_moves; 
@@ -84,6 +84,9 @@ class DramPerfModelDisagg : public DramPerfModel
         double m_r_page_queue_utilization_threshold;  // When the datamovement queue for pages has percentage utilization above this, remote pages aren't moved to local
         double m_r_mode_5_limit_moves_threshold;  // When m_r_mode == 5, operate according to m_r_mode 2 when the page queue utilization is >= this value, otherwise operate according to m_r_mode 1
         SubsecondTime m_r_mode_5_remote_access_history_window_size;  // When m_r_mode == 5, and operating according to m_r_mode, track page accesses using the most recent window size number of ns
+        bool m_use_throttled_pages_tracker;  // Whether to update m_throttled_pages_tracker. Must be true to use the ideal page throttler or print stats of throttled pages
+        bool m_use_ideal_page_throttling;  // Whether to use ideal page throttling
+        SubsecondTime m_r_ideal_pagethrottle_remote_access_history_window_size;  // Track remote page accesses using the most recent window size number of ns
 
         // Local Memory
         std::vector<QueueModel*> m_queue_model;
@@ -123,6 +126,7 @@ class DramPerfModelDisagg : public DramPerfModel
 
         std::map<UInt64, std::pair<SubsecondTime, UInt32>> m_throttled_pages_tracker;  // keep track of pages that were throttled. The value is a (time, count) pair of the last time the page was throttled and the number of times the page was requested within the same 10^6 ns
         std::vector<std::pair<UInt64, UInt32>> m_throttled_pages_tracker_values;       // values to keep track of for stats
+        std::list<UInt64> m_moved_pages_no_access_yet;                                 // Pages moved from remote to local, but haven't been accessed yet
 
         // TODO: Compression
         bool m_use_compression;
@@ -139,6 +143,11 @@ class DramPerfModelDisagg : public DramPerfModel
         SubsecondTime m_total_cacheline_compression_latency = SubsecondTime::Zero();
         SubsecondTime m_total_cacheline_decompression_latency = SubsecondTime::Zero();
 
+        // Prefetcher
+        bool m_r_enable_nl_prefetcher;            // Enable prefetcher to prefetch pages from remote DRAM to local DRAM
+        PrefetcherModel *m_prefetcher_model;
+        bool m_prefetch_unencountered_pages;      // Whether to prefetch pages that haven't been encountered yet in program execution
+
         // Variables to keep track of stats
         UInt64 m_dram_page_hits;
         UInt64 m_dram_page_empty;
@@ -149,14 +158,17 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_remote_reads;
         UInt64 m_remote_writes;
         UInt64 m_page_moves;
-        UInt64 m_page_prefetches;
+        UInt64 m_page_prefetches;                                 // number of successful prefetches
+        UInt64 m_prefetch_page_not_done_datamovement_queue_full;  // number of times a page prefetch candidate was not prefetched due to the queue for moving pages having full utilization
+        UInt64 m_prefetch_page_not_done_page_local_already;       // number of times a page prefetch candidate was not prefetched due to the page already being in local memory
+        UInt64 m_prefetch_page_not_done_page_not_initialized;     // number of times a page prefetch candidate was not prefetched due to the page not having been initialized already
         UInt64 m_inflight_hits;
         UInt64 m_writeback_pages;
         UInt64 m_local_evictions;
         UInt64 m_extra_pages;
         UInt64 m_redundant_moves;                   // number of times both a cacheline and its containing page are requested together
         UInt64 m_redundant_moves_type1;
-        UInt64 m_redundant_moves_type1_cache_slower_than_page;
+        UInt64 partition_queues_cacheline_slower_than_page;  // with the new change, these situations no longer result in redundant moves
         UInt64 m_redundant_moves_type2;
         UInt64 m_cacheline_queue_request_cancelled; // number of times a cacheline queue request is cancelled (currently, due to m_r_limit_redundant_moves)
         UInt64 m_max_bufferspace;                   // the maximum number of localdram pages actually used to back inflight and inflight_evicted pages 
@@ -165,6 +177,9 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_move_page_cancelled_rmode5;                   // the number of times a remote page was not moved to local due to rmode5
         UInt64 m_rmode5_page_moved_due_to_threshold;           // the number of time when in rmode5 and acting according to rmode2, a page was moved because the threshold number of accesses was reached
         UInt64 m_unique_pages_accessed;             // track number of unique pages accessed
+        UInt64 m_ideal_page_throttling_swaps_inflight;         // number of times the ideal page throttling algorithm swaps a throttled page with a previously moved page that was inflight
+        UInt64 m_ideal_page_throttling_swaps_non_inflight;     // number of times the ideal page throttling algorithm swaps a throttled page with a previously moved page that was not inflight
+        UInt64 m_ideal_page_throttling_swap_unavailable;       // number of times in the ideal page throttling algorithm a subsequent access to a throttled page could not be swapped with a previously moved page
         SubsecondTime m_redundant_moves_type1_time_savings;
         SubsecondTime m_redundant_moves_type2_time_savings;
 
