@@ -296,6 +296,8 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
       ('  PQ=1 cacheline queue avg injected time (ns)', 'dram.cacheline_queue_avg_injected_time', format_ns(2)),
       ('  PQ=1 max imbalanced page requests', 'dram-datamovement-queue.max-imbalanced-page-requests', str),
       ('  PQ=1 max imbalanced cacheline requests', 'dram-datamovement-queue.max-imbalanced-cacheline-requests', str),
+      ('  PQ=1 page imbalanced decreased from window size', 'dram-datamovement-queue.page-imbalance-decreased-due-to-window-size', str),
+      ('  PQ=1 cacheline imbalanced decreased from window size', 'dram-datamovement-queue.cacheline-imbalance-decreased-due-to-window-size', str),
       ('  num unique pages accessed', 'dram.unique-pages-accessed', str),
       ('  remote datamovement max effective bandwidth (GB/s)', 'dram.both_queues_total_max_effective_bandwidth', format_float(4)),
       ('    page queue max effective bandwidth (GB/s)', 'dram.page_queue_max_effective_bandwidth', format_float(4)),

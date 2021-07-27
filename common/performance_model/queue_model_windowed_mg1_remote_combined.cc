@@ -29,6 +29,8 @@ QueueModelWindowedMG1RemoteCombined::QueueModelWindowedMG1RemoteCombined(String 
    , m_imbalanced_cacheline_requests(0)
    , m_max_imbalanced_page_requests(0)
    , m_max_imbalanced_cacheline_requests_rounded(0)
+   , m_page_request_dropped_window_size(0)
+   , m_cacheline_request_dropped_window_size(0)
    , m_request_tracking_window_size(SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("queue_model/windowed_mg1_remote_combined/request_tracking_window_size")))
    , m_cacheline_tracking_fractional_part(0.0)
    , m_name(name)
@@ -81,6 +83,8 @@ QueueModelWindowedMG1RemoteCombined::QueueModelWindowedMG1RemoteCombined(String 
    registerStatsMetric(name, id, "total-cacheline-utilization-injected-time", &m_total_cacheline_request_injected_time);
    registerStatsMetric(name, id, "max-imbalanced-page-requests", &m_max_imbalanced_page_requests);
    registerStatsMetric(name, id, "max-imbalanced-cacheline-requests", &m_max_imbalanced_cacheline_requests_rounded);
+   registerStatsMetric(name, id, "page-imbalance-decreased-due-to-window-size", &m_page_request_dropped_window_size);
+   registerStatsMetric(name, id, "cacheline-imbalance-decreased-due-to-window-size", &m_cacheline_request_dropped_window_size);
    
    registerStatsMetric(name, id, "num-requests-queue-full", &m_total_requests_queue_full);
    registerStatsMetric(name, id, "num-requests-capped-by-window-size", &m_total_requests_capped_by_window_size);
@@ -102,6 +106,7 @@ QueueModelWindowedMG1RemoteCombined::QueueModelWindowedMG1RemoteCombined(String 
    registerStatsMetric(name, id, "num-cacheline-effective-bandwidth-exceeded-allowable-max", &m_cacheline_effective_bandwidth_exceeded_allowable_max);
 
    std::cout << "m_page_processing_time = " << m_page_processing_time.getNS() << " ns, m_cacheline_processing_time = " << m_cacheline_processing_time.getNS() << " ns" << std::endl;
+   std::cout << "m_request_tracking_window_size in ns: " << m_request_tracking_window_size.getNS() << std::endl;
 }
 
 QueueModelWindowedMG1RemoteCombined::~QueueModelWindowedMG1RemoteCombined()
@@ -262,12 +267,14 @@ QueueModelWindowedMG1RemoteCombined::computeQueueDelayNoEffect(SubsecondTime pkt
          auto map_entry = m_page_requests.begin();
          m_imbalanced_page_requests -= 1;
          m_page_requests.erase(map_entry);
+         ++m_page_request_dropped_window_size;
       }
       while(!m_cacheline_requests.empty() && *(m_cacheline_requests.begin()) + m_request_tracking_window_size < Sim()->getClockSkewMinimizationServer()->getGlobalTime())
       {
          auto map_entry = m_cacheline_requests.begin();
          m_imbalanced_cacheline_requests -= 1;
          m_cacheline_requests.erase(map_entry);
+         ++m_cacheline_request_dropped_window_size;
       }
       // Process differently whether this is a page or cacheline access
       if (request_type == QueueModel::PAGE) {
@@ -370,12 +377,14 @@ QueueModelWindowedMG1RemoteCombined::computeQueueDelayTrackBytes(SubsecondTime p
          auto map_entry = m_page_requests.begin();
          m_imbalanced_page_requests -= 1;
          m_page_requests.erase(map_entry);
+         ++m_page_request_dropped_window_size;
       }
       while(!m_cacheline_requests.empty() && *(m_cacheline_requests.begin()) + m_request_tracking_window_size < Sim()->getClockSkewMinimizationServer()->getGlobalTime())
       {
          auto map_entry = m_cacheline_requests.begin();
          m_imbalanced_cacheline_requests -= 1;
          m_cacheline_requests.erase(map_entry);
+         ++m_cacheline_request_dropped_window_size;
       }
       // Process differently whether this is a page or cacheline access
       if (request_type == QueueModel::PAGE) {
@@ -393,6 +402,7 @@ QueueModelWindowedMG1RemoteCombined::computeQueueDelayTrackBytes(SubsecondTime p
          if (m_imbalanced_page_requests > m_max_imbalanced_page_requests) {
             m_max_imbalanced_page_requests = m_imbalanced_page_requests;
          }
+         m_page_requests.insert(pkt_time);
       } else {  // request_type == QueueModel::CACHELINE
          UInt64 max_additional_page_requests_before_this = 0;
          if (m_imbalanced_cacheline_requests >= bw_one_page_to_cachelines) {
@@ -404,12 +414,12 @@ QueueModelWindowedMG1RemoteCombined::computeQueueDelayTrackBytes(SubsecondTime p
          adjusted_utilization = (double)(service_time_sum + utilization_inject_ps) / m_window_size.getPS();
          adjusted_service_time_sum2 = m_service_time_sum2 + m_imbalanced_page_requests * (m_page_processing_time.getPS() * m_page_processing_time.getPS());
 
-         ++m_total_cacheline_requests;
          m_total_cacheline_request_injected_time += max_additional_page_requests_before_this * m_page_processing_time;
          m_imbalanced_cacheline_requests += 1;
          if (m_imbalanced_cacheline_requests > m_max_imbalanced_cacheline_requests_rounded) {
             m_max_imbalanced_cacheline_requests_rounded = (UInt64)m_imbalanced_cacheline_requests + 1;  // truncate then add 1
          }
+         m_cacheline_requests.insert(pkt_time);
       }
 
       double service_time_Es2 = adjusted_service_time_sum2 / m_num_arrivals;

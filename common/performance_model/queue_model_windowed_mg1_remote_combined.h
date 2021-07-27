@@ -51,6 +51,8 @@ private:
    UInt64 m_max_imbalanced_cacheline_requests_rounded;
    std::multiset<SubsecondTime> m_page_requests;       // Map to keep track of requests made within a window size
    std::multiset<SubsecondTime> m_cacheline_requests;  // Map to keep track of requests made within a window size
+   UInt64 m_page_request_dropped_window_size;       // Number of times page queue request tracker stops tracking a page request in imbalance because of window size
+   UInt64 m_cacheline_request_dropped_window_size;  // Number of times cacheline queue request tracker stops tracking a cacheline request in imbalance because of window size
    SubsecondTime m_request_tracking_window_size;       // Window size for maps tracking requests
    double m_cacheline_tracking_fractional_part;
 
@@ -93,7 +95,7 @@ private:
    SubsecondTime m_total_queue_delay;
    SubsecondTime m_total_page_queue_delay;
    SubsecondTime m_total_cacheline_queue_delay;
-
+   
    SubsecondTime m_total_page_request_injected_time;       // Total amount of time injected in cacheline queue requests
    SubsecondTime m_total_cacheline_request_injected_time;  // Total amount of time injected in cacheline queue requests
 
