@@ -14,6 +14,9 @@ CompressionModelLZ78::CompressionModelLZ78(String name, UInt32 id, UInt32 page_s
     , m_sum_max_dict_entry(0)
     , m_sum_avg_dict_entry(0)
     , m_max_dict_entry(0)
+    , dictsize_count_stats(m_dictsize_saved_stats_num_points, 0)
+    , bytes_saved_count_stats(m_dictsize_saved_stats_num_points, 0)
+    , max_entry_bytes_count_stats(m_dictsize_saved_stats_num_points, 0)
 {
     // Set compression/decompression cycle latencies if configured
     if (Sim()->getCfg()->getInt("perf_model/dram/compression_model/lz78/compression_latency") != -1)
@@ -37,6 +40,26 @@ CompressionModelLZ78::CompressionModelLZ78(String name, UInt32 id, UInt32 page_s
     registerStatsMetric("compression", id, "avg_max_dictionary_entry", &m_avg_max_dict_entry);
     registerStatsMetric("compression", id, "avg_avg_dictionary_entry", &m_avg_avg_dict_entry);
     registerStatsMetric("compression", id, "max_dictionary_entry", &m_max_dict_entry);
+
+    // Register stats for dictionary table
+    for (UInt32 i = 0; i < m_dictsize_saved_stats_num_points - 1; ++i) {
+        UInt32 percentile = (UInt32)(100.0 / m_dictsize_saved_stats_num_points) * (i + 1);
+        String stat_name = "lz-dictsize-count-p";
+        stat_name += std::to_string(percentile).c_str();
+        registerStatsMetric("compression", id, stat_name, &(dictsize_count_stats[i]));
+        stat_name = "lz-bytes_saved-count-p";
+        stat_name += std::to_string(percentile).c_str();
+        registerStatsMetric("compression", id, stat_name, &(bytes_saved_count_stats[i]));
+        stat_name = "lz-max_entry_bytes-count-p";
+        stat_name += std::to_string(percentile).c_str();
+        registerStatsMetric("compression", id, stat_name, &(max_entry_bytes_count_stats[i]));
+ 
+    }
+    // Make sure last one is p100
+    registerStatsMetric("compression", id, "lz-dictsize-count-p100", &(dictsize_count_stats[m_dictsize_saved_stats_num_points - 1]));
+    registerStatsMetric("compression", id, "lz-bytes_saved-count-p100", &(bytes_saved_count_stats[m_dictsize_saved_stats_num_points - 1]));
+    registerStatsMetric("compression", id, "lz-max_entry_bytes-count-p100", &(max_entry_bytes_count_stats[m_dictsize_saved_stats_num_points - 1]));
+
 }
 
 CompressionModelLZ78::~CompressionModelLZ78()
@@ -49,6 +72,90 @@ CompressionModelLZ78::finalizeStats()
     m_avg_dict_size = m_sum_dict_size / m_num_compress_pages;
     m_avg_max_dict_entry = m_sum_max_dict_entry / m_num_compress_pages;
     m_avg_avg_dict_entry = m_sum_avg_dict_entry / m_num_compress_pages;
+
+    if(m_dictsize_saved_map.size() > 0) {
+        std::vector<std::pair<UInt32, UInt64>> dictsize_saved_counts;  // first is the dictionary size, second is the bytes saved
+        for (auto it = m_dictsize_saved_map.begin(); it != m_dictsize_saved_map.end(); ++it) {
+            dictsize_saved_counts.push_back(std::pair<UInt32, UInt64>(it->first, it->second));
+        }
+        std::sort(dictsize_saved_counts.begin(), dictsize_saved_counts.end());  // sort by dictionary size
+
+        std::vector<std::pair<UInt32, UInt32>> dictsize_max_entry_counts;  // first is the dictionary size, second is the number of bytes for the maximum entry
+        for (auto it = m_dictsize_max_entry_map.begin(); it != m_dictsize_max_entry_map.end(); ++it) {
+            dictsize_max_entry_counts.push_back(std::pair<UInt32, UInt32>(it->first, it->second));
+        }
+        std::sort(dictsize_max_entry_counts.begin(), dictsize_max_entry_counts.end());  // sort by dictionary size
+
+
+        // Update stats vector
+        UInt64 total_bytes_saved = 0;
+        SInt32 prev_index = -1;
+        UInt64 bytes_saved = 0;
+        UInt32 max_entry = 0;        
+        for (UInt32 i = 0; i < m_dictsize_saved_stats_num_points - 1; ++i) {
+            UInt64 index = (UInt64)((double)(i + 1) / m_dictsize_saved_stats_num_points * (dictsize_saved_counts.size() - 1));
+            dictsize_count_stats[i] = (UInt64) dictsize_saved_counts[index].first; // Store the dictionary size
+            for(SInt32 j = prev_index + 1; j <= index; j++) 
+                bytes_saved += dictsize_saved_counts[j].second;
+            bytes_saved_count_stats[i] = bytes_saved; // Store the number of bytes saved for that range of dictionary size
+
+            for(SInt32 j = prev_index + 1; j <= index; j++) 
+                if(dictsize_max_entry_counts[j].second > max_entry)
+                    max_entry = dictsize_max_entry_counts[j].second;
+            max_entry_bytes_count_stats[i] = (UInt64) max_entry;
+
+            prev_index = index;
+            total_bytes_saved += bytes_saved;
+            bytes_saved = 0;
+            max_entry = 0;
+        }
+
+        // Make sure last one is p100
+        dictsize_count_stats[m_dictsize_saved_stats_num_points - 1] = (UInt64) dictsize_saved_counts[dictsize_saved_counts.size() - 1].first;
+        for(SInt32 j = prev_index + 1; j <= dictsize_saved_counts.size() - 1; j++) 
+            bytes_saved += dictsize_saved_counts[j].second;
+        total_bytes_saved += bytes_saved;
+        bytes_saved_count_stats[m_dictsize_saved_stats_num_points - 1] = bytes_saved; // Store the number of bytes saved for that range of dictionary size
+        std::cout << "Total bytes saved: " << total_bytes_saved << std::endl;
+        for(SInt32 j = prev_index + 1; j <= dictsize_max_entry_counts.size() - 1; j++) 
+            if(dictsize_max_entry_counts[j].second > max_entry)
+                max_entry = dictsize_max_entry_counts[j].second;
+        max_entry_bytes_count_stats[m_dictsize_saved_stats_num_points - 1] = (UInt64) max_entry;
+
+        
+        /*
+        // Print detailed statistics
+        UInt32 num_bins = 20;
+        double percentage;
+        UInt32 dictsize;
+        UInt64 total_bytes_saved = 0;
+        UInt64 bytes_saved = 0;
+        int prev_index = - 1;
+        int index = 0;
+        for(int bin = 0; bin < num_bins; bin++) {
+            percentage = (double) bin / num_bins;
+            index = (int) (percentage * (dictsize_saved_counts.size() - 1));
+            dictsize = dictsize_saved_counts[index].first;
+            for(int j = prev_index + 1; j <= index; j++) 
+                bytes_saved += dictsize_saved_counts[j].second;
+            std::cout << "percentage: " << percentage << ", vector index: " << index << ", dictsize: " << dictsize << ", bytes_saved: " << bytes_saved << std::endl;
+
+            prev_index = index;
+            total_bytes_saved += bytes_saved;
+            bytes_saved = 0;
+        }
+    
+        dictsize = dictsize_saved_counts[dictsize_saved_counts.size() - 1].first;
+        for(int j = prev_index + 1; j <= dictsize_saved_counts.size() - 1; j++) 
+            bytes_saved += dictsize_saved_counts[j].second;
+        total_bytes_saved += bytes_saved;
+        std::cout << "percentage: 1.0, vector index: " << dictsize_saved_counts.size() - 1 << ", dictsize: " << dictsize << ", bytes_saved: " << bytes_saved << std::endl;
+        std::cout << "Total bytes saved: " << total_bytes_saved << std::endl;
+        // Print detailed statistics
+        */
+
+    }
+    
 }
 
 SubsecondTime
@@ -216,6 +323,20 @@ CompressionModelLZ78::compressData(void* in, void* out, UInt32 data_size, UInt32
     m_sum_dict_size += dictionary_size;
     m_sum_max_dict_entry += max_entry;
     m_sum_avg_dict_entry += (sum_entry / inserts);
+    if(m_dictsize_saved_map.count(dictionary_size) == 0) {
+        // Compressed bytes
+        m_dictsize_saved_map[dictionary_size] = 0;         
+        m_dictsize_saved_map[dictionary_size] += (UInt64)(m_page_size - compressed_size); // Assuming that lz is 'only' used to compressed data in page-granularity
+        // Max_entry size 
+        m_dictsize_max_entry_map[dictionary_size] = (UInt32) max_entry;         
+    } else {
+        // Compressed bytes
+        m_dictsize_saved_map[dictionary_size] += (UInt64)(m_page_size - compressed_size); // Assuming that lz is 'only' used to compressed data in page-granularity
+        // Max_entry size 
+        if(m_dictsize_max_entry_map[dictionary_size] < (UInt32) max_entry) 
+            m_dictsize_max_entry_map[dictionary_size] = (UInt32) max_entry;         
+    }
+    // statistics
 
     //printf("Compressed Size %d Dictionary Table Size %d %d and Max Entry Size %d Total Size (KB) %d Accesses %d\n", compressed_size, dictionary_size, inserts, max_string_size, dictionary_size * max_string_size / 1024, accesses);
     // statistics - RemoveMe

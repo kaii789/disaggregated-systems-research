@@ -4,6 +4,11 @@
 #include "compression_model.h"
 #include <string>
 #include <map>
+#include <map>
+#include <vector>
+#include <list>
+#include <algorithm>
+
 
 using namespace std;
 
@@ -57,6 +62,14 @@ private:
     UInt64 m_sum_avg_dict_entry;
     UInt64 m_avg_avg_dict_entry = 0;
     UInt64 m_max_dict_entry;
+    const UInt32 m_dictsize_saved_stats_num_points = 10;  // the number of percentiles (from above 0% to including 100%)
+    std::map<UInt32, UInt64> m_dictsize_saved_map; // track number of bytes saved for each particular dictionary size
+    std::map<UInt32, UInt32> m_dictsize_max_entry_map; // track max_entry size in bytes for each particular dictionary size
+    std::vector<UInt64> dictsize_count_stats;
+    std::vector<UInt64> bytes_saved_count_stats;
+    std::vector<UInt64> max_entry_bytes_count_stats;
+
+
 };
 
 #endif /* __COMPRESSION_MODEL_LZW_H__ */
