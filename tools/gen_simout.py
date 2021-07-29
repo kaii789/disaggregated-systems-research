@@ -168,6 +168,16 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     if 'dram-datamovement-queue.total-cacheline-utilization-injected-time' in results and sum(results['dram-datamovement-queue.num-cacheline-requests']) > 0:
       results['dram.cacheline_queue_avg_injected_time'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram-datamovement-queue.total-cacheline-utilization-injected-time'], results['dram-datamovement-queue.num-cacheline-requests']))
     
+    if 'dram-datamovement-queue.num-cacheline-requests-capped-by-window-size' in results and sum(results['dram-datamovement-queue.num-requests']) > 0:
+      results['dram.remotequeuemodel_datamovement_percent_capped_by_window_size'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue.num-page-requests-capped-by-window-size'], results['dram-datamovement-queue.num-page-requests']))
+      results['dram.remotequeuemodel_datamovement_percent_queue_full'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue.num-page-requests-queue-full'], results['dram-datamovement-queue.num-page-requests']))
+      results['dram.remotequeuemodel_datamovement2_percent_capped_by_window_size'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue.num-cacheline-requests-capped-by-window-size'], results['dram-datamovement-queue.num-cacheline-requests']))
+      results['dram.remotequeuemodel_datamovement2_percent_queue_full'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue.num-cacheline-requests-queue-full'], results['dram-datamovement-queue.num-cacheline-requests']))
+
+    elif 'dram-datamovement-queue.num-requests-capped-by-window-size' in results and sum(results['dram-datamovement-queue.num-requests']) > 0:
+      results['dram.remotequeuemodel_datamovement_percent_capped_by_window_size'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue.num-requests-capped-by-window-size'], results['dram-datamovement-queue.num-requests']))
+      results['dram.remotequeuemodel_datamovement_percent_queue_full'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue.num-requests-queue-full'], results['dram-datamovement-queue.num-requests']))
+      results['dram.remotequeuemodel_datamovement_percent_capped_by_custom_cap'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue.num-requests-capped-by-custom-cap'], results['dram-datamovement-queue.num-requests']))
   else:
     if 'dram-datamovement-queue.num-requests' in results and sum(results['dram-datamovement-queue.num-requests']) > 0:
       results['dram.page_queue_avgdelay'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram-datamovement-queue.total-queue-delay'], results['dram-datamovement-queue.num-requests']))
@@ -178,6 +188,16 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
       results['dram.page_queue_max_effective_bandwidth'] = map(lambda (a,b): 1000*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue.max-effective-bandwidth-bytes'], results['dram-datamovement-queue.max-effective-bandwidth-ps']))
     if 'dram-datamovement-queue-2.max-effective-bandwidth-ps' in results and sum(results['dram-datamovement-queue-2.max-effective-bandwidth-ps']) > 0:
       results['dram.cacheline_queue_max_effective_bandwidth'] = map(lambda (a,b): 1000*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue-2.max-effective-bandwidth-bytes'], results['dram-datamovement-queue-2.max-effective-bandwidth-ps']))
+
+    if 'dram-datamovement-queue.num-requests-capped-by-window-size' in results and sum(results['dram-datamovement-queue.num-requests']) > 0:
+      results['dram.remotequeuemodel_datamovement_percent_capped_by_window_size'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue.num-requests-capped-by-window-size'], results['dram-datamovement-queue.num-requests']))
+      results['dram.remotequeuemodel_datamovement_percent_queue_full'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue.num-requests-queue-full'], results['dram-datamovement-queue.num-requests']))
+      results['dram.remotequeuemodel_datamovement_percent_capped_by_custom_cap'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue.num-requests-capped-by-custom-cap'], results['dram-datamovement-queue.num-requests']))
+    if 'dram-datamovement-queue-2.num-requests-capped-by-window-size' in results and sum(results['dram-datamovement-queue-2.num-requests']) > 0:
+      results['dram.remotequeuemodel_datamovement2_percent_capped_by_window_size'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue-2.num-requests-capped-by-window-size'], results['dram-datamovement-queue-2.num-requests']))
+      results['dram.remotequeuemodel_datamovement2_percent_queue_full'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue-2.num-requests-queue-full'], results['dram-datamovement-queue-2.num-requests']))
+      results['dram.remotequeuemodel_datamovement2_percent_capped_by_custom_cap'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue-2.num-requests-capped-by-custom-cap'], results['dram-datamovement-queue-2.num-requests']))
+
 
   # Compression
   bytes_saved = results['compression.bytes-saved'][0] if 'compression.bytes-saved' in results else 0
@@ -278,15 +298,6 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     results['dram.bandwidth'] = map(lambda a: 100*a/time0 if time0 else float('inf'), results['dram-queue.total-time-used'])
     template.append(('  average dram bandwidth utilization', 'dram.bandwidth', lambda v: '%.2f%%' % v))
 
-  if 'dram-datamovement-queue.num-requests-capped-by-window-size' in results and sum(results['dram-datamovement-queue.num-requests']) > 0:
-    results['dram.remotequeuemodel_datamovement_percent_capped_by_window_size'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue.num-requests-capped-by-window-size'], results['dram-datamovement-queue.num-requests']))
-    results['dram.remotequeuemodel_datamovement_percent_queue_full'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue.num-requests-queue-full'], results['dram-datamovement-queue.num-requests']))
-    results['dram.remotequeuemodel_datamovement_percent_capped_by_custom_cap'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue.num-requests-capped-by-custom-cap'], results['dram-datamovement-queue.num-requests']))
-  if 'dram-datamovement-queue-2.num-requests-capped-by-window-size' in results and sum(results['dram-datamovement-queue-2.num-requests']) > 0:
-    results['dram.remotequeuemodel_datamovement2_percent_capped_by_window_size'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue-2.num-requests-capped-by-window-size'], results['dram-datamovement-queue-2.num-requests']))
-    results['dram.remotequeuemodel_datamovement2_percent_queue_full'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue-2.num-requests-queue-full'], results['dram-datamovement-queue-2.num-requests']))
-    results['dram.remotequeuemodel_datamovement2_percent_capped_by_custom_cap'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue-2.num-requests-capped-by-custom-cap'], results['dram-datamovement-queue-2.num-requests']))
-
   # if 'dram.redundant-moves-temp1-time-savings' in results:
   template.extend([
       ('Experiment stats', '', ''),
@@ -298,6 +309,8 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
       ('  PQ=1 max imbalanced cacheline requests', 'dram-datamovement-queue.max-imbalanced-cacheline-requests', str),
       ('  PQ=1 page imbalanced decreased from window size', 'dram-datamovement-queue.page-imbalance-decreased-due-to-window-size', str),
       ('  PQ=1 cacheline imbalanced decreased from window size', 'dram-datamovement-queue.cacheline-imbalance-decreased-due-to-window-size', str),
+      ('  PQ idea page queue overflowed', 'dram-datamovement-queue.num-requests-page-queue-overflowed-to-cacheline-queue', str),
+      ('  PQ idea cacheline queue overflowed', 'dram-datamovement-queue.num-requests-cacheline-queue-overflowed-to-page-queue', str),
       ('  num unique pages accessed', 'dram.unique-pages-accessed', str),
       ('  remote datamovement max effective bandwidth (GB/s)', 'dram.both_queues_total_max_effective_bandwidth', format_float(4)),
       ('    page queue max effective bandwidth (GB/s)', 'dram.page_queue_max_effective_bandwidth', format_float(4)),

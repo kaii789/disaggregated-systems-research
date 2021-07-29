@@ -7,6 +7,7 @@
 #include "queue_model_windowed_mg1.h"
 #include "queue_model_windowed_mg1_remote.h"
 #include "queue_model_windowed_mg1_remote_combined.h"
+#include "queue_model_windowed_mg1_remote_subqueuemodels.h"
 #include "queue_model_network_latency_only.h"
 #include "log.h"
 #include "config.hpp"
@@ -74,6 +75,10 @@ QueueModel::create(String name, UInt32 id, String model_type, SubsecondTime min_
    else if (model_type == "windowed_mg1_remote_combined")
    {
       return new QueueModelWindowedMG1RemoteCombined(name, id, bw_bits_per_us, baseline_page_processing_time, baseline_cacheline_processing_time);
+   }
+   else if (model_type == "windowed_mg1_remote_subqueuemodels")
+   {
+      return new QueueModelWindowedMG1Subqueuemodels(name, id, bw_bits_per_us);
    }
    else if (model_type == "network_latency_only")
    {
