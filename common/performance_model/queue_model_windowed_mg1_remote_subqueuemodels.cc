@@ -168,7 +168,7 @@ double QueueModelWindowedMG1Subqueuemodels::getPageQueueUtilizationPercentage(Su
    removeItemsUpdateBytes(time_point, pkt_time, false);
 
    // Use queue utilization as measure to determine whether the queue is full
-   double utilization = (double)m_page_service_time_sum / ((1 - m_r_cacheline_queue_fraction) * m_window_size.getPS());
+   double utilization = (double)m_page_service_time_sum / m_window_size.getPS();
    return utilization;
 }
 
@@ -183,7 +183,7 @@ double QueueModelWindowedMG1Subqueuemodels::getCachelineQueueUtilizationPercenta
    removeItemsUpdateBytes(time_point, pkt_time, false);
 
    // Use queue utilization as measure to determine whether the queue is full
-   double utilization = (double)m_cacheline_service_time_sum / (m_r_cacheline_queue_fraction * m_window_size.getPS());
+   double utilization = (double)m_cacheline_service_time_sum / m_window_size.getPS();
    return utilization;
 }
 
@@ -198,7 +198,7 @@ double QueueModelWindowedMG1Subqueuemodels::getTotalQueueUtilizationPercentage(S
    removeItemsUpdateBytes(time_point, pkt_time, false);
 
    // Use queue utilization as measure to determine whether the queue is full
-   double utilization = (double)(m_page_service_time_sum + m_cacheline_service_time_sum) / m_window_size.getPS();
+   double utilization = (double)(m_page_service_time_sum + m_cacheline_service_time_sum) / (2 * m_window_size.getPS());
    return utilization;
 }
 
