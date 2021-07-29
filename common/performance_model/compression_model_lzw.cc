@@ -17,6 +17,7 @@ CompressionModelLZW::CompressionModelLZW(String name, UInt32 id, UInt32 page_siz
     , m_max_dict_entry(0)
     , dictsize_count_stats(m_dictsize_saved_stats_num_points, 0)
     , bytes_saved_count_stats(m_dictsize_saved_stats_num_points, 0)
+    , accesses_count_stats(m_dictsize_saved_stats_num_points, 0)
     , max_entry_bytes_count_stats(m_dictsize_saved_stats_num_points, 0)
 {
     // Set compression/decompression cycle latencies if configured
@@ -51,6 +52,9 @@ CompressionModelLZW::CompressionModelLZW(String name, UInt32 id, UInt32 page_siz
         stat_name = "lz-bytes_saved-count-p";
         stat_name += std::to_string(percentile).c_str();
         registerStatsMetric("compression", id, stat_name, &(bytes_saved_count_stats[i]));
+        stat_name = "lz-accesses-count-p";
+        stat_name += std::to_string(percentile).c_str();
+        registerStatsMetric("compression", id, stat_name, &(accesses_count_stats[i]));
         stat_name = "lz-max_entry_bytes-count-p";
         stat_name += std::to_string(percentile).c_str();
         registerStatsMetric("compression", id, stat_name, &(max_entry_bytes_count_stats[i]));
@@ -59,6 +63,7 @@ CompressionModelLZW::CompressionModelLZW(String name, UInt32 id, UInt32 page_siz
     // Make sure last one is p100
     registerStatsMetric("compression", id, "lz-dictsize-count-p100", &(dictsize_count_stats[m_dictsize_saved_stats_num_points - 1]));
     registerStatsMetric("compression", id, "lz-bytes_saved-count-p100", &(bytes_saved_count_stats[m_dictsize_saved_stats_num_points - 1]));
+    registerStatsMetric("compression", id, "lz-accesses-count-p100", &(accesses_count_stats[m_dictsize_saved_stats_num_points - 1]));
     registerStatsMetric("compression", id, "lz-max_entry_bytes-count-p100", &(max_entry_bytes_count_stats[m_dictsize_saved_stats_num_points - 1]));
 
 
@@ -82,6 +87,12 @@ CompressionModelLZW::finalizeStats()
         }
         std::sort(dictsize_saved_counts.begin(), dictsize_saved_counts.end());  // sort by dictionary size
 
+        std::vector<std::pair<UInt32, UInt64>> dictsize_accesses_counts;  // first is the dictionary size, second is the number of accesses
+        for (auto it = m_dictsize_accesses_map.begin(); it != m_dictsize_accesses_map.end(); ++it) {
+            dictsize_accesses_counts.push_back(std::pair<UInt32, UInt64>(it->first, it->second));
+        }
+        std::sort(dictsize_accesses_counts.begin(), dictsize_accesses_counts.end());  // sort by dictionary size
+
         std::vector<std::pair<UInt32, UInt32>> dictsize_max_entry_counts;  // first is the dictionary size, second is the number of bytes for the maximum entry
         for (auto it = m_dictsize_max_entry_map.begin(); it != m_dictsize_max_entry_map.end(); ++it) {
             dictsize_max_entry_counts.push_back(std::pair<UInt32, UInt32>(it->first, it->second));
@@ -93,6 +104,7 @@ CompressionModelLZW::finalizeStats()
         UInt64 total_bytes_saved = 0;
         SInt32 prev_index = -1;
         UInt64 bytes_saved = 0;
+        UInt64 accesses = 0;
         UInt32 max_entry = 0;        
         for (UInt32 i = 0; i < m_dictsize_saved_stats_num_points - 1; ++i) {
             UInt64 index = (UInt64)((double)(i + 1) / m_dictsize_saved_stats_num_points * (dictsize_saved_counts.size() - 1));
@@ -102,6 +114,10 @@ CompressionModelLZW::finalizeStats()
             bytes_saved_count_stats[i] = bytes_saved; // Store the number of bytes saved for that range of dictionary size
 
             for(SInt32 j = prev_index + 1; j <= index; j++) 
+                accesses += dictsize_accesses_counts[j].second;
+            accesses_count_stats[i] = accesses; // Store the number of accesses for that range of dictionary size
+
+            for(SInt32 j = prev_index + 1; j <= index; j++) 
                 if(dictsize_max_entry_counts[j].second > max_entry)
                     max_entry = dictsize_max_entry_counts[j].second;
             max_entry_bytes_count_stats[i] = (UInt64) max_entry;
@@ -109,6 +125,7 @@ CompressionModelLZW::finalizeStats()
             prev_index = index;
             total_bytes_saved += bytes_saved;
             bytes_saved = 0;
+            accesses = 0;
             max_entry = 0;
         }
 
@@ -119,6 +136,9 @@ CompressionModelLZW::finalizeStats()
         total_bytes_saved += bytes_saved;
         bytes_saved_count_stats[m_dictsize_saved_stats_num_points - 1] = bytes_saved; // Store the number of bytes saved for that range of dictionary size
         std::cout << "Total bytes saved: " << total_bytes_saved << std::endl;
+        for(SInt32 j = prev_index + 1; j <= dictsize_accesses_counts.size() - 1; j++) 
+            accesses += dictsize_accesses_counts[j].second;
+        accesses_count_stats[m_dictsize_saved_stats_num_points - 1] = accesses; // Store the number of accesses for that range of dictionary size
         for(SInt32 j = prev_index + 1; j <= dictsize_max_entry_counts.size() - 1; j++) 
             if(dictsize_max_entry_counts[j].second > max_entry)
                 max_entry = dictsize_max_entry_counts[j].second;
@@ -356,11 +376,15 @@ CompressionModelLZW::compressData(void* in, void* out, UInt32 data_size, UInt32 
         // Compressed bytes
         m_dictsize_saved_map[dictionary_size] = 0;         
         m_dictsize_saved_map[dictionary_size] += (UInt64)(m_page_size - compressed_size); // Assuming that lz is 'only' used to compressed data in page-granularity
+
+        m_dictsize_accesses_map[dictionary_size] = 0;         
+        m_dictsize_accesses_map[dictionary_size] += (UInt64) accesses;
         // Max_entry size 
         m_dictsize_max_entry_map[dictionary_size] = (UInt32) max_entry;         
     } else {
         // Compressed bytes
         m_dictsize_saved_map[dictionary_size] += (UInt64)(m_page_size - compressed_size); // Assuming that lz is 'only' used to compressed data in page-granularity
+        m_dictsize_accesses_map[dictionary_size] += (UInt64) accesses;
         // Max_entry size 
         if(m_dictsize_max_entry_map[dictionary_size] < (UInt32) max_entry) 
             m_dictsize_max_entry_map[dictionary_size] = (UInt32) max_entry;         

@@ -296,6 +296,7 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     for i in range(10, 101, 10):  # 10, 20, ..., 100
         template.append(('    {}% percentile - dictionary_size'.format(i), 'compression.lz-dictsize-count-p{}'.format(i), str))
         template.append(('    {}% percentile - total_bytes_saved'.format(i), 'compression.lz-bytes_saved-count-p{}'.format(i), str))
+        template.append(('    {}% percentile - accesses'.format(i), 'compression.lz-accesses-count-p{}'.format(i), str))
         template.append(('    {}% percentile - max_entry_bytes'.format(i), 'compression.lz-max_entry_bytes-count-p{}'.format(i), str))
 
 
