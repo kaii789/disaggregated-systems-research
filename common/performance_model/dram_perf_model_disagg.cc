@@ -324,7 +324,11 @@ DramPerfModelDisagg::finalizeStats()
     bool process_and_print_throttled_pages_stats = true;
 
     // Compression Stats
-    m_compression_model->finalizeStats();
+    if (m_use_compression) {
+        m_compression_model->finalizeStats();
+        if (m_use_cacheline_compression)
+            ;//m_cacheline_compression_model->finalizeStats();
+    }
 
 
     if (process_and_print_page_locality_stats && m_page_usage_map.size() > 0) {

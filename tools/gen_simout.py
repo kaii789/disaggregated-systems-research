@@ -253,11 +253,16 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
 
   bdi_total_compressed = results['compression.bdi_total_compressed'][0] if 'compression.bdi_total_compressed' in results else 0
   if bdi_total_compressed != 0:
-    for i in range(0, 12): 
+    template += [
+      ('  bdi_successful_compression', 'compression.bdi_total_compressed', str)]
+    for i in range(0, 13): 
       bdi_option = float(results['compression.bdi_usage_option-{}'.format(i)][0]) / float(bdi_total_compressed) * 100
       bdi_option_format = "{:.2f}".format(bdi_option)
       results['compression.bdi_usage_option-{}'.format(i)] = [bdi_option_format]
       template.append(('  bdi_usage(%)_option-{}'.format(i), 'compression.bdi_usage_option-{}'.format(i), str))
+    for i in range(0, 13): 
+      template.append(('  bdi_bytes_saved_option-{}'.format(i), 'compression.bdi_bytes_saved_option-{}'.format(i), str))
+
 
 
   if 'dram.total-read-queueing-delay' in results:

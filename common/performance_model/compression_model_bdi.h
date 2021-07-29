@@ -52,7 +52,7 @@ private:
     SInt64 readWord(void*, UInt32, UInt32);
     void writeWord(void*, UInt32, SInt64, UInt32);
     void zeroValues(void *, m_compress_info *, void *);
-    void repeatedValues(void *, m_compress_info *, void *);
+    void repeatedValues(void *, m_compress_info *, void *, UInt32);
     void specializedCompress(void *, m_compress_info *, void *, SInt32, SInt32);
     bool checkDeltaLimits(SInt64, UInt32);
     UInt32 compressCacheLine(void *in, void *out);
@@ -60,7 +60,8 @@ private:
 
     // Statistics
     UInt64 m_total_compressed;
-    UInt64 m_compress_options[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    UInt64 m_compress_options[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    UInt64 m_bytes_saved_per_option[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 };
 
