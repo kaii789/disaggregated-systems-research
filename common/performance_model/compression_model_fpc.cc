@@ -19,7 +19,7 @@ const UInt32 CompressionModelFPC::neg_check[6]=
         0xffffffff, // N/A
         0xff80ff80}; // Two halfwords, each a byte
 
-CompressionModelFPC::CompressionModelFPC(String name, UInt32 page_size, UInt32 cache_line_size)
+CompressionModelFPC::CompressionModelFPC(String name, UInt32 id, UInt32 page_size, UInt32 cache_line_size)
     : m_name(name)
     , m_page_size(page_size)
     , m_cache_line_size(cache_line_size)
@@ -35,6 +35,18 @@ CompressionModelFPC::CompressionModelFPC(String name, UInt32 page_size, UInt32 c
     m_data_buffer = new char[m_page_size];
     m_compressed_data_buffer = new char[m_page_size + m_cacheline_count];
     m_compressed_cache_line_sizes = new UInt32[m_cacheline_count];
+}
+
+CompressionModelFPC::~CompressionModelFPC()
+{
+    delete [] m_data_buffer;
+    delete [] m_compressed_data_buffer;
+    delete [] m_compressed_cache_line_sizes;
+}
+
+void CompressionModelFPC::finalizeStats()
+{
+
 }
 
 SubsecondTime
@@ -72,13 +84,6 @@ CompressionModelFPC::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
     // Return compression latency
     ComponentLatency compress_latency(ComponentLatency(core->getDvfsDomain(), m_cacheline_count * m_compression_latency));
     return compress_latency.getLatency();
-}
-
-CompressionModelFPC::~CompressionModelFPC()
-{
-    delete [] m_data_buffer;
-    delete [] m_compressed_data_buffer;
-    delete [] m_compressed_cache_line_sizes;
 }
 
 UInt32 CompressionModelFPC::compressCacheLine(void* _inbuf, void* _outbuf)

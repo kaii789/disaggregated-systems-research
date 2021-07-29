@@ -15,7 +15,7 @@
 class CompressionModelBDI : public CompressionModel
 {
 public:
-   CompressionModelBDI(String name, UInt32 page_size, UInt32 cache_line_size);
+   CompressionModelBDI(String name, UInt32 id, UInt32 page_size, UInt32 cache_line_size);
    ~CompressionModelBDI();
 
    SubsecondTime compress(IntPtr addr, size_t data_size, core_id_t core_id, UInt32 *compressed_page_size, UInt32 *compressed_cache_lines);
@@ -23,6 +23,8 @@ public:
 
    SubsecondTime compress_multipage(std::vector<UInt64> addr_list, UInt32 num_pages, core_id_t core_id, UInt32 *compressed_multipage_size, std::map<UInt64, UInt32> *address_to_num_cache_lines);
    SubsecondTime decompress_multipage(std::vector<UInt64> addr_list, UInt32 num_pages, core_id_t core_id, std::map<UInt64, UInt32> *address_to_num_cache_lines);
+
+   void finalizeStats();
 
 private:
     String m_name; 
@@ -42,8 +44,7 @@ private:
     UInt32 m_compression_latency = 3; 
     // Decompression latency per cache line
     UInt32 m_decompression_latency = 3; 
-
-    int m_compression_granularity;
+    SInt32 m_compression_granularity;
 
     bool use_additional_options;
 
@@ -51,11 +52,16 @@ private:
     SInt64 readWord(void*, UInt32, UInt32);
     void writeWord(void*, UInt32, SInt64, UInt32);
     void zeroValues(void *, m_compress_info *, void *);
-    void repeatedValues(void *, m_compress_info *, void *);
+    void repeatedValues(void *, m_compress_info *, void *, UInt32);
     void specializedCompress(void *, m_compress_info *, void *, SInt32, SInt32);
     bool checkDeltaLimits(SInt64, UInt32);
     UInt32 compressCacheLine(void *in, void *out);
-   //  UInt32 decompressCacheLine(void *in, void *out);
+    //UInt32 decompressCacheLine(void *in, void *out);
+
+    // Statistics
+    UInt64 m_total_compressed;
+    UInt64 m_compress_options[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    UInt64 m_bytes_saved_per_option[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 };
 

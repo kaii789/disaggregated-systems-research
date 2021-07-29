@@ -206,13 +206,16 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     ('      remote datamovement2 queue model avg access latency (ns)', 'dram.remotequeuemodel_datamovement2_avgdelay', format_ns(2)),
     ('  num page moves', 'dram.page-moves', str),
     ('  num page prefetches', 'dram.page-prefetches', str),
+    ('  page prefetch not done due to full queue', 'dram.queue-full-page-prefetch-not-done', str),
+    ('  page prefetch not done since page local already', 'dram.page-local-already-page-prefetch-not-done', str),
+    ('  page prefetch not done since page uninitialized/not seen yet', 'dram.page-not-initialized-page-prefetch-not-done', str),
     ('  num inflight hits', 'dram.inflight-hits', str),
     ('  num writeback pages', 'dram.writeback-pages', str),
     ('  num local evictions', 'dram.local-evictions', str),
     ('  num pages disturbed by extra traffic', 'dram.extra-traffic', str),
     ('  num redundant moves total', 'dram.redundant-moves', str),
     ('    num redundant moves type1', 'dram.redundant-moves-type1', str),
-    ('      num type1 cache slower than page', 'dram.redundant-moves-type1-cache-slower-than-page', str),
+    ('      num type1 cache slower than page', 'dram.pq-cacheline-slower-than-page', str),
     ('    num redundant moves type2', 'dram.redundant-moves-type2', str),
     ('  max simultaneous # inflight pages (bufferspace)', 'dram.max-bufferspace', str),
     ('  remote page move cancelled due to full bufferspace', 'dram.bufferspace-full-move-page-cancelled', str),
@@ -221,21 +224,6 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     ('  remote page moved due to exceeding threshold in rmode5', 'dram.rmode5-page-moved-due-to-threshold', str),
   ]
 
-  # Compression
-  if bytes_saved != 0:
-    template += [
-      ('  bytes saved', 'compression.bytes-saved', str),
-      ('  avg compression ratio', 'compression.avg-compression-ratio', str),
-      ('  avg compression latency(ns)', 'compression.avg-compression-latency', format_ns(2)),
-      ('  avg decompression latency(ns)', 'compression.avg-decompression-latency', format_ns(2)),
-    ]
-  if cacheline_bytes_saved != 0:
-    template += [
-      ('  cacheline bytes saved', 'compression.cacheline-bytes-saved', str),
-      ('  avg cacheline compression ratio', 'compression.avg-cacheline-compression-ratio', str),
-      ('  avg cacheline compression latency(ns)', 'compression.avg-cacheline-compression-latency', format_ns(2)),
-      ('  avg cacheline decompression latency(ns)', 'compression.avg-cacheline-decompression-latency', format_ns(2)),
-    ]
 
   if 'dram.total-read-queueing-delay' in results:
     results['dram.avgqueueread'] = map(lambda (a,b): a/(b or 1), zip(results['dram.total-read-queueing-delay'], results['dram.reads']))
@@ -263,6 +251,56 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     results['dram.remotequeuemodel_datamovement2_percent_queue_full'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue-2.num-requests-queue-full'], results['dram-datamovement-queue-2.num-requests']))
     results['dram.remotequeuemodel_datamovement2_percent_capped_by_custom_cap'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue-2.num-requests-capped-by-custom-cap'], results['dram-datamovement-queue-2.num-requests']))
 
+  # Compression
+  if bytes_saved != 0:
+    template.append(('Compression', '', ''))
+    template += [
+      ('  bytes saved', 'compression.bytes-saved', str),
+      ('  avg compression ratio', 'compression.avg-compression-ratio', str),
+      ('  avg compression latency(ns)', 'compression.avg-compression-latency', format_ns(2)),
+      ('  avg decompression latency(ns)', 'compression.avg-decompression-latency', format_ns(2)),
+    ]
+  if cacheline_bytes_saved != 0:
+    template += [
+      ('  cacheline bytes saved', 'compression.cacheline-bytes-saved', str),
+      ('  avg cacheline compression ratio', 'compression.avg-cacheline-compression-ratio', str),
+      ('  avg cacheline compression latency(ns)', 'compression.avg-cacheline-compression-latency', format_ns(2)),
+      ('  avg cacheline decompression latency(ns)', 'compression.avg-cacheline-decompression-latency', format_ns(2)),
+    ]
+
+  max_dict_size = results['compression.max_dictionary_size'][0] if 'compression.max_dictionary_size' in results else 0
+  if max_dict_size != 0:
+    template += [
+            ('  avg_dictionary_size', 'compression.avg_dictionary_size', str),
+            ('  max_dictionary_size', 'compression.max_dictionary_size', str),
+            ('  avg_max_dictionary_entry', 'compression.avg_max_dictionary_entry', str),
+            ('  avg_avg_dictionary_entry', 'compression.avg_avg_dictionary_entry', str),
+            ('  max_dictionary_entry', 'compression.max_dictionary_entry', str),
+        ]
+
+  bdi_total_compressed = results['compression.bdi_total_compressed'][0] if 'compression.bdi_total_compressed' in results else 0
+  if bdi_total_compressed != 0:
+    template += [
+      ('  bdi_successful_compression', 'compression.bdi_total_compressed', str)]
+    for i in range(0, 13): 
+      bdi_option = float(results['compression.bdi_usage_option-{}'.format(i)][0]) / float(bdi_total_compressed) * 100
+      bdi_option_format = "{:.2f}".format(bdi_option)
+      results['compression.bdi_usage_option-{}'.format(i)] = [bdi_option_format]
+      template.append(('  bdi_usage(%)_option-{}'.format(i), 'compression.bdi_usage_option-{}'.format(i), str))
+    for i in range(0, 13): 
+      template.append(('  bdi_bytes_saved_option-{}'.format(i), 'compression.bdi_bytes_saved_option-{}'.format(i), str))
+
+  lz_compression = results['compression.avg_dictionary_size'][0] if 'compression.avg_dictionary_size' in results else 0
+  if lz_compression != 0:
+    template.append(('  Dictionary table stats (count within dictionary_size, entire ROI)', '', ''))
+    for i in range(10, 101, 10):  # 10, 20, ..., 100
+        template.append(('    {}% percentile - dictionary_size'.format(i), 'compression.lz-dictsize-count-p{}'.format(i), str))
+        template.append(('    {}% percentile - total_bytes_saved'.format(i), 'compression.lz-bytes_saved-count-p{}'.format(i), str))
+        template.append(('    {}% percentile - accesses'.format(i), 'compression.lz-accesses-count-p{}'.format(i), str))
+        template.append(('    {}% percentile - max_entry_bytes'.format(i), 'compression.lz-max_entry_bytes-count-p{}'.format(i), str))
+
+
+
   # if 'dram.redundant-moves-temp1-time-savings' in results:
   template.extend([
       ('Experiment stats', '', ''),
@@ -277,6 +315,9 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
       ('  remote datamovement2 % capped by window size', 'dram.remotequeuemodel_datamovement2_percent_capped_by_window_size', format_float(2)),
       ('  remote datamovement2 % queue utilization full', 'dram.remotequeuemodel_datamovement2_percent_queue_full', format_float(2)),
       ('  remote datamovement2 % queue capped by custom cap', 'dram.remotequeuemodel_datamovement2_percent_capped_by_custom_cap', format_float(2)),
+      ('  ideal page throttling: num swaps inflight', 'dram.ideal-page-throttling-num-swaps-inflight', str),
+      ('  ideal page throttling: num swaps non-inflight', 'dram.ideal-page-throttling-num-swaps-non-inflight', str),
+      ('  ideal page throttling: num swaps unavailable', 'dram.ideal-page-throttling-num-swap-unavailable', str),
   ])
 
   # if '' in results:
