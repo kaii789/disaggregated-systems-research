@@ -31,6 +31,7 @@ private:
    SubsecondTime m_queue_delay_cap;      // Only considered if m_use_separate_queue_delay_cap is true; cap applied before network additional latency
    bool m_use_separate_queue_delay_cap;  // Whether to use a separate queue delay cap
 
+   bool m_use_utilization_overflow;
    double m_utilization_overflow_threshold;
    UInt64 m_page_queue_overflowed_to_cacheline_queue;
    UInt64 m_cacheline_queue_overflowed_to_page_queue;

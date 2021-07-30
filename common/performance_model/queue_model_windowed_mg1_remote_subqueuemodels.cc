@@ -14,6 +14,7 @@
 QueueModelWindowedMG1Subqueuemodels::QueueModelWindowedMG1Subqueuemodels(String name, UInt32 id, UInt64 bw_bits_per_us)
    : m_window_size(SubsecondTime::NS(Sim()->getCfg()->getInt("queue_model/windowed_mg1_remote_subqueuemodels/window_size")))
    , m_use_separate_queue_delay_cap(Sim()->getCfg()->getBool("queue_model/windowed_mg1_remote_subqueuemodels/use_separate_queue_delay_cap"))
+   , m_use_utilization_overflow(Sim()->getCfg()->getBool("queue_model/windowed_mg1_remote_subqueuemodels/use_utilization_overflow"))
    , m_utilization_overflow_threshold(Sim()->getCfg()->getFloat("queue_model/windowed_mg1_remote_subqueuemodels/subqueue_utilization_overflow_threshold"))
    , m_page_queue_overflowed_to_cacheline_queue(0)
    , m_cacheline_queue_overflowed_to_page_queue(0)
@@ -228,17 +229,20 @@ QueueModelWindowedMG1Subqueuemodels::computeQueueDelayNoEffect(SubsecondTime pkt
       double utilization;
       double service_time_sum2;
 
-      // Process differently whether this is a page or cacheline access
-      if (request_type == QueueModel::PAGE) {
-         utilization = (double)m_page_service_time_sum / m_window_size.getPS();
-         service_time_sum2 = m_page_service_time_sum2;
-      } else {  // request_type == QueueModel::CACHELINE
-         utilization = (double)m_cacheline_service_time_sum / m_window_size.getPS();
-         service_time_sum2 = m_cacheline_service_time_sum2;
-      }
+      // // Process differently whether this is a page or cacheline access
+      // if (request_type == QueueModel::PAGE) {
+      //    utilization = (double)m_page_service_time_sum / m_window_size.getPS();
+      //    service_time_sum2 = m_page_service_time_sum2;
+      // } else {  // request_type == QueueModel::CACHELINE
+      //    utilization = (double)m_cacheline_service_time_sum / m_window_size.getPS();
+      //    service_time_sum2 = m_cacheline_service_time_sum2;
+      // }
+      utilization = (double)(m_page_service_time_sum + m_cacheline_service_time_sum) / (2 * m_window_size.getPS());
+      service_time_sum2 = m_page_service_time_sum2 + m_cacheline_service_time_sum2;
 
       double service_time_Es2 = service_time_sum2 / m_num_arrivals;
-      double arrival_rate = (double)m_num_arrivals / m_window_size.getPS();
+      // double arrival_rate = (double)m_num_arrivals / m_window_size.getPS();
+      double arrival_rate = (double)m_num_arrivals / (2 * m_window_size.getPS());
       
       // If requesters do not throttle based on returned latency, it's their problem, not ours
       if (utilization > .9999) { // number here changed from .99 to .9999; still needed?
@@ -288,19 +292,22 @@ QueueModelWindowedMG1Subqueuemodels::computeQueueDelayTrackBytes(SubsecondTime p
    {
       double utilization;
       double service_time_sum2;
-
-      // Process differently whether this is a page or cacheline access
-      if (request_type == QueueModel::PAGE) {
-         utilization = (double)m_page_service_time_sum / m_window_size.getPS();
-         service_time_sum2 = m_page_service_time_sum2;
-      } else {  // request_type == QueueModel::CACHELINE
-         utilization = (double)m_cacheline_service_time_sum / m_window_size.getPS();
-         service_time_sum2 = m_cacheline_service_time_sum2;
-      }
+      
+      // // Process differently whether this is a page or cacheline access
+      // if (request_type == QueueModel::PAGE) {
+      //    utilization = (double)m_page_service_time_sum / m_window_size.getPS();
+      //    service_time_sum2 = m_page_service_time_sum2;
+      // } else {  // request_type == QueueModel::CACHELINE
+      //    utilization = (double)m_cacheline_service_time_sum / m_window_size.getPS();
+      //    service_time_sum2 = m_cacheline_service_time_sum2;
+      // }
+      utilization = (double)(m_page_service_time_sum + m_cacheline_service_time_sum) / (2 * m_window_size.getPS());
+      service_time_sum2 = m_page_service_time_sum2 + m_cacheline_service_time_sum2;
 
       double service_time_Es2 = service_time_sum2 / m_num_arrivals;
-      double arrival_rate = (double)m_num_arrivals / m_window_size.getPS();
-      
+      // double arrival_rate = (double)m_num_arrivals / m_window_size.getPS();
+      double arrival_rate = (double)m_num_arrivals / (2 * m_window_size.getPS());
+
       // If requesters do not throttle based on returned latency, it's their problem, not ours
       if (utilization > .9999) { // number here changed from .99 to .9999; still needed?
          if (request_type == QueueModel::PAGE)
@@ -344,12 +351,12 @@ QueueModelWindowedMG1Subqueuemodels::computeQueueDelayTrackBytes(SubsecondTime p
    // If one queue's utilization is high, add it to the other queue if the other queue has space
    double page_queue_utilization_percentage = getPageQueueUtilizationPercentage(pkt_time);
    double cacheline_queue_utilization_percentage = getCachelineQueueUtilizationPercentage(pkt_time);
-   if (request_type == QueueModel::PAGE && page_queue_utilization_percentage > m_utilization_overflow_threshold && cacheline_queue_utilization_percentage < m_utilization_overflow_threshold - 0.01) {
+   if (m_use_utilization_overflow && request_type == QueueModel::PAGE && page_queue_utilization_percentage > m_utilization_overflow_threshold && cacheline_queue_utilization_percentage < m_utilization_overflow_threshold - 0.1) {
       // Add to cacheline queue instead (fills its utilization)
       addItem(pkt_time, processing_time, QueueModel::CACHELINE);
       addItemUpdateBytes(pkt_time, num_bytes, t_queue, QueueModel::CACHELINE);
       ++m_page_queue_overflowed_to_cacheline_queue;
-   } else if (request_type == QueueModel::CACHELINE && cacheline_queue_utilization_percentage > m_utilization_overflow_threshold && page_queue_utilization_percentage < m_utilization_overflow_threshold - 0.01) {
+   } else if (m_use_utilization_overflow && request_type == QueueModel::CACHELINE && cacheline_queue_utilization_percentage > m_utilization_overflow_threshold && page_queue_utilization_percentage < m_utilization_overflow_threshold - 0.1) {
       // Add to page queue instead (fills its utilization)
       addItem(pkt_time, processing_time, QueueModel::PAGE);
       addItemUpdateBytes(pkt_time, num_bytes, t_queue, QueueModel::PAGE);
