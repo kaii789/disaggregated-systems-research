@@ -347,7 +347,8 @@ CompressionModelLZ78::compressData(void* in, void* out, UInt32 data_size, UInt32
     if(m_dictsize_saved_map.count(dictionary_size) == 0) {
         // Compressed bytes
         m_dictsize_saved_map[dictionary_size] = 0;         
-        m_dictsize_saved_map[dictionary_size] += (UInt64)(m_page_size - compressed_size); // Assuming that lz is 'only' used to compressed data in page-granularity
+        if (m_page_size > compressed_size)
+            m_dictsize_saved_map[dictionary_size] += (UInt64)(m_page_size - compressed_size); // Assuming that lz is 'only' used to compressed data in page-granularity
 
         m_dictsize_accesses_map[dictionary_size] = 0;         
         m_dictsize_accesses_map[dictionary_size] += (UInt64) accesses;
@@ -355,7 +356,8 @@ CompressionModelLZ78::compressData(void* in, void* out, UInt32 data_size, UInt32
         m_dictsize_max_entry_map[dictionary_size] = (UInt32) max_entry;         
     } else {
         // Compressed bytes
-        m_dictsize_saved_map[dictionary_size] += (UInt64)(m_page_size - compressed_size); // Assuming that lz is 'only' used to compressed data in page-granularity
+        if (m_page_size > compressed_size)
+            m_dictsize_saved_map[dictionary_size] += (UInt64)(m_page_size - compressed_size); // Assuming that lz is 'only' used to compressed data in page-granularity
         m_dictsize_accesses_map[dictionary_size] += (UInt64) accesses;
         // Max_entry size 
         if(m_dictsize_max_entry_map[dictionary_size] < (UInt32) max_entry) 
