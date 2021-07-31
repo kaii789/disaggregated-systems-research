@@ -276,6 +276,7 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
             ('  avg_max_dictionary_entry', 'compression.avg_max_dictionary_entry', str),
             ('  avg_avg_dictionary_entry', 'compression.avg_avg_dictionary_entry', str),
             ('  max_dictionary_entry', 'compression.max_dictionary_entry', str),
+            ('  overflowed_pages', 'compression.num_overflowed_pages', str),
         ]
 
   bdi_total_compressed = results['compression.bdi_total_compressed'][0] if 'compression.bdi_total_compressed' in results else 0
