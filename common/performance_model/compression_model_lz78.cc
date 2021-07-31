@@ -32,8 +32,8 @@ CompressionModelLZ78::CompressionModelLZ78(String name, UInt32 id, UInt32 page_s
     if (m_compression_granularity == -1)
         m_compression_granularity = m_page_size;
   
-    if (Sim()->getCfg()->getInt("perf_model/dram/compression_model/lz78/dictionary_size") != -1) {
-        compression_CAM = new CAMLZ("lz78_dictionary", Sim()->getCfg()->getInt("perf_model/dram/compression_model/lz78/dictionary_size"),  Sim()->getCfg()->getBool("perf_model/dram/compression_model/lz78/size_limit"));
+    if ((Sim()->getCfg()->getInt("perf_model/dram/compression_model/lz78/dictionary_size") != -1) && (Sim()->getCfg()->getInt("perf_model/dram/compression_model/lz78/entry_size") != -1)) {
+        compression_CAM = new CAMLZ("lz78_dictionary", Sim()->getCfg()->getInt("perf_model/dram/compression_model/lz78/dictionary_size"),  Sim()->getCfg()->getInt("perf_model/dram/compression_model/lz78/entry_size"), Sim()->getCfg()->getBool("perf_model/dram/compression_model/lz78/size_limit"));
     } else {
         compression_CAM = new CAMLZ("lz78_dictionary",  Sim()->getCfg()->getBool("perf_model/dram/compression_model/lz78/size_limit"));
     }
@@ -77,6 +77,7 @@ CompressionModelLZ78::CompressionModelLZ78(String name, UInt32 id, UInt32 page_s
 
 CompressionModelLZ78::~CompressionModelLZ78()
 {
+    delete compression_CAM;
 }
 
 void
@@ -306,7 +307,7 @@ CompressionModelLZ78::compressData(void* in, void* out, UInt32 data_size, UInt32
     string s;
     SInt64 cur_word;
     SInt8 cur_byte;
-    bool found;
+    bool found, inserted;
     while (((i * m_word_size) < data_size) && (overflow == false)) {
         // Read next word byte-by-byte
         cur_word = readWord(in, i, m_word_size);
@@ -321,8 +322,11 @@ CompressionModelLZ78::compressData(void* in, void* out, UInt32 data_size, UInt32
         if(found == false) { // If not found in dictionary, add it 
             dictionary_size++;
             inserts++;
-            compression_CAM->insert(s);
-            accesses++;
+            inserted = compression_CAM->insert(s);
+            if (inserted == true)
+                accesses++;
+            else
+                inserts++; // an additional index is needed to capture that this particular byte was not inserted in the dictionary
             //writeWord(out, out_indx, cur_word, m_word_size);
             //out_indx++; 
             compressed_size += m_word_size;
@@ -333,11 +337,13 @@ CompressionModelLZ78::compressData(void* in, void* out, UInt32 data_size, UInt32
                 
 
             // statistics 
-            if (s.size() > m_max_dict_entry)
-                m_max_dict_entry = s.size();
-            if (s.size() > max_entry)
-                max_entry = s.size();
-            sum_entry += s.size();
+            if (inserted == true) {
+                if (s.size() > m_max_dict_entry)
+                    m_max_dict_entry = s.size();
+                if (s.size() > max_entry)
+                    max_entry = s.size();
+                sum_entry += s.size();
+            }
             // statistics 
 
 
@@ -348,7 +354,7 @@ CompressionModelLZ78::compressData(void* in, void* out, UInt32 data_size, UInt32
     }
 
     // Metadata needed for decompression
-    dictionary_size == compression_CAM->getSize();
+    dictionary_size = compression_CAM->getSize();
     UInt32 dictionary_size_log2 = floorLog2(dictionary_size); // bits needed to index an entry in the dictionary
     // additional bytes need for metadata related to index the corresponding entries in the dictionary
     UInt32 index_bytes = (inserts * dictionary_size_log2) / 8; // Convert bits to bytes

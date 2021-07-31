@@ -14,12 +14,12 @@ CAMLZ::CAMLZ(string name, bool size_limit)
 
     if(m_size_limit == true)
         LRU = new UInt32[m_size+1]{0};
-    std::cout << "dict size: " << m_size << "size limit " << size_limit << std::endl;
 }
 
-CAMLZ::CAMLZ(string name, UInt32 size, bool size_limit)
+CAMLZ::CAMLZ(string name, UInt32 size, UInt32 max_entry, bool size_limit)
     : m_name(name)
     , m_size(size) 
+    , m_max_entry(max_entry) 
     , m_cur_size(0)
     , m_size_limit(size_limit) 
 {
@@ -29,7 +29,6 @@ CAMLZ::CAMLZ(string name, UInt32 size, bool size_limit)
     if(m_size_limit == true)
         LRU = new UInt32[m_size+1]{0};
 
-    std::cout << "dict size: " << m_size << "size limit " << size_limit << std::endl;
 }
 
 CAMLZ::~CAMLZ() 
@@ -63,8 +62,10 @@ CAMLZ::setReplacementIndex(UInt32 start_index)
 bool
 CAMLZ::find(string s)
 {
-    bool found = false;
+    if((m_size_limit == true) && (s.size() > m_max_entry))
+        return false;
 
+    bool found = false;
     map<string, UInt32>::iterator it;
     it = m_dictionary_table.find(s);
 
@@ -79,7 +80,7 @@ CAMLZ::find(string s)
     return found;
 }
 
-void 
+bool 
 CAMLZ::insert(string s) 
 {
     if(m_size_limit == false) { // If there is no size limit, just insert it in the dictionary table
@@ -87,6 +88,9 @@ CAMLZ::insert(string s)
         m_dictionary_table.insert(pair<string,UInt32>(s, m_cur_size));
         //m_reverse_table.insert(pair<UInt32, string>(m_cur_size, s));
     } else { 
+        if(s.size() > m_max_entry)
+            return false;
+
         if (m_cur_size < m_size){ // If the dictionary table is not full, add a new entry at the end of it
             m_cur_size++;
             m_dictionary_table.insert(pair<string, UInt32>(s, m_cur_size));
@@ -119,7 +123,7 @@ CAMLZ::insert(string s)
             m_reverse_table.insert(pair<UInt32, string>(lru_index, s));
         }
     }
-
+    return true;
 }
 
 UInt32

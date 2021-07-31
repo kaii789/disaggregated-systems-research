@@ -13,18 +13,19 @@ class CAMLZ
 {
 public:
     CAMLZ(string name, bool);
-    CAMLZ(string name, UInt32, bool);
+    CAMLZ(string name, UInt32, UInt32, bool);
     ~CAMLZ();
 
     void clear();
     void setReplacementIndex(UInt32);
     bool find(string);
-    void insert(string);
+    bool insert(string);
     UInt32 getSize();
 
 private:
     string m_name;
     UInt32 m_size = 1024;
+    UInt32 m_max_entry = 96; // bytes
     bool m_size_limit = true;
     UInt32 m_cur_size = 0;
     UInt32 m_start_replacement_index = 1;
