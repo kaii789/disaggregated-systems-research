@@ -161,28 +161,11 @@ bool
 CompressionModelBDI::checkDeltaLimits(SInt64 delta, UInt32 delta_size)
 {
     bool within_limits = true;
-    switch (delta_size)
-    {
-        case 7:
-            break;
-        case 6:
-            break;
-        case 5:
-            break;
-        case 4:
-            if ((delta < INT_MIN) || (delta > INT_MAX)) within_limits = false;
-            break;
-        case 3:
-            break;
-        case 2:
-            if ((delta < SHRT_MIN) || (delta > SHRT_MAX)) within_limits = false;
-            break;
-        case 1:
-            if ((delta < SCHAR_MIN) || (delta > SCHAR_MAX)) within_limits = false;
-            break;
-        default:
-            fprintf(stderr,"Unknown Delta Size\n");
-            exit(1);
+    SInt8 cur_byte;
+    for(SInt8 j = delta_size; j < sizeof(SInt64); j++) {     
+        cur_byte = (delta >> (8*j)) & 0xff; // Get j-th byte from the word
+        if (cur_byte != 0)
+            within_limits = false;
     }
     return within_limits;
 }
