@@ -33,6 +33,14 @@ CompressionModelLZW::CompressionModelLZW(String name, UInt32 id, UInt32 page_siz
     if (m_compression_granularity == -1)
         m_compression_granularity = m_page_size;
 
+    if (Sim()->getCfg()->getInt("perf_model/dram/compression_model/lzw/dictionary_size") != -1) {
+        compression_CAM = new CAMLZ("lzw_dictionary", Sim()->getCfg()->getInt("perf_model/dram/compression_model/lzw/dictionary_size"),  Sim()->getCfg()->getBool("perf_model/dram/compression_model/lzw/size_limit"));
+    } else {
+        compression_CAM = new CAMLZ("lzw_dictionary",  Sim()->getCfg()->getBool("perf_model/dram/compression_model/lzw/size_limit"));
+    }
+    compression_CAM->setReplacementIndex(pow(2, m_word_size * 8));
+
+
     m_cacheline_count = m_page_size / m_cache_line_size;
     m_data_buffer = new char[m_page_size];
     m_compressed_data_buffer = new char[m_page_size + m_cacheline_count];
@@ -290,14 +298,14 @@ CompressionModelLZW::compressData(void* in, void* out, UInt32 data_size, UInt32 
     bool overflow = false;
     string s;
     UInt8 cur_byte;
-    compression_CAM.clear(); // What is the cost of flushing/clearing the dictionary?
+    compression_CAM->clear(); // What is the cost of flushing/clearing the dictionary?
 
     if (m_word_size == 1) { 
         for(j = 0; j < pow(2, m_word_size * 8); j++) {
             dictionary_size++;
             cur_byte = (UInt8) j; 
             s.push_back(cur_byte); 
-            compression_CAM.insert(pair<string, UInt32>(s, dictionary_size));
+            compression_CAM->insert(s);
             s.clear();
         }
     } else if (m_word_size == 2) {
@@ -307,7 +315,7 @@ CompressionModelLZW::compressData(void* in, void* out, UInt32 data_size, UInt32 
                 cur_byte = (k >> (8*j)) & 0xff; // Get j-th byte from the word
                 s.push_back(cur_byte); 
             }
-            compression_CAM.insert(pair<string, UInt32>(s, dictionary_size));
+            compression_CAM->insert(s);
             s.clear();
         }
     } else {
@@ -325,7 +333,7 @@ CompressionModelLZW::compressData(void* in, void* out, UInt32 data_size, UInt32 
     UInt32 out_indx = 0;
     UInt32 inserts = 0;
     SInt64 cur_word;
-    map<string, UInt32>::iterator it;
+    bool found;
     while ((i * m_word_size) < data_size) {
         // Read next word byte-by-byte
         cur_word = readWord(in, i, m_word_size);
@@ -334,13 +342,13 @@ CompressionModelLZW::compressData(void* in, void* out, UInt32 data_size, UInt32 
             s.push_back(cur_byte); 
         }
         
-        it = compression_CAM.find(s); 
+        found = compression_CAM->find(s); 
         accesses++;
 
-        if(it == compression_CAM.end()) { // If not found in dictionary, add it 
+        if(found == false) { // If not found in dictionary, add it 
             dictionary_size++;
             inserts++;
-            compression_CAM.insert(pair<string, UInt32>(s, dictionary_size));
+            compression_CAM->insert(s);
             accesses++;
             //writeIndex to output
 
@@ -364,6 +372,7 @@ CompressionModelLZW::compressData(void* in, void* out, UInt32 data_size, UInt32 
     }
 
     // Metadata needed for decompression
+    dictionary_size == compression_CAM->getSize();
     UInt32 dictionary_size_log2 = floorLog2(dictionary_size); // bits needed to index an entry in the dictionary
     // additional bytes need for metadata related to index the corresponding entries in the dictionary
     UInt32 index_bytes = (inserts * dictionary_size_log2) / 8; // Convert bits to bytes
@@ -372,7 +381,7 @@ CompressionModelLZW::compressData(void* in, void* out, UInt32 data_size, UInt32 
     compressed_size += index_bytes;
 
     *total_accesses = accesses;
-    compression_CAM.clear();
+    compression_CAM->clear();
 
     // If the compressed size is larger than m_page_size, Send the page in an uncompressed format 
     // (assuming that we check the payload of the packet. 

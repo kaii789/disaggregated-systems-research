@@ -2,6 +2,7 @@
 #define __COMPRESSION_MODEL_LZW_H__
 
 #include "compression_model.h"
+#include "CAM_lz.h"
 #include <string>
 #include <map>
 #include <map>
@@ -46,7 +47,7 @@ private:
     UInt8 m_cam_size = 256;
     UInt8 m_cam_size_log2 = 8;
 
-    std::map<string, UInt32> compression_CAM; 
+    CAMLZ *compression_CAM; 
 
     SInt64 readWord(void*, UInt32, UInt32);
     void writeWord(void*, UInt32, SInt64, UInt32);
