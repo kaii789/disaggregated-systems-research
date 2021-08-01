@@ -57,6 +57,17 @@ if __name__ == "__main__":
     }
 
     compression_series_experiment_run_configs = [
+         # 10) Remote on, PQ = 0
+        ExperimentRunConfig(
+            [
+                ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
+                ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+                ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+                ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
+            ]
+        ),
+
+ 
          # 11) Remote on, PQ = 0, compression = 'bdi' 
         ExperimentRunConfig(
             [
@@ -67,19 +78,6 @@ if __name__ == "__main__":
                 ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "bdi"),
                 ConfigEntry("perf_model/dram/compression_model/bdi", "compression_granularity", "-1"),
                 ConfigEntry("perf_model/dram/compression_model/bdi", "use_additional_options", "false"),
-            ]
-        ),
-
-        # 12) Remote on, PQ = 0, compression = 'bdi+' 
-        ExperimentRunConfig(
-            [
-                ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
-                ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
-                ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
-                ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
-                ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "bdi"),
-                ConfigEntry("perf_model/dram/compression_model/bdi", "compression_granularity", "-1"),
-                ConfigEntry("perf_model/dram/compression_model/bdi", "use_additional_options", "true"),
             ]
         ),
 
@@ -108,10 +106,11 @@ if __name__ == "__main__":
                 ConfigEntry("perf_model/dram/compression_model/lz78", "compression_latency", "0"),
                 ConfigEntry("perf_model/dram/compression_model/lz78", "decompression_latency", "0"),
                 ConfigEntry("perf_model/dram/compression_model/lz78", "word_size" , "1"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "size_limit" , "false"),
             ]
         ),
 
-        # 18) Remote on, PQ = 0, compression = 'lz78', compression_latency = 0
+        # 17) Remote on, PQ = 0, compression = 'lz78', compression_latency = 0
         ExperimentRunConfig(
             [
                 ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
@@ -121,9 +120,30 @@ if __name__ == "__main__":
                 ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lz78"),
                 ConfigEntry("perf_model/dram/compression_model/lz78", "compression_latency", "0"),
                 ConfigEntry("perf_model/dram/compression_model/lz78", "decompression_latency", "0"),
-                ConfigEntry("perf_model/dram/compression_model/lz78", "word_size" , "2"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "word_size" , "1"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "dictionary_size" , "1024"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "entry_size" , "96"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "size_limit" , "true"),
             ]
         ),
+
+        # 17) Remote on, PQ = 0, compression = 'lz78', compression_latency = 0
+        ExperimentRunConfig(
+            [
+                ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
+                ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+                ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+                ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+                ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lz78"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "compression_latency", "3"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "decompression_latency", "3"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "word_size" , "1"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "dictionary_size" , "1024"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "entry_size" , "96"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "size_limit" , "true"),
+            ]
+        ),
+
 
         # 17) Remote on, PQ = 0, compression = 'lzw', compression_latency = 0
         ExperimentRunConfig(
@@ -136,10 +156,12 @@ if __name__ == "__main__":
                 ConfigEntry("perf_model/dram/compression_model/lzw", "compression_latency", "0"),
                 ConfigEntry("perf_model/dram/compression_model/lzw", "decompression_latency", "0"),
                 ConfigEntry("perf_model/dram/compression_model/lzw", "word_size" , "1"),
+                ConfigEntry("perf_model/dram/compression_model/lzw", "size_limit" , "false"),
             ]
         ),
 
-        # 18) Remote on, PQ = 0, compression = 'lzw', compression_latency = 0
+
+        # 17) Remote on, PQ = 0, compression = 'lzw', compression_latency = 0
         ExperimentRunConfig(
             [
                 ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
@@ -149,10 +171,30 @@ if __name__ == "__main__":
                 ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lzw"),
                 ConfigEntry("perf_model/dram/compression_model/lzw", "compression_latency", "0"),
                 ConfigEntry("perf_model/dram/compression_model/lzw", "decompression_latency", "0"),
-                ConfigEntry("perf_model/dram/compression_model/lzw", "word_size" , "2"),
+                ConfigEntry("perf_model/dram/compression_model/lzw", "word_size" , "1"),
+                ConfigEntry("perf_model/dram/compression_model/lzw", "dictionary_size" , "1024"),
+                ConfigEntry("perf_model/dram/compression_model/lzw", "entry_size" , "96"),
+                ConfigEntry("perf_model/dram/compression_model/lzw", "size_limit" , "true"),
             ]
         ),
 
+
+        # 17) Remote on, PQ = 0, compression = 'lzw', compression_latency = 0
+        ExperimentRunConfig(
+            [
+                ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
+                ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+                ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+                ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+                ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lzw"),
+                ConfigEntry("perf_model/dram/compression_model/lzw", "compression_latency", "3"),
+                ConfigEntry("perf_model/dram/compression_model/lzw", "decompression_latency", "3"),
+                ConfigEntry("perf_model/dram/compression_model/lzw", "word_size" , "1"),
+                ConfigEntry("perf_model/dram/compression_model/lzw", "dictionary_size" , "1024"),
+                ConfigEntry("perf_model/dram/compression_model/lzw", "entry_size" , "96"),
+                ConfigEntry("perf_model/dram/compression_model/lzw", "size_limit" , "true"),
+            ]
+        ),
 
 
  
@@ -169,7 +211,7 @@ if __name__ == "__main__":
     # SSSP roadNet, bw_factor [4, 16] 
     sssp_roadNet_compression_experiments_remoteinit_true = []
     for remote_init in ["true"]:  # "false"
-        for bw_scalefactor in [4, 16]:
+        for bw_scalefactor in [8]:
             command_str = sssp_int_base_options.format(
                 "roadNet-CA.mtx",
                 sniper_options="-g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -s stop-by-icount:{}".format(
@@ -194,7 +236,7 @@ if __name__ == "__main__":
     # stream triad, bw_factor [4, 16] 
     stream_triad_compression_experiments_remoteinit_true = []
     for remote_init in ["true"]:  # "false"
-        for bw_scalefactor in [4, 16]:
+        for bw_scalefactor in [8]:
             command_str = stream_base_options.format(
                 "3",
                 sniper_options="-g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -s stop-by-icount:{}".format(
@@ -219,7 +261,7 @@ if __name__ == "__main__":
     # rodinia-nw needle 6144, bw_factor [4, 16] 
     nw_compression_experiments_remoteinit_true = []
     for remote_init in ["true"]:  # "false"
-        for bw_scalefactor in [4, 16]:
+        for bw_scalefactor in [8]:
             command_str = nw_base_options.format(
                 "2048",
                 sniper_options="-g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -s stop-by-icount:{}".format(
@@ -245,9 +287,9 @@ if __name__ == "__main__":
 
     # darknet bw_factor [4, 16] 
     darknet_compression_experiments_remoteinit_true = []
-    for model_type in ["darknet19", "resnet50"]:
+    for model_type in ["darknet19", "resnet50", "vgg-16", "yolov3"]:
         for remote_init in ["true"]:  # "false"
-            for bw_scalefactor in [4, 16]:
+            for bw_scalefactor in [8]:
                 command_str = darknet_base_options.format(
                     model_type,
                     sniper_options="-g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -s stop-by-icount:{}".format(
@@ -273,7 +315,7 @@ if __name__ == "__main__":
     # spmv pkustk14.mtx, bw_factor [4, 16] 
     spmv_pkustk14_compression_experiments_remoteinit_true = []
     for remote_init in ["true"]:  # "false"
-        for bw_scalefactor in [4, 16]:
+        for bw_scalefactor in [8]:
             command_str = spmv_base_options.format(
                 "pkustk14.mtx",
                 sniper_options="-g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -s stop-by-icount:{}".format(
@@ -298,7 +340,7 @@ if __name__ == "__main__":
     # BFS rMat_1000000, bw_factor [4, 16] 
     bfs_rmat1M_compression_experiments_remoteinit_true = []
     for remote_init in ["true"]:  # "false"
-        for bw_scalefactor in [4, 16]:
+        for bw_scalefactor in [8]:
             command_str = ligra_base_options.format(
                 "BFS",
                 "rMat_1000000",
@@ -325,7 +367,7 @@ if __name__ == "__main__":
     # PageRank rMat_1000000, bw_factor [4, 16] 
     pagerank_rmat1M_compression_experiments_remoteinit_true = []
     for remote_init in ["true"]:  # "false"
-        for bw_scalefactor in [4, 16]:
+        for bw_scalefactor in [8]:
             command_str = ligra_base_options.format(
                 "PageRank",
                 "rMat_1000000",
@@ -352,7 +394,7 @@ if __name__ == "__main__":
     # TriangleCounting rMat_1000000, bw_factor [4, 16] 
     triangle_rmat1M_compression_experiments_remoteinit_true = []
     for remote_init in ["true"]:  # "false"
-        for bw_scalefactor in [4, 16]:
+        for bw_scalefactor in [8]:
             command_str = ligra_base_options.format(
                 "Triangle",
                 "rMat_1000000",
@@ -379,7 +421,7 @@ if __name__ == "__main__":
     # Components rMat_1000000, bw_factor [4, 16] 
     components_rmat1M_compression_experiments_remoteinit_true = []
     for remote_init in ["true"]:  # "false"
-        for bw_scalefactor in [4, 16]:
+        for bw_scalefactor in [8]:
             command_str = ligra_base_options.format(
                 "Components",
                 "rMat_1000000",
@@ -406,7 +448,7 @@ if __name__ == "__main__":
     # Radii rMat_1000000, bw_factor [4, 16] 
     radii_rmat1M_compression_experiments_remoteinit_true = []
     for remote_init in ["true"]:  # "false"
-        for bw_scalefactor in [4, 16]:
+        for bw_scalefactor in [8]:
             command_str = ligra_base_options.format(
                 "Radii",
                 "rMat_1000000",
@@ -433,7 +475,7 @@ if __name__ == "__main__":
     # timeseries power_demand, bw_factor [4, 16] 
     timeseries_power_compression_experiments_remoteinit_true = []
     for remote_init in ["true"]:  # "false"
-        for bw_scalefactor in [4, 16]:
+        for bw_scalefactor in [8]:
             command_str = timeseries_base_options.format(
                 "power_demand.txt",
                 sniper_options="-g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -s stop-by-icount:{}".format(
@@ -463,8 +505,12 @@ if __name__ == "__main__":
     experiments.extend(spmv_pkustk14_compression_experiments_remoteinit_true)
     experiments.extend(sssp_roadNet_compression_experiments_remoteinit_true)
     experiments.extend(darknet_compression_experiments_remoteinit_true)
-    experiments.extend(nw_compression_experiments_remoteinit_true)
     experiments.extend(stream_triad_compression_experiments_remoteinit_true)
+    experiments.extend(bfs_rmat1M_compression_experiments_remoteinit_true)
+    experiments.extend(triangle_rmat1M_compression_experiments_remoteinit_true)
+    experiments.extend(components_rmat1M_compression_experiments_remoteinit_true)
+    experiments.extend(radii_rmat1M_compression_experiments_remoteinit_true)
+    experiments.extend(pagerank_rmat1M_compression_experiments_remoteinit_true)
 
 
     ### Run Sniper experiments using ExperimentManager ###

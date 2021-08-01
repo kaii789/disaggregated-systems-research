@@ -11,7 +11,7 @@ CompressionModelBDI::CompressionModelBDI(String name, UInt32 id, UInt32 page_siz
     , use_additional_options(Sim()->getCfg()->getBool("perf_model/dram/compression_model/bdi/use_additional_options"))
     , m_total_compressed(0)
 {
-    m_options = (use_additional_options) ? 13 : 11;
+    m_options = (use_additional_options) ? 16 : 11;
 
     // Set compression/decompression cycle latencies if configured
     if (Sim()->getCfg()->getInt("perf_model/dram/compression_model/bdi/compression_latency") != -1)
@@ -161,22 +161,11 @@ bool
 CompressionModelBDI::checkDeltaLimits(SInt64 delta, UInt32 delta_size)
 {
     bool within_limits = true;
-    switch (delta_size)
-    {
-        case 4:
-            if ((delta < INT_MIN) || (delta > INT_MAX)) within_limits = false;
-            break;
-        case 3:
-            break;
-        case 2:
-            if ((delta < SHRT_MIN) || (delta > SHRT_MAX)) within_limits = false;
-            break;
-        case 1:
-            if ((delta < SCHAR_MIN) || (delta > SCHAR_MAX)) within_limits = false;
-            break;
-        default:
-            fprintf(stderr,"Unknown Delta Size\n");
-            exit(1);
+    SInt8 cur_byte;
+    for(SInt8 j = delta_size; j < sizeof(SInt64); j++) {     
+        cur_byte = (delta >> (8*j)) & 0xff; // Get j-th byte from the word
+        if (cur_byte != 0)
+            within_limits = false;
     }
     return within_limits;
 }
@@ -346,21 +335,17 @@ CompressionModelBDI::compressCacheLine(void* in, void* out)
         // Option 6: base_size = 8 bytes, delta_size = 2 bytes
         // Option 7: base_size = 8 bytes, delta_size = 3 bytes
         // Option 8: base_size = 8 bytes, delta_size = 4 bytes
-        // Option 9: base_size = 4 bytes, delta_size = 1 byte
-        // Option 10: base_size = 4 bytes, delta_size = 2 bytes
-        // Option 11: base_size = 4 bytes, delta_size = 3 bytes
-        // Option 12: base_size = 2 bytes, delta_size = 1 byte
+        // Option 9: base_size = 8 bytes, delta_size = 5 bytes
+        // Option 10: base_size = 8 bytes, delta_size = 6 bytes
+        // Option 11: base_size = 8 bytes, delta_size = 7 bytes
+        // Option 12: base_size = 4 bytes, delta_size = 1 byte
+        // Option 13: base_size = 4 bytes, delta_size = 2 bytes
+        // Option 14: base_size = 4 bytes, delta_size = 3 bytes
+        // Option 15: base_size = 2 bytes, delta_size = 1 byte
         for (b = 8; b >= 2; b /= 2) {
-            if (b > 4) {
-                for(d = 1; d <= 4; d++){
-                    specializedCompress(in, &(m_options_compress_info[cur_option]), (void*)m_options_data_buffer[cur_option], b, d);
-                    cur_option++;
-                }
-            } else {
-                for(d = 1; d < b; d++){
-                    specializedCompress(in, &(m_options_compress_info[cur_option]), (void*)m_options_data_buffer[cur_option], b, d);
-                    cur_option++;
-                }
+            for(d = 1; d < b; d++){
+                specializedCompress(in, &(m_options_compress_info[cur_option]), (void*)m_options_data_buffer[cur_option], b, d);
+                cur_option++;
             }
         }
     } else {

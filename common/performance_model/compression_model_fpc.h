@@ -35,6 +35,11 @@ private:
     static const UInt32 mask[6];
     static const UInt32 neg_check[6];
 
+    // Stats
+    UInt64 m_total_compressed = 0;
+    UInt64 pattern_to_compressed_words[7] = {0, 0, 0, 0, 0, 0, 0};
+    UInt64 pattern_to_bytes_saved[7] = {0, 0, 0, 0, 0, 0, 0};
+
     UInt32 compressCacheLine(void *in, void *out);
     UInt32 decompressCacheLine(void *in, void *out);
 

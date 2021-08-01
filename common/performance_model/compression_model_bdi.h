@@ -60,8 +60,8 @@ private:
 
     // Statistics
     UInt64 m_total_compressed;
-    UInt64 m_compress_options[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    UInt64 m_bytes_saved_per_option[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    UInt64 m_compress_options[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    UInt64 m_bytes_saved_per_option[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 };
 

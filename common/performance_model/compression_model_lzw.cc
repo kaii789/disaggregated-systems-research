@@ -15,6 +15,7 @@ CompressionModelLZW::CompressionModelLZW(String name, UInt32 id, UInt32 page_siz
     , m_sum_max_dict_entry(0)
     , m_sum_avg_dict_entry(0)
     , m_max_dict_entry(0)
+    , m_num_overflowed_pages(0)
     , dictsize_count_stats(m_dictsize_saved_stats_num_points, 0)
     , bytes_saved_count_stats(m_dictsize_saved_stats_num_points, 0)
     , accesses_count_stats(m_dictsize_saved_stats_num_points, 0)
@@ -32,6 +33,14 @@ CompressionModelLZW::CompressionModelLZW(String name, UInt32 id, UInt32 page_siz
     if (m_compression_granularity == -1)
         m_compression_granularity = m_page_size;
 
+    if ((Sim()->getCfg()->getInt("perf_model/dram/compression_model/lzw/dictionary_size") != -1) && (Sim()->getCfg()->getInt("perf_model/dram/compression_model/lzw/entry_size") != -1)) {
+        compression_CAM = new CAMLZ("lzw_dictionary", Sim()->getCfg()->getInt("perf_model/dram/compression_model/lzw/dictionary_size"),  Sim()->getCfg()->getInt("perf_model/dram/compression_model/lzw/entry_size"), Sim()->getCfg()->getBool("perf_model/dram/compression_model/lzw/size_limit"));
+    } else {
+        compression_CAM = new CAMLZ("lzw_dictionary",  Sim()->getCfg()->getBool("perf_model/dram/compression_model/lzw/size_limit"));
+    }
+    compression_CAM->setReplacementIndex(pow(2, m_word_size * 8));
+
+
     m_cacheline_count = m_page_size / m_cache_line_size;
     m_data_buffer = new char[m_page_size];
     m_compressed_data_buffer = new char[m_page_size + m_cacheline_count];
@@ -42,6 +51,7 @@ CompressionModelLZW::CompressionModelLZW(String name, UInt32 id, UInt32 page_siz
     registerStatsMetric("compression", id, "avg_max_dictionary_entry", &m_avg_max_dict_entry);
     registerStatsMetric("compression", id, "avg_avg_dictionary_entry", &m_avg_avg_dict_entry);
     registerStatsMetric("compression", id, "max_dictionary_entry", &m_max_dict_entry);
+    registerStatsMetric("compression", id, "num_overflowed_pages", &m_num_overflowed_pages);
 
     // Register stats for dictionary table
     for (UInt32 i = 0; i < m_dictsize_saved_stats_num_points - 1; ++i) {
@@ -71,6 +81,7 @@ CompressionModelLZW::CompressionModelLZW(String name, UInt32 id, UInt32 page_siz
 
 CompressionModelLZW::~CompressionModelLZW()
 {
+    delete compression_CAM;
 }
 
 void
@@ -195,7 +206,7 @@ CompressionModelLZW::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
     UInt32 total_bytes = 0;
     UInt32 total_accesses;
     total_bytes = compressData(m_data_buffer, m_compressed_data_buffer, data_size, &total_accesses); 
-    //assert(total_bytes <= m_page_size && "[LZW] Wrong compression!\n");
+    assert(total_bytes <= m_page_size && "[LZW] Wrong compression!\n");
     //printf("total accesses %d\n", total_accesses);
 
     // Use total accesses instead of compressed cache lines for decompression
@@ -206,6 +217,12 @@ CompressionModelLZW::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
 
     // Return compression latency
     ComponentLatency compress_latency(ComponentLatency(core->getDvfsDomain(), m_compression_latency * total_accesses));
+
+    // If the page has been overflowed and is about to be sent in an uncompressed format (i.e., its size is m_page_size),
+    // fix the compressed_cache_lines to be 0, such that the decompression latency to be added will be 0 (page is left uncompresed)
+    if (total_bytes == m_page_size)
+        *compressed_cache_lines = 0;
+
     return compress_latency.getLatency();
 }
 
@@ -279,16 +296,17 @@ CompressionModelLZW::compressData(void* in, void* out, UInt32 data_size, UInt32 
     SInt64 k;
     UInt32 dictionary_size = 0; 
     UInt32 compressed_size = 0;
+    bool overflow = false;
     string s;
     UInt8 cur_byte;
-    compression_CAM.clear(); // What is the cost of flushing/clearing the dictionary?
+    compression_CAM->clear(); // What is the cost of flushing/clearing the dictionary?
 
     if (m_word_size == 1) { 
         for(j = 0; j < pow(2, m_word_size * 8); j++) {
             dictionary_size++;
             cur_byte = (UInt8) j; 
             s.push_back(cur_byte); 
-            compression_CAM.insert(pair<string, UInt32>(s, dictionary_size));
+            compression_CAM->insert(s);
             s.clear();
         }
     } else if (m_word_size == 2) {
@@ -298,7 +316,7 @@ CompressionModelLZW::compressData(void* in, void* out, UInt32 data_size, UInt32 
                 cur_byte = (k >> (8*j)) & 0xff; // Get j-th byte from the word
                 s.push_back(cur_byte); 
             }
-            compression_CAM.insert(pair<string, UInt32>(s, dictionary_size));
+            compression_CAM->insert(s);
             s.clear();
         }
     } else {
@@ -316,7 +334,7 @@ CompressionModelLZW::compressData(void* in, void* out, UInt32 data_size, UInt32 
     UInt32 out_indx = 0;
     UInt32 inserts = 0;
     SInt64 cur_word;
-    map<string, UInt32>::iterator it;
+    bool found, inserted;
     while ((i * m_word_size) < data_size) {
         // Read next word byte-by-byte
         cur_word = readWord(in, i, m_word_size);
@@ -325,22 +343,27 @@ CompressionModelLZW::compressData(void* in, void* out, UInt32 data_size, UInt32 
             s.push_back(cur_byte); 
         }
         
-        it = compression_CAM.find(s); 
+        found = compression_CAM->find(s); 
         accesses++;
 
-        if(it == compression_CAM.end()) { // If not found in dictionary, add it 
+        if(found == false) { // If not found in dictionary, add it 
             dictionary_size++;
             inserts++;
-            compression_CAM.insert(pair<string, UInt32>(s, dictionary_size));
-            accesses++;
+            inserted = compression_CAM->insert(s);
+            if (inserted == true)
+                accesses++;
+            else
+                inserts++; // an additional index is needed to capture that this particular byte was not inserted in the dictionary
             //writeIndex to output
 
             // statistics 
-            if (s.size() > m_max_dict_entry)
-                m_max_dict_entry = s.size();
-            if (s.size() > max_entry)
-                max_entry = s.size();
-            sum_entry += s.size();
+            if(inserted == true) {
+                if (s.size() > m_max_dict_entry)
+                    m_max_dict_entry = s.size();
+                if (s.size() > max_entry)
+                    max_entry = s.size();
+                sum_entry += s.size();
+            }
             // statistics 
 
             s.clear();
@@ -355,6 +378,7 @@ CompressionModelLZW::compressData(void* in, void* out, UInt32 data_size, UInt32 
     }
 
     // Metadata needed for decompression
+    dictionary_size = compression_CAM->getSize();
     UInt32 dictionary_size_log2 = floorLog2(dictionary_size); // bits needed to index an entry in the dictionary
     // additional bytes need for metadata related to index the corresponding entries in the dictionary
     UInt32 index_bytes = (inserts * dictionary_size_log2) / 8; // Convert bits to bytes
@@ -363,31 +387,43 @@ CompressionModelLZW::compressData(void* in, void* out, UInt32 data_size, UInt32 
     compressed_size += index_bytes;
 
     *total_accesses = accesses;
-    compression_CAM.clear();
+    compression_CAM->clear();
 
+    // If the compressed size is larger than m_page_size, Send the page in an uncompressed format 
+    // (assuming that we check the payload of the packet. 
+    // If data payload size = m_page_size, we avoid all the latencies related to decompressing the page
+    if ((compressed_size >= m_page_size) || (overflow == true)) {
+        compressed_size = m_page_size;
+        overflow = true;
+        m_num_overflowed_pages++;
+    }
 
     // statistics 
-    if(dictionary_size > m_max_dict_size)
-        m_max_dict_size = dictionary_size;
-    m_sum_dict_size += dictionary_size;
-    m_sum_max_dict_entry += max_entry;
-    m_sum_avg_dict_entry += (sum_entry / inserts);
-    if(m_dictsize_saved_map.count(dictionary_size) == 0) {
-        // Compressed bytes
-        m_dictsize_saved_map[dictionary_size] = 0;         
-        m_dictsize_saved_map[dictionary_size] += (UInt64)(m_page_size - compressed_size); // Assuming that lz is 'only' used to compressed data in page-granularity
+    if (overflow == false) {
+        if(dictionary_size > m_max_dict_size)
+            m_max_dict_size = dictionary_size;
+        m_sum_dict_size += dictionary_size;
+        m_sum_max_dict_entry += max_entry;
+        m_sum_avg_dict_entry += (sum_entry / inserts);
+        if(m_dictsize_saved_map.count(dictionary_size) == 0) {
+            // Compressed bytes
+            m_dictsize_saved_map[dictionary_size] = 0;         
+            if (m_page_size >= compressed_size)
+                m_dictsize_saved_map[dictionary_size] += (UInt64)(m_page_size - compressed_size); // Assuming that lz is 'only' used to compressed data in page-granularity
 
-        m_dictsize_accesses_map[dictionary_size] = 0;         
-        m_dictsize_accesses_map[dictionary_size] += (UInt64) accesses;
-        // Max_entry size 
-        m_dictsize_max_entry_map[dictionary_size] = (UInt32) max_entry;         
-    } else {
-        // Compressed bytes
-        m_dictsize_saved_map[dictionary_size] += (UInt64)(m_page_size - compressed_size); // Assuming that lz is 'only' used to compressed data in page-granularity
-        m_dictsize_accesses_map[dictionary_size] += (UInt64) accesses;
-        // Max_entry size 
-        if(m_dictsize_max_entry_map[dictionary_size] < (UInt32) max_entry) 
+            m_dictsize_accesses_map[dictionary_size] = 0;         
+            m_dictsize_accesses_map[dictionary_size] += (UInt64) accesses;
+            // Max_entry size 
             m_dictsize_max_entry_map[dictionary_size] = (UInt32) max_entry;         
+        } else {
+            // Compressed bytes
+            if (m_page_size >= compressed_size)
+                m_dictsize_saved_map[dictionary_size] += (UInt64)(m_page_size - compressed_size); // Assuming that lz is 'only' used to compressed data in page-granularity
+            m_dictsize_accesses_map[dictionary_size] += (UInt64) accesses;
+            // Max_entry size 
+            if(m_dictsize_max_entry_map[dictionary_size] < (UInt32) max_entry) 
+                m_dictsize_max_entry_map[dictionary_size] = (UInt32) max_entry;         
+        }
     }
     // statistics
 

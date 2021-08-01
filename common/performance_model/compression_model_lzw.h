@@ -2,6 +2,7 @@
 #define __COMPRESSION_MODEL_LZW_H__
 
 #include "compression_model.h"
+#include "CAM_lz.h"
 #include <string>
 #include <map>
 #include <map>
@@ -46,7 +47,7 @@ private:
     UInt8 m_cam_size = 256;
     UInt8 m_cam_size_log2 = 8;
 
-    std::map<string, UInt32> compression_CAM; 
+    CAMLZ *compression_CAM; 
 
     SInt64 readWord(void*, UInt32, UInt32);
     void writeWord(void*, UInt32, SInt64, UInt32);
@@ -62,6 +63,7 @@ private:
     UInt64 m_sum_avg_dict_entry;
     UInt64 m_avg_avg_dict_entry = 0;
     UInt64 m_max_dict_entry;
+    UInt64 m_num_overflowed_pages;
     const UInt32 m_dictsize_saved_stats_num_points = 10;  // the number of percentiles (from above 0% to including 100%)
     std::map<UInt32, UInt64> m_dictsize_saved_map; // track number of bytes saved for each particular dictionary size
     std::map<UInt32, UInt64> m_dictsize_accesses_map; // track number of accesses for each particular dictionary size
