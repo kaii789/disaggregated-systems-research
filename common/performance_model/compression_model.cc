@@ -12,6 +12,7 @@
 #include "compression_model_lz78.h"
 #include "compression_model_lzw.h"
 #include "compression_model_lz78_bdi.h"
+#include "compression_model_deflate.h"
 
 CompressionModel*
 CompressionModel::create(String name, UInt32 id, UInt32 page_size, UInt32 cache_line_size, String compression_type)
@@ -51,6 +52,10 @@ CompressionModel::create(String name, UInt32 id, UInt32 page_size, UInt32 cache_
     else if (compression_type == "lz78_bdi")
     {
         return new CompressionModelLZ78BDI(name, id, page_size, cache_line_size);
+    }
+    else if (compression_type == "deflate")
+    {
+        return new CompressionModelDeflate(name, id, page_size, cache_line_size);
     }
     else
     {
