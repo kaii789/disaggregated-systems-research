@@ -48,7 +48,7 @@ CompressionModelDeflate::compress(IntPtr addr, size_t data_size, core_id_t core_
     int total_bytes = 0;
     uLongf compressed_size = m_compression_granularity;
     for (int i = 0; i < m_page_size / (UInt32)m_compression_granularity; i++) {
-        compress2((Bytef*)&m_compressed_data_buffer[total_bytes], &compressed_size, (Bytef*)&m_data_buffer[m_compression_granularity * i], (uLongf)m_compression_granularity, 1);
+        compress2((Bytef*)&m_compressed_data_buffer[total_bytes], &compressed_size, (Bytef*)&m_data_buffer[m_compression_granularity * i], (uLongf)m_compression_granularity, Z_DEFAULT_COMPRESSION);
         total_bytes += compressed_size;
     }
 
