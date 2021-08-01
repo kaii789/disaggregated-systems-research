@@ -291,6 +291,18 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     for i in range(0, 13): 
       template.append(('  bdi_bytes_saved_option-{}'.format(i), 'compression.bdi_bytes_saved_option-{}'.format(i), str))
 
+  fpc_total_compressed = results['compression.fpc_total_compressed'][0] if 'compression.fpc_total_compressed' in results else 0
+  if fpc_total_compressed != 0:
+    template += [
+      ('  fpc_successful_compression', 'compression.fpc_total_compressed', str)]
+    for i in range(7): 
+      fpc_pattern = float(results['compression.fpc_usage_pattern-{}'.format(i)][0]) / float(fpc_total_compressed) * 100
+      fpc_pattern_format = "{:.2f}".format(fpc_pattern)
+      results['compression.fpc_usage_pattern-{}'.format(i)] = [fpc_pattern_format]
+      template.append(('  fpc_usage(%)_pattern-{}'.format(i), 'compression.fpc_usage_pattern-{}'.format(i), str))
+    for i in range(7): 
+      template.append(('  fpc_bytes_saved_pattern-{}'.format(i), 'compression.fpc_bytes_saved_pattern-{}'.format(i), str))
+
   lz_compression = results['compression.avg_dictionary_size'][0] if 'compression.avg_dictionary_size' in results else 0
   if lz_compression != 0:
     template.append(('  Dictionary table stats (count within dictionary_size, entire ROI)', '', ''))
