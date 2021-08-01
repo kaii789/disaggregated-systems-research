@@ -265,7 +265,7 @@ def run_stream(type):
     experiments = []
     net_lat = 120
     for num_MB in [2]:
-        for bw_scalefactor in [4, 16]:
+        for bw_scalefactor in [4]:
             localdram_size_str = "{}MB".format(num_MB)
             command_str = stream_base_options.format(
                 type,
@@ -298,7 +298,7 @@ def run_sssp(input):
     net_lat = 120
     for remote_init in ["true"]:  # "false"
         for num_B in [524288]:
-            for bw_scalefactor in [4, 16]:
+            for bw_scalefactor in [4]:
                 localdram_size_str = "{}B".format(num_B)
                 command_str = sssp_base_options.format(
                     input,
