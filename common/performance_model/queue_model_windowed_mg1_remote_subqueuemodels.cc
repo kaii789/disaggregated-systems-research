@@ -15,7 +15,6 @@ QueueModelWindowedMG1Subqueuemodels::QueueModelWindowedMG1Subqueuemodels(String 
    : m_window_size(SubsecondTime::NS(Sim()->getCfg()->getInt("queue_model/windowed_mg1_remote_subqueuemodels/window_size")))
    , m_use_separate_queue_delay_cap(Sim()->getCfg()->getBool("queue_model/windowed_mg1_remote_subqueuemodels/use_separate_queue_delay_cap"))
    , m_use_utilization_overflow(Sim()->getCfg()->getBool("queue_model/windowed_mg1_remote_subqueuemodels/use_utilization_overflow"))
-   , m_utilization_overflow_threshold(Sim()->getCfg()->getFloat("queue_model/windowed_mg1_remote_subqueuemodels/subqueue_utilization_overflow_threshold"))
    , m_page_queue_overflowed_to_cacheline_queue(0)
    , m_cacheline_queue_overflowed_to_page_queue(0)
    , m_num_arrivals(0)
@@ -61,6 +60,10 @@ QueueModelWindowedMG1Subqueuemodels::QueueModelWindowedMG1Subqueuemodels(String 
    } else {
       m_queue_delay_cap = m_window_size;  // in this case m_queue_delay_cap won't be used, but set accordingly just in case
    }
+
+   if (m_use_utilization_overflow) {
+      m_utilization_overflow_threshold = Sim()->getCfg()->getFloat("queue_model/windowed_mg1_remote_subqueuemodels/subqueue_utilization_overflow_threshold");
+   }
    
    registerStatsMetric(name, id, "num-requests", &m_total_requests);
    registerStatsMetric(name, id, "num-page-requests", &m_total_page_requests);
@@ -80,6 +83,18 @@ QueueModelWindowedMG1Subqueuemodels::QueueModelWindowedMG1Subqueuemodels(String 
    registerStatsMetric(name, id, "num-requests-page-queue-overflowed-to-cacheline-queue", &m_page_queue_overflowed_to_cacheline_queue);
    registerStatsMetric(name, id, "num-requests-cacheline-queue-overflowed-to-page-queue", &m_cacheline_queue_overflowed_to_page_queue);
    
+   registerStatsMetric(name, id, "total-cacheline-queue-utilization-during-page-requests-numerator", &m_total_cacheline_queue_utilization_during_page_requests_numerator);
+   registerStatsMetric(name, id, "total-cacheline-queue-utilization-during-page-requests-denominator", &m_total_cacheline_queue_utilization_during_page_requests_denominator);
+   registerStatsMetric(name, id, "total-page-queue-utilization-during-cacheline-requests-numerator", &m_total_page_queue_utilization_during_cacheline_requests_numerator);
+   registerStatsMetric(name, id, "total-page-queue-utilization-during-cacheline-requests-denominator", &m_total_page_queue_utilization_during_cacheline_requests_denominator);
+
+   registerStatsMetric(name, id, "total-cacheline-queue-utilization-during-page-no-effect-numerator", &m_total_cacheline_queue_utilization_during_page_no_effect_numerator);
+   registerStatsMetric(name, id, "total-cacheline-queue-utilization-during-page-no-effect-denominator", &m_total_cacheline_queue_utilization_during_page_no_effect_denominator);
+   registerStatsMetric(name, id, "total-page-queue-utilization-during-cacheline-no-effect-numerator", &m_total_page_queue_utilization_during_cacheline_no_effect_numerator);
+   registerStatsMetric(name, id, "total-page-queue-utilization-during-cacheline-no-effect-denominator", &m_total_page_queue_utilization_during_cacheline_no_effect_denominator);
+   registerStatsMetric(name, id, "num-no-effect-page-requests", &m_total_no_effect_page_requests);
+   registerStatsMetric(name, id, "num-no-effect-cacheline-requests", &m_total_no_effect_cacheline_requests);
+
    // Divide the first following stat by the second one to get bytes / ps (can't register a double type as a stat)
    // The only reason why it's in bytes/ps is because these were the raw values used to compute effective bandwidth
    // in this class. Considering converting to GB/s like other bandwidth values?
@@ -95,7 +110,11 @@ QueueModelWindowedMG1Subqueuemodels::QueueModelWindowedMG1Subqueuemodels(String 
    registerStatsMetric(name, id, "num-page-effective-bandwidth-exceeded-allowable-max", &m_page_effective_bandwidth_exceeded_allowable_max);
    registerStatsMetric(name, id, "num-cacheline-effective-bandwidth-exceeded-allowable-max", &m_cacheline_effective_bandwidth_exceeded_allowable_max);
 
-   std::cout << "Using windowed_mg1_remote_subqueuemodels queue model with utilization overflow threshold " << m_utilization_overflow_threshold << std::endl;
+   std::cout << "Using windowed_mg1_remote_subqueuemodels queue model with m_use_utilization_overflow=" << m_use_utilization_overflow;
+   if (m_use_utilization_overflow) {
+      std::cout<< ", utilization overflow threshold=" << m_utilization_overflow_threshold;
+   }
+   std::cout << std::endl;
 }
 
 QueueModelWindowedMG1Subqueuemodels::~QueueModelWindowedMG1Subqueuemodels()
@@ -147,14 +166,27 @@ QueueModelWindowedMG1Subqueuemodels::~QueueModelWindowedMG1Subqueuemodels()
       std::cout << "% of windows with effective bandwidth that exceeded the allowable max bandwidth of " << m_specified_bw_GB_per_s * m_max_bandwidth_allowable_excess_ratio << "GB/s" << std::endl;
    }
 
-   if ((double) m_page_effective_bandwidth_exceeded_allowable_max / m_total_page_requests > 0.01) {
-      std::cout << "Queue " << m_name << " page portion had " << 100 * (double)m_page_effective_bandwidth_exceeded_allowable_max / m_total_page_requests;
-      std::cout << "% of windows with effective bandwidth that exceeded the allowable max bandwidth of " << m_specified_bw_GB_per_s * (1 - m_r_cacheline_queue_fraction) * m_max_bandwidth_allowable_excess_ratio << "GB/s" << std::endl;
+   if (m_total_page_requests > 0) {
+      if ((double) m_page_effective_bandwidth_exceeded_allowable_max / m_total_page_requests > 0.01) {
+         std::cout << "Queue " << m_name << " page portion had " << 100 * (double)m_page_effective_bandwidth_exceeded_allowable_max / m_total_page_requests;
+         std::cout << "% of windows with effective bandwidth that exceeded the allowable max bandwidth of " << m_specified_bw_GB_per_s * (1 - m_r_cacheline_queue_fraction) * m_max_bandwidth_allowable_excess_ratio << "GB/s" << std::endl;
+      }
+      std::cout << "Avg cacheline queue utilization during page requests: " << m_total_cacheline_queue_utilization_during_page_requests / m_total_page_requests << std::endl;
    }
 
-   if ((double) m_cacheline_effective_bandwidth_exceeded_allowable_max / m_total_cacheline_requests > 0.01) {
-      std::cout << "Queue " << m_name << " cacheline portion had " << 100 * (double)m_cacheline_effective_bandwidth_exceeded_allowable_max / m_total_cacheline_requests;
-      std::cout << "% of windows with effective bandwidth that exceeded the allowable max bandwidth of " << m_specified_bw_GB_per_s * m_r_cacheline_queue_fraction * m_max_bandwidth_allowable_excess_ratio << "GB/s" << std::endl;
+   if (m_total_cacheline_requests > 0) {
+      if ((double) m_cacheline_effective_bandwidth_exceeded_allowable_max / m_total_cacheline_requests > 0.01) {
+         std::cout << "Queue " << m_name << " cacheline portion had " << 100 * (double)m_cacheline_effective_bandwidth_exceeded_allowable_max / m_total_cacheline_requests;
+         std::cout << "% of windows with effective bandwidth that exceeded the allowable max bandwidth of " << m_specified_bw_GB_per_s * m_r_cacheline_queue_fraction * m_max_bandwidth_allowable_excess_ratio << "GB/s" << std::endl;
+      }
+      std::cout << "Avg page queue utilization during cacheline requests: " << m_total_page_queue_utilization_during_cacheline_requests / m_total_cacheline_requests << std::endl;
+   }
+
+   if (m_total_no_effect_page_requests > 0) {
+      std::cout << "Avg cacheline queue utilization during page No Effect requests: " << m_total_cacheline_queue_utilization_during_page_no_effect / m_total_no_effect_page_requests << std::endl;
+   }
+   if (m_total_no_effect_cacheline_requests > 0) {
+      std::cout << "Avg page queue utilization during cacheline No Effect requests: " << m_total_page_queue_utilization_during_cacheline_no_effect / m_total_no_effect_cacheline_requests << std::endl;
    }
 }
 
@@ -227,7 +259,7 @@ QueueModelWindowedMG1Subqueuemodels::computeQueueDelayNoEffect(SubsecondTime pkt
    if (m_num_arrivals > 1)
    {
       double utilization;
-      double service_time_sum2;
+      UInt64 service_time_sum2;
 
       // // Process differently whether this is a page or cacheline access
       // if (request_type == QueueModel::PAGE) {
@@ -237,8 +269,10 @@ QueueModelWindowedMG1Subqueuemodels::computeQueueDelayNoEffect(SubsecondTime pkt
       //    utilization = (double)m_cacheline_service_time_sum / m_window_size.getPS();
       //    service_time_sum2 = m_cacheline_service_time_sum2;
       // }
-      utilization = (double)(m_page_service_time_sum + m_cacheline_service_time_sum) / (2 * m_window_size.getPS());
-      service_time_sum2 = m_page_service_time_sum2 + m_cacheline_service_time_sum2;
+      // Include the incoming packet in calculations to differentiate between small and large requests in decision making.
+      // Don't need to update m_num_arrivals since it gets cancelled out in the formula
+      utilization = (double)(m_page_service_time_sum + m_cacheline_service_time_sum + processing_time.getPS()) / (2 * m_window_size.getPS());
+      service_time_sum2 = m_page_service_time_sum2 + m_cacheline_service_time_sum2 + processing_time.getPS() * processing_time.getPS();
 
       double service_time_Es2 = service_time_sum2 / m_num_arrivals;
       // double arrival_rate = (double)m_num_arrivals / m_window_size.getPS();
@@ -269,6 +303,19 @@ QueueModelWindowedMG1Subqueuemodels::computeQueueDelayNoEffect(SubsecondTime pkt
    t_queue += m_r_added_latency;  // is it ok for t_queue to potentially be larger than m_window_size?
 
    // removed addItem() call and calls that updated stats
+   
+   // Stats for diagnosing
+   double page_queue_utilization_percentage = getPageQueueUtilizationPercentage(pkt_time);
+   double cacheline_queue_utilization_percentage = getCachelineQueueUtilizationPercentage(pkt_time);
+   if (request_type == QueueModel::PAGE) {
+      ++m_total_no_effect_page_requests;
+      m_total_cacheline_queue_utilization_during_page_no_effect += cacheline_queue_utilization_percentage;
+      m_total_cacheline_queue_utilization_during_page_no_effect_numerator = (UInt64)(m_total_cacheline_queue_utilization_during_page_no_effect * m_total_cacheline_queue_utilization_during_page_no_effect_denominator);
+   } else {  // request_type == QueueModel::CACHELINE
+      ++m_total_no_effect_cacheline_requests;
+      m_total_page_queue_utilization_during_cacheline_no_effect += page_queue_utilization_percentage;
+      m_total_page_queue_utilization_during_cacheline_no_effect_numerator = (UInt64)(m_total_page_queue_utilization_during_cacheline_no_effect * m_total_page_queue_utilization_during_cacheline_no_effect_denominator);
+   }
 
    return t_queue;
 }
@@ -291,7 +338,7 @@ QueueModelWindowedMG1Subqueuemodels::computeQueueDelayTrackBytes(SubsecondTime p
    if (m_num_arrivals > 1)  // Share num_arrivals among both queues, since the number gets cancelled out anyways
    {
       double utilization;
-      double service_time_sum2;
+      UInt64 service_time_sum2;
       
       // // Process differently whether this is a page or cacheline access
       // if (request_type == QueueModel::PAGE) {
@@ -301,8 +348,10 @@ QueueModelWindowedMG1Subqueuemodels::computeQueueDelayTrackBytes(SubsecondTime p
       //    utilization = (double)m_cacheline_service_time_sum / m_window_size.getPS();
       //    service_time_sum2 = m_cacheline_service_time_sum2;
       // }
-      utilization = (double)(m_page_service_time_sum + m_cacheline_service_time_sum) / (2 * m_window_size.getPS());
-      service_time_sum2 = m_page_service_time_sum2 + m_cacheline_service_time_sum2;
+      // Include the incoming packet in calculations to differentiate between small and large requests in decision making.
+      // Don't need to update m_num_arrivals since it gets cancelled out in the formula
+      utilization = (double)(m_page_service_time_sum + m_cacheline_service_time_sum + processing_time.getPS()) / (2 * m_window_size.getPS());
+      service_time_sum2 = m_page_service_time_sum2 + m_cacheline_service_time_sum2 + processing_time.getPS() * processing_time.getPS();
 
       double service_time_Es2 = service_time_sum2 / m_num_arrivals;
       // double arrival_rate = (double)m_num_arrivals / m_window_size.getPS();
@@ -373,9 +422,13 @@ QueueModelWindowedMG1Subqueuemodels::computeQueueDelayTrackBytes(SubsecondTime p
    if (request_type == QueueModel::PAGE) {
       ++m_total_page_requests;
       m_total_page_queue_delay += t_queue;
+      m_total_cacheline_queue_utilization_during_page_requests += cacheline_queue_utilization_percentage;
+      m_total_cacheline_queue_utilization_during_page_requests_numerator = (UInt64)(m_total_cacheline_queue_utilization_during_page_requests * m_total_cacheline_queue_utilization_during_page_requests_denominator);
    } else {  // request_type == QueueModel::CACHELINE
       ++m_total_cacheline_requests;
       m_total_cacheline_queue_delay += t_queue;
+      m_total_page_queue_utilization_during_cacheline_requests += page_queue_utilization_percentage;
+      m_total_page_queue_utilization_during_cacheline_requests_numerator = (UInt64)(m_total_page_queue_utilization_during_cacheline_requests * m_total_page_queue_utilization_during_cacheline_requests_denominator);
    }
 
    return t_queue;

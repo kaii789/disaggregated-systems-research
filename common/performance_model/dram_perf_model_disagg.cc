@@ -829,9 +829,9 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     perf->updateTime(t_now, ShmemPerf::DRAM_BUS);
 
     // Adding data movement cost of the entire page for now (this just adds contention in the queue)
+    SubsecondTime page_datamovement_queue_delay = SubsecondTime::Zero();
     if (move_page) {
         ++m_page_moves;
-        SubsecondTime page_datamovement_queue_delay = SubsecondTime::Zero();
         SubsecondTime page_compression_latency = SubsecondTime::Zero();  // when page compression is not enabled, this is always 0
         if (m_r_simulate_datamov_overhead && !m_r_cacheline_gran) {
             //check if queue is full
@@ -896,7 +896,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
                     } else if (m_r_partition_queues == 3) {
                         cacheline_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + cacheline_compression_latency, m_r_part2_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, requester);
                     }
-                    t_now -= page_compression_latency;  // Page compression is not on critical path
+                    t_now -= page_compression_latency;  // Page compression is not on critical path; this is 0 if compression is off
                     ++m_redundant_moves;
                     ++m_redundant_moves_type1;
                     m_redundant_moves_type1_time_savings += (page_compression_latency + page_datamovement_queue_delay) - (cacheline_compression_latency + datamovement_queue_delay);
