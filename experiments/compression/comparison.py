@@ -203,7 +203,7 @@ def run_ligra(application_name, ligra_input_selection, num_MB):
     ligra_input_file = ligra_input_to_file[ligra_input_selection]
     net_lat = 120
     for remote_init in ["false"]:  # "false"
-        for bw_scalefactor in [4]:
+        for bw_scalefactor in [16]:
             localdram_size_str = "{}MB".format(num_MB)
             command_str = ligra_base_str_options.format(
                 application_name,
@@ -241,7 +241,7 @@ def run_tinynet(model_type):
     experiments = []
     net_lat = 120
     for num_MB in [2]:
-        for bw_scalefactor in [4]:
+        for bw_scalefactor in [16]:
             localdram_size_str = "{}MB".format(num_MB)
             command_str = darknet_base_str_options.format(
                 model_type,
@@ -273,7 +273,7 @@ def run_stream(type):
     experiments = []
     net_lat = 120
     for num_MB in [2]:
-        for bw_scalefactor in [4]:
+        for bw_scalefactor in [16]:
             localdram_size_str = "{}MB".format(num_MB)
             command_str = stream_base_options.format(
                 type,
@@ -306,7 +306,7 @@ def run_sssp(input):
     net_lat = 120
     for remote_init in ["true"]:  # "false"
         for num_B in [524288]:
-            for bw_scalefactor in [4]:
+            for bw_scalefactor in [16]:
                 localdram_size_str = "{}B".format(num_B)
                 command_str = sssp_base_options.format(
                     input,
@@ -339,7 +339,7 @@ def run_hpcg():
     experiments = []
     net_lat = 120
     for num_MB in [32]:
-        for bw_scalefactor in [4]:
+        for bw_scalefactor in [16]:
             localdram_size_str = "{}MB".format(num_MB)
             command_str = hpcg_base_options.format(
                 sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
@@ -368,7 +368,7 @@ def run_nw(type):
     experiments = []
     net_lat = 120
     for num_MB in [4]:
-        for bw_scalefactor in [4]:
+        for bw_scalefactor in [16]:
             localdram_size_str = "{}MB".format(num_MB)
             command_str = nw_base_options.format(
                 type, 
@@ -398,7 +398,7 @@ def run_sls():
     experiments = []
     net_lat = 120
     for num_MB in [16]:
-        for bw_scalefactor in [4]:
+        for bw_scalefactor in [16]:
             localdram_size_str = "{}MB".format(num_MB)
             command_str = sls_base_options.format(
                 sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
@@ -424,7 +424,7 @@ def run_sls():
     return experiments
 
 def graph(res_name, benchmark_list, local_dram_list, bw_scalefactor_list):
-    labels = ["Remote Bandwidth Scalefactor", "Compression Off", "Page Compression(ideal)", "Cacheline + Page Compression(ideal)", "Page Compression", "Cacheline + Page Compression"]
+    labels = ["Remote Bandwidth Scalefactor", "BDI", "FPC", "LZ78(ideal)", "LZW(ideal)", "Deflate"]
     # "stream_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_combo"
 
     process = 0
@@ -437,13 +437,15 @@ def graph(res_name, benchmark_list, local_dram_list, bw_scalefactor_list):
                 dir1 = "{}localdram_{}_netlat_120_bw_scalefactor_{}_combo_output_files".format(benchmark, size, factor)
                 for run in range(1, 1 + num_bars):
                     try:
-                        dir2 = "run_{}_process_{}_temp".format(run, process)
+                        # dir2 = "run_{}_process_{}_temp".format(run, process)
+                        dir2 = "run_{}".format(run)
                         res_dir = "./{}/{}".format(dir1, dir2)
+                        print(res_dir)
                         ipc = stats.get_ipc(res_dir)
                         res[run].append(ipc)
 
                         # Compression res
-                        if run in range(2, 1 + num_bars):
+                        if run in range(1, 1 + num_bars):
                             type = "{}-{}".format(run - 1, factor)
                             compression_res[type] = {}
                             cr, cl, dl, ccr, ccl, cdl = stats.get_compression_stats(res_dir)
