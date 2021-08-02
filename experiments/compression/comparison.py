@@ -14,6 +14,14 @@ import stats
 import run_sniper_repeat_base as automation
 
 config_list = [
+    # 0) No Compression
+    automation.ExperimentRunConfig(
+        [
+            automation.ConfigEntry("perf_model/l3_cache", "cache_size", "512"),
+            automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
+            automation.ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+        ]
+    ),
     # 1) BDI
     automation.ExperimentRunConfig(
         [
@@ -477,37 +485,74 @@ def gen_settings_for_graph(benchmark_name):
         local_dram_list = ["524288B"]
         bw_scalefactor_list = [4, 16]
     elif benchmark_name == "bfs_reg":
-        res_name = "bfs_reg_4MB_combo"
+        res_name = "bfs_reg_4MB_comparison"
         benchmark_list = []
         benchmark_list.append("ligra_{}_".format("bfs"))
         local_dram_list = ["4MB"]
-        bw_scalefactor_list = [4, 16]
+        bw_scalefactor_list = [4]
     elif benchmark_name == "triangle_reg":
-        res_name = "triangle_reg_16MB_combo"
+        res_name = "triangle_reg_16MB_comparison"
         benchmark_list = []
         benchmark_list.append("ligra_{}_".format("triangle"))
         local_dram_list = ["16MB"]
-        bw_scalefactor_list = [4, 16]
+        bw_scalefactor_list = [4]
+    elif benchmark_name == "bc_reg":
+        res_name = "bc_reg_4MB_comparison"
+        benchmark_list = []
+        benchmark_list.append("ligra_{}_".format("bc"))
+        local_dram_list = ["4MB"]
+        bw_scalefactor_list = [4]
+    elif benchmark_name == "components_reg":
+        res_name = "components_reg_4MB_comparison"
+        benchmark_list = []
+        benchmark_list.append("ligra_{}_".format("bc"))
+        local_dram_list = ["4MB"]
+        bw_scalefactor_list = [4]
     elif benchmark_name == "tinynet":
-        res_name = "tinynet_2MB_combo"
+        res_name = "tinynet_2MB_comparison"
         benchmark_list = []
         for model in ["tiny"]:
             benchmark_list.append("darknet_{}_".format(model))
         local_dram_list = ["2MB"]
-        bw_scalefactor_list = [4, 16]
+        bw_scalefactor_list = [4]
     elif benchmark_name == "darknet19":
-        res_name = "tinynet_2MB_combo"
+        res_name = "darknet19_2MB_comparison"
         benchmark_list = []
         for model in ["darknet19"]:
             benchmark_list.append("darknet_{}_".format(model))
         local_dram_list = ["2MB"]
-        bw_scalefactor_list = [4, 16]
+        bw_scalefactor_list = [4]
+    elif benchmark_name == "resnet50":
+        res_name = "resnet50_2MB_comparison"
+        benchmark_list = []
+        for model in ["resnet50"]:
+            benchmark_list.append("darknet_{}_".format(model))
+        local_dram_list = ["2MB"]
+        bw_scalefactor_list = [4]
     elif benchmark_name == "stream_1":
-        res_name = "stream_1_2MB_combo"
+        res_name = "stream_1_2MB_comparison"
         benchmark_list = []
         benchmark_list.append("stream_1_")
         local_dram_list = ["2MB"]
         bw_scalefactor_list = [4, 16]
+    elif benchmark_name == "stream_0":
+        res_name = "stream_0_2MB_combo"
+        benchmark_list = []
+        benchmark_list.append("stream_0_")
+        local_dram_list = ["2MB"]
+        bw_scalefactor_list = [4]
+    elif benchmark_name == "hpcg":
+        res_name = "hpcg_32MB_comparison"
+        benchmark_list = []
+        benchmark_list.append("hpcg_")
+        local_dram_list = ["32MB"]
+        bw_scalefactor_list = [4]
+    elif benchmark_name == "sls":
+        res_name = "sls_16MB_comparison"
+        benchmark_list = []
+        benchmark_list.append("sls_")
+        local_dram_list = ["16MB"]
+        bw_scalefactor_list = [4]
 
     return res_name, benchmark_list, local_dram_list, bw_scalefactor_list
 
