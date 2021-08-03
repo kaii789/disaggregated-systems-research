@@ -57,18 +57,7 @@ if __name__ == "__main__":
     }
 
     compression_series_experiment_run_configs = [
-         # 10) Remote on, PQ = 0
-        ExperimentRunConfig(
-            [
-                ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
-                ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
-                ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
-                ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
-            ]
-        ),
-
- 
-         # 11) Remote on, PQ = 0, compression = 'bdi' 
+        # 11) Remote on, PQ = 0, compression = 'bdi' 
         ExperimentRunConfig(
             [
                 ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
@@ -81,19 +70,19 @@ if __name__ == "__main__":
             ]
         ),
 
- 
-         # 14) Remote on, PQ = 0, compression = 'lz4', compression_latency = 0
+         # 11) Remote on, PQ = 0, compression = 'fpc' 
         ExperimentRunConfig(
             [
                 ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
                 ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
                 ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
                 ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
-                ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lz4"),
-                ConfigEntry("perf_model/dram/compression_model/lz4", "compression_latency", "0"),
-                ConfigEntry("perf_model/dram/compression_model/lz4", "decompression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "fpc"),
+                ConfigEntry("perf_model/dram/compression_model/bdi", "compression_granularity", "-1"),
+                ConfigEntry("perf_model/dram/compression_model/bdi", "use_additional_options", "false"),
             ]
         ),
+
 
         # 17) Remote on, PQ = 0, compression = 'lz78', compression_latency = 0
         ExperimentRunConfig(
@@ -121,11 +110,85 @@ if __name__ == "__main__":
                 ConfigEntry("perf_model/dram/compression_model/lz78", "compression_latency", "0"),
                 ConfigEntry("perf_model/dram/compression_model/lz78", "decompression_latency", "0"),
                 ConfigEntry("perf_model/dram/compression_model/lz78", "word_size" , "1"),
-                ConfigEntry("perf_model/dram/compression_model/lz78", "dictionary_size" , "1024"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "dictionary_size" , "256"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "entry_size" , "4"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "size_limit" , "true"),
+            ]
+        ),
+
+ 
+        # 17) Remote on, PQ = 0, compression = 'lz78', compression_latency = 0
+        ExperimentRunConfig(
+            [
+                ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
+                ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+                ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+                ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+                ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lz78"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "compression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "decompression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "word_size" , "1"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "dictionary_size" , "256"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "entry_size" , "16"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "size_limit" , "true"),
+            ]
+        ),
+
+ 
+        # 17) Remote on, PQ = 0, compression = 'lz78', compression_latency = 0
+        ExperimentRunConfig(
+            [
+                ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
+                ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+                ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+                ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+                ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lz78"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "compression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "decompression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "word_size" , "1"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "dictionary_size" , "256"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "entry_size" , "32"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "size_limit" , "true"),
+            ]
+        ),
+
+
+ 
+        # 17) Remote on, PQ = 0, compression = 'lz78', compression_latency = 0
+        ExperimentRunConfig(
+            [
+                ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
+                ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+                ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+                ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+                ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lz78"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "compression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "decompression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "word_size" , "1"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "dictionary_size" , "256"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "entry_size" , "64"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "size_limit" , "true"),
+            ]
+        ),
+
+ 
+        # 17) Remote on, PQ = 0, compression = 'lz78', compression_latency = 0
+        ExperimentRunConfig(
+            [
+                ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
+                ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+                ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+                ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+                ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lz78"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "compression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "decompression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "word_size" , "1"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "dictionary_size" , "256"),
                 ConfigEntry("perf_model/dram/compression_model/lz78", "entry_size" , "96"),
                 ConfigEntry("perf_model/dram/compression_model/lz78", "size_limit" , "true"),
             ]
         ),
+
 
         # 17) Remote on, PQ = 0, compression = 'lz78', compression_latency = 0
         ExperimentRunConfig(
@@ -135,8 +198,267 @@ if __name__ == "__main__":
                 ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
                 ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
                 ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lz78"),
-                ConfigEntry("perf_model/dram/compression_model/lz78", "compression_latency", "3"),
-                ConfigEntry("perf_model/dram/compression_model/lz78", "decompression_latency", "3"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "compression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "decompression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "word_size" , "1"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "dictionary_size" , "512"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "entry_size" , "4"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "size_limit" , "true"),
+            ]
+        ),
+
+ 
+        # 17) Remote on, PQ = 0, compression = 'lz78', compression_latency = 0
+        ExperimentRunConfig(
+            [
+                ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
+                ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+                ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+                ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+                ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lz78"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "compression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "decompression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "word_size" , "1"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "dictionary_size" , "512"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "entry_size" , "16"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "size_limit" , "true"),
+            ]
+        ),
+
+ 
+        # 17) Remote on, PQ = 0, compression = 'lz78', compression_latency = 0
+        ExperimentRunConfig(
+            [
+                ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
+                ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+                ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+                ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+                ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lz78"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "compression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "decompression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "word_size" , "1"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "dictionary_size" , "512"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "entry_size" , "32"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "size_limit" , "true"),
+            ]
+        ),
+
+
+ 
+        # 17) Remote on, PQ = 0, compression = 'lz78', compression_latency = 0
+        ExperimentRunConfig(
+            [
+                ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
+                ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+                ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+                ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+                ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lz78"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "compression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "decompression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "word_size" , "1"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "dictionary_size" , "512"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "entry_size" , "64"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "size_limit" , "true"),
+            ]
+        ),
+
+ 
+        # 17) Remote on, PQ = 0, compression = 'lz78', compression_latency = 0
+        ExperimentRunConfig(
+            [
+                ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
+                ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+                ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+                ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+                ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lz78"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "compression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "decompression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "word_size" , "1"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "dictionary_size" , "512"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "entry_size" , "96"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "size_limit" , "true"),
+            ]
+        ),
+
+
+
+
+        # 17) Remote on, PQ = 0, compression = 'lz78', compression_latency = 0
+        ExperimentRunConfig(
+            [
+                ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
+                ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+                ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+                ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+                ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lz78"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "compression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "decompression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "word_size" , "1"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "dictionary_size" , "768"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "entry_size" , "4"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "size_limit" , "true"),
+            ]
+        ),
+
+ 
+        # 17) Remote on, PQ = 0, compression = 'lz78', compression_latency = 0
+        ExperimentRunConfig(
+            [
+                ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
+                ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+                ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+                ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+                ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lz78"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "compression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "decompression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "word_size" , "1"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "dictionary_size" , "768"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "entry_size" , "16"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "size_limit" , "true"),
+            ]
+        ),
+
+ 
+        # 17) Remote on, PQ = 0, compression = 'lz78', compression_latency = 0
+        ExperimentRunConfig(
+            [
+                ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
+                ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+                ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+                ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+                ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lz78"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "compression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "decompression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "word_size" , "1"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "dictionary_size" , "768"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "entry_size" , "32"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "size_limit" , "true"),
+            ]
+        ),
+
+
+ 
+        # 17) Remote on, PQ = 0, compression = 'lz78', compression_latency = 0
+        ExperimentRunConfig(
+            [
+                ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
+                ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+                ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+                ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+                ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lz78"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "compression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "decompression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "word_size" , "1"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "dictionary_size" , "768"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "entry_size" , "64"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "size_limit" , "true"),
+            ]
+        ),
+
+ 
+        # 17) Remote on, PQ = 0, compression = 'lz78', compression_latency = 0
+        ExperimentRunConfig(
+            [
+                ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
+                ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+                ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+                ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+                ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lz78"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "compression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "decompression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "word_size" , "1"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "dictionary_size" , "768"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "entry_size" , "96"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "size_limit" , "true"),
+            ]
+        ),
+
+
+
+
+        # 17) Remote on, PQ = 0, compression = 'lz78', compression_latency = 0
+        ExperimentRunConfig(
+            [
+                ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
+                ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+                ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+                ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+                ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lz78"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "compression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "decompression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "word_size" , "1"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "dictionary_size" , "1024"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "entry_size" , "4"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "size_limit" , "true"),
+            ]
+        ),
+
+ 
+        # 17) Remote on, PQ = 0, compression = 'lz78', compression_latency = 0
+        ExperimentRunConfig(
+            [
+                ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
+                ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+                ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+                ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+                ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lz78"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "compression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "decompression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "word_size" , "1"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "dictionary_size" , "1024"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "entry_size" , "16"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "size_limit" , "true"),
+            ]
+        ),
+
+ 
+        # 17) Remote on, PQ = 0, compression = 'lz78', compression_latency = 0
+        ExperimentRunConfig(
+            [
+                ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
+                ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+                ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+                ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+                ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lz78"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "compression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "decompression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "word_size" , "1"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "dictionary_size" , "1024"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "entry_size" , "32"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "size_limit" , "true"),
+            ]
+        ),
+
+
+ 
+        # 17) Remote on, PQ = 0, compression = 'lz78', compression_latency = 0
+        ExperimentRunConfig(
+            [
+                ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
+                ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+                ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+                ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+                ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lz78"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "compression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "decompression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "word_size" , "1"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "dictionary_size" , "1024"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "entry_size" , "64"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "size_limit" , "true"),
+            ]
+        ),
+
+ 
+        # 17) Remote on, PQ = 0, compression = 'lz78', compression_latency = 0
+        ExperimentRunConfig(
+            [
+                ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
+                ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+                ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+                ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+                ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lz78"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "compression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "decompression_latency", "0"),
                 ConfigEntry("perf_model/dram/compression_model/lz78", "word_size" , "1"),
                 ConfigEntry("perf_model/dram/compression_model/lz78", "dictionary_size" , "1024"),
                 ConfigEntry("perf_model/dram/compression_model/lz78", "entry_size" , "96"),
@@ -145,59 +467,103 @@ if __name__ == "__main__":
         ),
 
 
-        # 17) Remote on, PQ = 0, compression = 'lzw', compression_latency = 0
+
+        # 17) Remote on, PQ = 0, compression = 'lz78', compression_latency = 0
         ExperimentRunConfig(
             [
                 ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
                 ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
                 ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
                 ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
-                ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lzw"),
-                ConfigEntry("perf_model/dram/compression_model/lzw", "compression_latency", "0"),
-                ConfigEntry("perf_model/dram/compression_model/lzw", "decompression_latency", "0"),
-                ConfigEntry("perf_model/dram/compression_model/lzw", "word_size" , "1"),
-                ConfigEntry("perf_model/dram/compression_model/lzw", "size_limit" , "false"),
+                ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lz78"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "compression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "decompression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "word_size" , "1"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "dictionary_size" , "1280"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "entry_size" , "4"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "size_limit" , "true"),
             ]
         ),
 
-
-        # 17) Remote on, PQ = 0, compression = 'lzw', compression_latency = 0
+ 
+        # 17) Remote on, PQ = 0, compression = 'lz78', compression_latency = 0
         ExperimentRunConfig(
             [
                 ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
                 ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
                 ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
                 ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
-                ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lzw"),
-                ConfigEntry("perf_model/dram/compression_model/lzw", "compression_latency", "0"),
-                ConfigEntry("perf_model/dram/compression_model/lzw", "decompression_latency", "0"),
-                ConfigEntry("perf_model/dram/compression_model/lzw", "word_size" , "1"),
-                ConfigEntry("perf_model/dram/compression_model/lzw", "dictionary_size" , "1024"),
-                ConfigEntry("perf_model/dram/compression_model/lzw", "entry_size" , "96"),
-                ConfigEntry("perf_model/dram/compression_model/lzw", "size_limit" , "true"),
+                ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lz78"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "compression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "decompression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "word_size" , "1"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "dictionary_size" , "1280"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "entry_size" , "16"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "size_limit" , "true"),
             ]
         ),
 
-
-        # 17) Remote on, PQ = 0, compression = 'lzw', compression_latency = 0
+ 
+        # 17) Remote on, PQ = 0, compression = 'lz78', compression_latency = 0
         ExperimentRunConfig(
             [
                 ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
                 ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
                 ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
                 ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
-                ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lzw"),
-                ConfigEntry("perf_model/dram/compression_model/lzw", "compression_latency", "3"),
-                ConfigEntry("perf_model/dram/compression_model/lzw", "decompression_latency", "3"),
-                ConfigEntry("perf_model/dram/compression_model/lzw", "word_size" , "1"),
-                ConfigEntry("perf_model/dram/compression_model/lzw", "dictionary_size" , "1024"),
-                ConfigEntry("perf_model/dram/compression_model/lzw", "entry_size" , "96"),
-                ConfigEntry("perf_model/dram/compression_model/lzw", "size_limit" , "true"),
+                ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lz78"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "compression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "decompression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "word_size" , "1"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "dictionary_size" , "1280"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "entry_size" , "32"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "size_limit" , "true"),
             ]
         ),
 
 
  
+        # 17) Remote on, PQ = 0, compression = 'lz78', compression_latency = 0
+        ExperimentRunConfig(
+            [
+                ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
+                ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+                ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+                ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+                ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lz78"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "compression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "decompression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "word_size" , "1"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "dictionary_size" , "1280"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "entry_size" , "64"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "size_limit" , "true"),
+            ]
+        ),
+
+ 
+        # 17) Remote on, PQ = 0, compression = 'lz78', compression_latency = 0
+        ExperimentRunConfig(
+            [
+                ConfigEntry("perf_model/dram", "enable_remote_mem", "true"),
+                ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+                ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+                ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+                ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lz78"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "compression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "decompression_latency", "0"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "word_size" , "1"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "dictionary_size" , "1280"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "entry_size" , "96"),
+                ConfigEntry("perf_model/dram/compression_model/lz78", "size_limit" , "true"),
+            ]
+        ),
+
+
+
+
+
+
+
 
 
 
