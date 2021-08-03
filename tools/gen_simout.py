@@ -259,6 +259,7 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
       ('  avg compression ratio', 'compression.avg-compression-ratio', str),
       ('  avg compression latency(ns)', 'compression.avg-compression-latency', format_ns(2)),
       ('  avg decompression latency(ns)', 'compression.avg-decompression-latency', format_ns(2)),
+      ('  overflowed_pages', 'compression.num_overflowed_pages', str),
     ]
   if cacheline_bytes_saved != 0:
     template += [

@@ -2,12 +2,14 @@
 #include <zlib.h>
 #include "utils.h"
 #include "config.hpp"
+#include "stats.h"
 
 CompressionModelZlib::CompressionModelZlib(String name, UInt32 id, UInt32 page_size, UInt32 cache_line_size)
     : m_name(name)
     , m_page_size(page_size)
     , m_cache_line_size(cache_line_size)
     , m_compression_granularity(Sim()->getCfg()->getInt("perf_model/dram/compression_model/zlib/compression_granularity"))
+    , m_num_overflowed_pages(0)
 {
     // Set compression/decompression cycle latencies if configured
     if (Sim()->getCfg()->getInt("perf_model/dram/compression_model/zlib/compression_latency") != -1)
@@ -21,6 +23,8 @@ CompressionModelZlib::CompressionModelZlib(String name, UInt32 id, UInt32 page_s
     m_cacheline_count = m_page_size / m_cache_line_size;
     m_data_buffer = new char[m_page_size];
     m_compressed_data_buffer = new char[m_page_size];
+
+    registerStatsMetric("compression", id, "num_overflowed_pages", &m_num_overflowed_pages);
 }
 
 CompressionModelZlib::~CompressionModelZlib()
@@ -55,8 +59,10 @@ CompressionModelZlib::compress(IntPtr addr, size_t data_size, core_id_t core_id,
             printf("[Zlib] Something's wrong: %d code, %d bytes", res, total_bytes);
     }
 
-    if (total_bytes > m_page_size)
-        printf("[Zlib] Compressed size is bigger than page: %d bytes", total_bytes);
+    if (total_bytes > m_page_size) {
+        m_num_overflowed_pages++;
+        //printf("[Zlib] Compressed size is bigger than page: %d bytes", total_bytes);
+    }
 
     // Use total bytes instead of compressed cache lines for decompression
     *compressed_cache_lines = total_bytes;
@@ -70,7 +76,7 @@ CompressionModelZlib::compress(IntPtr addr, size_t data_size, core_id_t core_id,
         return SubsecondTime::Zero();
     }
 
-    // 10 GB/s compression rate
+    // 10 GB/s compression rate - TODO FIXME
     double compression_latency = 1 / (double)((10 * (UInt64)1000000000) / (double)m_page_size); // In seconds
 
     // printf("[Zlib] Compression latency: %f ns\n", compression_latency * 1000000000);
@@ -85,7 +91,7 @@ SubsecondTime
 CompressionModelZlib::decompress(IntPtr addr, UInt32 compressed_cache_lines, core_id_t core_id)
 {
     int compressed_size = compressed_cache_lines;
-    // 10 GB/s decompression rate
+    // 10 GB/s compression rate - TODO FIXME
     double decompression_latency = 1 / (double)((10 * (UInt64)1000000000) / (double)compressed_size); // In seconds
     // printf("[Zlib] %f ns\n", decompression_latency * 1000000000);
 

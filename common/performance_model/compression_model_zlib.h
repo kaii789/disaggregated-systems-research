@@ -24,6 +24,7 @@ private:
     char *m_data_buffer;
     char *m_compressed_data_buffer;
     UInt32 m_cacheline_count;
+    UInt64 m_num_overflowed_pages;
 
     // Only used for ideal latency
     UInt32 m_compression_latency = 30;
