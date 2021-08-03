@@ -56,7 +56,7 @@ CompressionModelZlib::compress(IntPtr addr, size_t data_size, core_id_t core_id,
         if (res == Z_OK)
             total_bytes += compressed_size;
         else
-            printf("[Zlib] Something's wrong: %d code, %d bytes", res, total_bytes);
+            printf("[Zlib] Something's wrong: %d code, %d bytes\n", res, total_bytes);
     }
 
     if (total_bytes > m_page_size) {
