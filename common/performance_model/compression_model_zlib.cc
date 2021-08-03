@@ -79,8 +79,7 @@ CompressionModelZlib::compress(IntPtr addr, size_t data_size, core_id_t core_id,
         return SubsecondTime::Zero();
     }
 
-    // 10 GB/s compression rate - TODO FIXME
-    double compression_latency = 1 / (double)((10 * (UInt64)1000000000) / (double)m_page_size); // In seconds
+    double compression_latency = 1 / (double)((m_compression_latency * (UInt64)1000000000) / (double)m_page_size); // In seconds
 
     // printf("[Zlib] Compression latency: %f ns\n", compression_latency * 1000000000);
     //assert(total_bytes <= m_page_size && "[Zlib] Wrong compression!\n");
@@ -94,8 +93,7 @@ SubsecondTime
 CompressionModelZlib::decompress(IntPtr addr, UInt32 compressed_cache_lines, core_id_t core_id)
 {
     int compressed_size = compressed_cache_lines;
-    // 10 GB/s compression rate - TODO FIXME
-    double decompression_latency = 1 / (double)((10 * (UInt64)1000000000) / (double)compressed_size); // In seconds
+    double decompression_latency = 1 / (double)((m_decompression_latency * (UInt64)1000000000) / (double)compressed_size); // In seconds
     // printf("[Zlib] %f ns\n", decompression_latency * 1000000000);
 
     if (m_decompression_latency == 0)
@@ -125,7 +123,7 @@ CompressionModelZlib::compress_multipage(std::vector<UInt64> addr_list, UInt32 n
     uLongf compressed_size = 0;
     compress2((Bytef*)&multipage_compressed_buffer, &compressed_size, (Bytef*)&multipage_data_buffer, (uLongf)m_compression_granularity, Z_DEFAULT_COMPRESSION);
     // 10 GB/s compression rate
-    double compression_latency = 1 / (double)((10 * (UInt64)1000000000) / (double)(m_page_size * num_pages)); // In seconds
+    double compression_latency = 1 / (double)((m_compression_latency * (UInt64)1000000000) / (double)(m_page_size * num_pages)); // In seconds
 
     *compressed_multipage_size = compressed_size;
 
@@ -141,7 +139,7 @@ SubsecondTime
 CompressionModelZlib::decompress_multipage(std::vector<UInt64> addr_list, UInt32 num_pages, core_id_t core_id, std::map<UInt64, UInt32> *address_to_num_cache_lines)
 {
     // 10 GB/s decompression rate
-    double decompression_latency = 1 / (double)((10 * (UInt64)1000000000) / (double)(m_page_size * num_pages)); // In seconds
+    double decompression_latency = 1 / (double)((m_decompression_latency * (UInt64)1000000000) / (double)(m_page_size * num_pages)); // In seconds
 
     if (m_decompression_latency == 0)
     {
