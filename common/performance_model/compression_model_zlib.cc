@@ -53,10 +53,13 @@ CompressionModelZlib::compress(IntPtr addr, size_t data_size, core_id_t core_id,
     uLongf compressed_size = m_compression_granularity;
     for (int i = 0; i < m_page_size / (UInt32)m_compression_granularity; i++) {
         int res = compress2((Bytef*)&m_compressed_data_buffer[total_bytes], &compressed_size, (Bytef*)&m_data_buffer[m_compression_granularity * i], (uLongf)m_compression_granularity, Z_DEFAULT_COMPRESSION);
-        if (res == Z_OK)
+        if (res == Z_OK) {
             total_bytes += compressed_size;
-        else
+        }
+        else {
+            total_bytes += m_page_size;
             printf("[Zlib] Something's wrong: %d code, %d bytes\n", res, total_bytes);
+        }
     }
 
     if (total_bytes > m_page_size) {
