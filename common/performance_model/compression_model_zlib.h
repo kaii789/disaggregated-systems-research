@@ -1,13 +1,13 @@
-#ifndef __COMPRESSION_MODEL_DEFLATE_H__
-#define __COMPRESSION_MODEL_DEFLATE_H__
+#ifndef __COMPRESSION_MODEL_ZLIB_H__
+#define __COMPRESSION_MODEL_ZLIB_H__
 
 #include "compression_model.h"
 
-class CompressionModelDeflate : public CompressionModel
+class CompressionModelZlib : public CompressionModel
 {
 public:
-   CompressionModelDeflate(String name, UInt32 id, UInt32 page_size, UInt32 cache_line_size);
-   ~CompressionModelDeflate();
+   CompressionModelZlib(String name, UInt32 id, UInt32 page_size, UInt32 cache_line_size);
+   ~CompressionModelZlib();
 
    SubsecondTime compress(IntPtr addr, size_t data_size, core_id_t core_id, UInt32 *compressed_page_size, UInt32 *compressed_cache_lines);
    SubsecondTime decompress(IntPtr addr, UInt32 compressed_cache_lines, core_id_t core_id);
@@ -36,4 +36,4 @@ private:
     char *multipage_compressed_buffer;
 };
 
-#endif /* __COMPRESSION_MODEL_DEFLATE_H__ */
+#endif /* __COMPRESSION_MODEL_ZLIB_H__ */
