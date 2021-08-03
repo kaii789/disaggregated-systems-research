@@ -55,7 +55,7 @@ CompressionModelBDI::~CompressionModelBDI()
 void
 CompressionModelBDI::finalizeStats()
 {
-    for (UInt32 i = 0; i < 13; i++) {
+    for (UInt32 i = 0; i < 16; i++) {
         m_total_compressed += m_compress_options[i];
     }
 }

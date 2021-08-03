@@ -7,17 +7,18 @@ CompressionModelLZBDI::CompressionModelLZBDI(String name, UInt32 id, UInt32 page
     : m_name(name)
     , m_page_size(page_size)
     , m_cache_line_size(cache_line_size)
-    , m_compression_granularity(Sim()->getCfg()->getInt("perf_model/dram/compression_model/bdi/compression_granularity"))
-    , use_additional_options(Sim()->getCfg()->getBool("perf_model/dram/compression_model/bdi/use_additional_options"))
+    , m_compression_granularity(Sim()->getCfg()->getInt("perf_model/dram/compression_model/lzbdi/compression_granularity"))
+    , use_additional_options(Sim()->getCfg()->getBool("perf_model/dram/compression_model/lzbdi/use_additional_options"))
     , m_total_compressed(0)
 {
     m_options = (use_additional_options) ? 16 : 11;
+    m_index_bits = 4;
 
     // Set compression/decompression cycle latencies if configured
-    if (Sim()->getCfg()->getInt("perf_model/dram/compression_model/bdi/compression_latency") != -1)
-        m_compression_latency = Sim()->getCfg()->getInt("perf_model/dram/compression_model/bdi/compression_latency");
-    if (Sim()->getCfg()->getInt("perf_model/dram/compression_model/bdi/decompression_latency") != -1)
-        m_decompression_latency = Sim()->getCfg()->getInt("perf_model/dram/compression_model/bdi/decompression_latency");
+    if (Sim()->getCfg()->getInt("perf_model/dram/compression_model/lzbdi/compression_latency") != -1)
+        m_compression_latency = Sim()->getCfg()->getInt("perf_model/dram/compression_model/lzbdi/compression_latency");
+    if (Sim()->getCfg()->getInt("perf_model/dram/compression_model/lzbdi/decompression_latency") != -1)
+        m_decompression_latency = Sim()->getCfg()->getInt("perf_model/dram/compression_model/lzbdi/decompression_latency");
 
     if (m_compression_granularity != -1) {
         m_cache_line_size = m_compression_granularity;
@@ -29,6 +30,7 @@ CompressionModelLZBDI::CompressionModelLZBDI(String name, UInt32 id, UInt32 page
     m_compressed_cache_line_sizes = new UInt32[m_cacheline_count];
 
     // Register stats for compression_options
+    registerStatsMetric("compression", id, "num_overflowed_pages", &m_num_overflowed_pages);
     registerStatsMetric("compression", id, "bdi_total_compressed", &(m_total_compressed));
     for (UInt32 i = 0; i < 13; i++) {
         String stat_name = "bdi_usage_option-";
@@ -55,7 +57,7 @@ CompressionModelLZBDI::~CompressionModelLZBDI()
 void
 CompressionModelLZBDI::finalizeStats()
 {
-    for (UInt32 i = 0; i < 13; i++) {
+    for (UInt32 i = 0; i < 16; i++) {
         m_total_compressed += m_compress_options[i];
     }
 }
@@ -83,6 +85,12 @@ CompressionModelLZBDI::compress(IntPtr addr, size_t data_size, core_id_t core_id
         total_bytes += m_compressed_cache_line_sizes[i];
         if (m_compressed_cache_line_sizes[i] < m_cache_line_size)
             total_compressed_cache_lines++;
+    }
+    UInt32 index_bytes = (m_index_bits * m_cacheline_count) / 8;
+    total_bytes  += index_bytes; // add indexing bytes to find the compresison pattern used
+    if (total_bytes > m_page_size) {
+        m_num_overflowed_pages++;
+        total_bytes = m_page_size; // if compressed data is larger than the page_size, we sent the page in uncompressed format
     }
     assert(total_bytes <= m_page_size && "[LZBDI] Wrong compression!");
   

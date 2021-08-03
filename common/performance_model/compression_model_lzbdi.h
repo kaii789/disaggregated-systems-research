@@ -34,6 +34,7 @@ private:
     UInt32 *m_compressed_cache_line_sizes;
     UInt32 m_cacheline_count;
     UInt32 m_options;
+    UInt32 m_index_bits;
     struct m_compress_info {
        bool is_compressible; 
        UInt32 compressed_size; // In bytes
@@ -59,6 +60,7 @@ private:
 
     // Statistics
     UInt64 m_total_compressed;
+    UInt64 m_num_overflowed_pages;
     UInt64 m_compress_options[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     UInt64 m_bytes_saved_per_option[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
