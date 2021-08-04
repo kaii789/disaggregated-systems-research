@@ -15,8 +15,8 @@ CompressionModelAdaptive::CompressionModelAdaptive(String name, UInt32 id, UInt3
 
     m_cacheline_compression_scheme = Sim()->getCfg()->getString("perf_model/dram/compression_model/adaptive/cacheline_compression_scheme");
     m_dict_compression_scheme = Sim()->getCfg()->getString("perf_model/dram/compression_model/adaptive/dict_compression_scheme");
-    m_cacheline_compression_model = CompressionModel::create("Cacheline Compression Model", id, m_cache_line_size, m_cache_line_size, m_cacheline_compression_scheme);
-    m_dict_compression_model = CompressionModel::create("Dictionary Compression Model", id, m_cache_line_size, m_cache_line_size, m_dict_compression_scheme);
+    m_cacheline_compression_model = CompressionModel::create("Cacheline Compression Model", id, m_page_size, m_cache_line_size, m_cacheline_compression_scheme);
+    m_dict_compression_model = CompressionModel::create("Dictionary Compression Model", id, m_page_size, m_cache_line_size, m_dict_compression_scheme);
 
     m_lower_bandwidth_thredhold = Sim()->getCfg()->getFloat("perf_model/dram/compression_model/adaptive/lower_bandwidth_threshold");
     m_upper_bandwidth_thredhold = Sim()->getCfg()->getFloat("perf_model/dram/compression_model/adaptive/upper_bandwidth_threshold");
