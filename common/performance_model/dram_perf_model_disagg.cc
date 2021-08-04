@@ -684,6 +684,11 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     if (m_use_compression)
     {
         if (m_r_cacheline_gran) {
+            if (m_r_partition_queues == 1)
+                m_compression_model->update_bandwidth_utilization(m_data_movement_2->getQueueUtilizationPercentage(t_now));
+            else
+                m_compression_model->update_bandwidth_utilization(m_data_movement->getQueueUtilizationPercentage(t_now));
+
             UInt32 compressed_cache_lines;
             cacheline_compression_latency = m_compression_model->compress(phys_page, m_cache_line_size, m_core_id, &size, &compressed_cache_lines);
             if (m_cache_line_size > size)
@@ -696,6 +701,11 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             m_total_compression_latency += cacheline_compression_latency;
             t_now += cacheline_compression_latency;
         } else if (m_use_cacheline_compression) {
+            if (m_r_partition_queues == 1)
+                m_cacheline_compression_model->update_bandwidth_utilization(m_data_movement_2->getQueueUtilizationPercentage(t_now));
+            else
+                m_cacheline_compression_model->update_bandwidth_utilization(m_data_movement->getQueueUtilizationPercentage(t_now));
+
             UInt32 compressed_cache_lines;
             cacheline_compression_latency = m_cacheline_compression_model->compress(phys_page, m_cache_line_size, m_core_id, &size, &compressed_cache_lines);
             if (m_cache_line_size > size)
@@ -837,13 +847,15 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             UInt32 page_size = m_page_size;
             if (m_use_compression)
             {
+                m_compression_model->update_bandwidth_utilization(m_data_movement->getQueueUtilizationPercentage(t_now));
+
                 UInt32 compressed_cache_lines;
                 page_compression_latency = m_compression_model->compress(phys_page, m_page_size, m_core_id, &page_size, &compressed_cache_lines);
                 if (m_page_size > page_size)
                     bytes_saved += m_page_size - page_size;
                 else
                     bytes_saved -= page_size - m_page_size;
-         
+
                 address_to_compressed_size[phys_page] = page_size;
                 address_to_num_cache_lines[phys_page] = compressed_cache_lines;
                 m_total_compression_latency += page_compression_latency;
@@ -1322,6 +1334,8 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
             UInt32 size = m_r_cacheline_gran ? m_cache_line_size : m_page_size;
             if (m_use_compression)
             {
+                m_compression_model->update_bandwidth_utilization(m_data_movement->getQueueUtilizationPercentage(t_now));
+
                 UInt32 gran_size = size;
                 UInt32 compressed_cache_lines;
                 SubsecondTime compression_latency = m_compression_model->compress(evicted_page, gran_size, m_core_id, &size, &compressed_cache_lines);
@@ -1370,6 +1384,8 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
             UInt32 size = m_r_cacheline_gran ? m_cache_line_size : m_page_size;
             if (m_use_compression)
             {
+                m_compression_model->update_bandwidth_utilization(m_data_movement->getQueueUtilizationPercentage(t_now));
+
                 UInt32 gran_size = size;
                 UInt32 compressed_cache_lines;
                 SubsecondTime compression_latency = m_compression_model->compress(evicted_page, gran_size, m_core_id, &size, &compressed_cache_lines);
@@ -1451,6 +1467,8 @@ DramPerfModelDisagg::possiblyPrefetch(UInt64 phys_page, SubsecondTime t_now, cor
         SubsecondTime page_compression_latency = SubsecondTime::Zero();  // when page compression is not enabled, this is always 0
         if (m_use_compression)
         {
+            m_compression_model->update_bandwidth_utilization(m_data_movement->getQueueUtilizationPercentage(t_now));
+
             UInt32 gran_size = size;
             UInt32 compressed_cache_lines;
             page_compression_latency = m_compression_model->compress(pref_page, gran_size, m_core_id, &size, &compressed_cache_lines);
