@@ -212,7 +212,7 @@ def run_ligra(application_name, ligra_input_selection, num_MB):
     ligra_input_file = ligra_input_to_file[ligra_input_selection]
     net_lat = 120
     for remote_init in ["false"]:  # "false"
-        for bw_scalefactor in [16]:
+        for bw_scalefactor in [4, 16]:
             localdram_size_str = "{}MB".format(num_MB)
             command_str = ligra_base_str_options.format(
                 application_name,
@@ -250,7 +250,7 @@ def run_tinynet(model_type):
     experiments = []
     net_lat = 120
     for num_MB in [2]:
-        for bw_scalefactor in [16]:
+        for bw_scalefactor in [4, 16]:
             localdram_size_str = "{}MB".format(num_MB)
             command_str = darknet_base_str_options.format(
                 model_type,
@@ -282,7 +282,7 @@ def run_stream(type):
     experiments = []
     net_lat = 120
     for num_MB in [2]:
-        for bw_scalefactor in [16]:
+        for bw_scalefactor in [4, 16]:
             localdram_size_str = "{}MB".format(num_MB)
             command_str = stream_base_options.format(
                 type,
