@@ -234,9 +234,9 @@ QueueModelWindowedMG1Remote::computeQueueDelayNoEffect(SubsecondTime pkt_time, S
 }
 
 
-// Also include the num_bytes parameter
+// Also include the num_bytes parameter; last two arguments currently not used
 SubsecondTime
-QueueModelWindowedMG1Remote::computeQueueDelayTrackBytes(SubsecondTime pkt_time, SubsecondTime processing_time, UInt64 num_bytes, request_t request_type, core_id_t requester)
+QueueModelWindowedMG1Remote::computeQueueDelayTrackBytes(SubsecondTime pkt_time, SubsecondTime processing_time, UInt64 num_bytes, request_t request_type, core_id_t requester, bool is_inflight_page, UInt64 phys_page)
 {
    SubsecondTime t_queue = SubsecondTime::Zero();
 
