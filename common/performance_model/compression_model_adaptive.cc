@@ -1,6 +1,7 @@
 #include "compression_model_adaptive.h"
 #include "utils.h"
 #include "config.hpp"
+#include "stats.h"
 
 CompressionModelAdaptive::CompressionModelAdaptive(String name, UInt32 id, UInt32 page_size, UInt32 cache_line_size)
     : m_name(name)
@@ -18,8 +19,11 @@ CompressionModelAdaptive::CompressionModelAdaptive(String name, UInt32 id, UInt3
     m_cacheline_compression_model = CompressionModel::create("Cacheline Compression Model", id, m_page_size, m_cache_line_size, m_cacheline_compression_scheme);
     m_dict_compression_model = CompressionModel::create("Dictionary Compression Model", id, m_page_size, m_cache_line_size, m_dict_compression_scheme);
 
-    m_lower_bandwidth_thredhold = Sim()->getCfg()->getFloat("perf_model/dram/compression_model/adaptive/lower_bandwidth_threshold");
-    m_upper_bandwidth_thredhold = Sim()->getCfg()->getFloat("perf_model/dram/compression_model/adaptive/upper_bandwidth_threshold");
+    m_lower_bandwidth_threshold = Sim()->getCfg()->getFloat("perf_model/dram/compression_model/adaptive/lower_bandwidth_threshold");
+    m_upper_bandwidth_threshold = Sim()->getCfg()->getFloat("perf_model/dram/compression_model/adaptive/upper_bandwidth_threshold");
+
+    registerStatsMetric("compression", id, "adaptive-cacheline-compression-count", &m_cacheline_compression_count);
+    registerStatsMetric("compression", id, "adaptive-dict-compression-count", &m_dict_compression_count);
 
     m_cacheline_count = m_page_size / m_cache_line_size;
 }
@@ -42,13 +46,15 @@ CompressionModelAdaptive::compress(IntPtr addr, size_t data_size, core_id_t core
     SubsecondTime total_compression_latency = SubsecondTime::Zero();
 
     // Compress depending on bandwidth
-    if (m_bandwidth_utilization >= m_lower_bandwidth_thredhold && m_bandwidth_utilization < m_upper_bandwidth_thredhold) {
+    if (m_bandwidth_utilization >= m_lower_bandwidth_threshold && m_bandwidth_utilization < m_upper_bandwidth_threshold) {
         total_compression_latency = m_cacheline_compression_model->compress(addr, data_size, core_id, &compressed_size, &compressed_cachelines);
         m_addr_to_scheme[addr] = m_cacheline_compression_scheme;
+        m_cacheline_compression_count += 1;
     }
-    else if (m_bandwidth_utilization >= m_upper_bandwidth_thredhold) {
+    else if (m_bandwidth_utilization >= m_upper_bandwidth_threshold) {
         total_compression_latency = m_dict_compression_model->compress(addr, data_size, core_id, &compressed_size, &compressed_cachelines);
         m_addr_to_scheme[addr] = m_dict_compression_scheme;
+        m_dict_compression_count += 1;
     }
 
     // assert(compressed_size <= m_page_size && "[Adaptive] Wrong compression!");

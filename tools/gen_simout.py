@@ -313,7 +313,11 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
         template.append(('    {}% percentile - accesses'.format(i), 'compression.lz-accesses-count-p{}'.format(i), str))
         template.append(('    {}% percentile - max_entry_bytes'.format(i), 'compression.lz-max_entry_bytes-count-p{}'.format(i), str))
 
-
+  if 'compression.adaptive-cacheline-compression-count' in results:
+    template += [
+      ('  adaptive cacheline compression count', 'compression.adaptive-cacheline-compression-count', str),
+      ('  adaptive dict compression count', 'compression.adaptive-dict-compression-count', str),
+    ]
 
   # if 'dram.redundant-moves-temp1-time-savings' in results:
   template.extend([
