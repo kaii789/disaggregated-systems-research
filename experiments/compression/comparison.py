@@ -31,7 +31,16 @@ config_list = [
             automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "bdi"),
         ]
     ),
-    # 2) FPC
+    # 2) LZBDI
+    automation.ExperimentRunConfig(
+        [
+            automation.ConfigEntry("perf_model/l3_cache", "cache_size", "512"),
+            automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+            automation.ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+            automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lzbdi"),
+        ]
+    ),
+    # 3) FPC
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "512"),
@@ -40,7 +49,7 @@ config_list = [
             automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "fpc"),
         ]
     ),
-    # 3) LZ78
+    # 4) LZ78
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "512"),
@@ -49,7 +58,7 @@ config_list = [
             automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lz78"),
         ]
     ),
-    # 4) LZW
+    # 5) LZW
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "512"),
@@ -58,7 +67,7 @@ config_list = [
             automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lzw"),
         ]
     ),
-    # 5) Deflate
+    # 6) Deflate
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "512"),
@@ -576,6 +585,7 @@ experiments = []
 # experiments.extend(run_ligra("Components", "regular_input", 4))
 # experiments.extend(run_nw("2048"))
 # experiments.extend(run_sls())
+# experiments.extend(run_ligra("PageRank", "regular_input", 8))
 
 log_filename = "run-sniper-repeat2_1.log"
 num = 2
