@@ -189,6 +189,11 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     if 'dram-datamovement-queue.total-page-queue-utilization-during-cacheline-no-effect-numerator' in results:
       results['dram.avg_page_queue_utilization_during_cacheline_no_effect'] = map(lambda (a,b,c): float(a)/b /c if b and c else float('inf'), zip(results['dram-datamovement-queue.total-page-queue-utilization-during-cacheline-no-effect-numerator'], results['dram-datamovement-queue.total-page-queue-utilization-during-cacheline-no-effect-denominator'], results['dram-datamovement-queue.num-no-effect-cacheline-requests']))
 
+    if 'dram-datamovement-queue.num-requests-cacheline-inserted-ahead-of-inflight-pages' in results:
+      results['dram.cacheline_request_percent_inserted_ahead_of_inflight_pages'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue.num-requests-cacheline-inserted-ahead-of-inflight-pages'], results['dram-datamovement-queue.num-cacheline-requests']))
+    if 'dram-datamovement-queue.num-no-effect-requests-cacheline-inserted-ahead-of-inflight-pages' in results:
+      results['dram.cacheline_no_effect_percent_inserted_ahead_of_inflight_pages'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue.num-no-effect-requests-cacheline-inserted-ahead-of-inflight-pages'], results['dram-datamovement-queue.num-no-effect-cacheline-requests']))
+
   else:
     if 'dram-datamovement-queue.num-requests' in results and sum(results['dram-datamovement-queue.num-requests']) > 0:
       results['dram.page_queue_avgdelay'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram-datamovement-queue.total-queue-delay'], results['dram-datamovement-queue.num-requests']))
@@ -326,6 +331,11 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
       ('  PQ idea avg page % util during cacheline requests', 'dram-datamovement-queue.avg_page_queue_utilization_during_cacheline_requests', str),
       ('  PQ idea avg cacheline % util during page no-effect requests', 'dram-datamovement-queue.avg_cacheline_queue_utilization_during_page_no_effect', str),
       ('  PQ idea avg page % util during cacheline no-effect requests', 'dram-datamovement-queue.avg_page_queue_utilization_during_cacheline_no_effect', str),
+      ('  PQ idea % cacheline inserted ahead of inflight pages', 'dram.cacheline_request_percent_inserted_ahead_of_inflight_pages', format_float(2)),
+      ('  PQ idea % cacheline no effect ahead of inflight pages', 'dram.cacheline_no_effect_percent_inserted_ahead_of_inflight_pages', format_float(2)),
+      ('  PQ idea inflight page delayed', 'dram.inflight-page-delayed', str),
+      ('  PQ idea inflight page total delayed time (ns)', 'dram.inflight-page-total-delay-time', format_ns(2)),
+      ('  PQ idea cacheline requests saved time (ns)', 'dram-datamovement-queue.total-cacheline-queue-delay-saved', format_ns(2)),
       ('  num unique pages accessed', 'dram.unique-pages-accessed', str),
       ('  remote datamovement max effective bandwidth (GB/s)', 'dram.both_queues_total_max_effective_bandwidth', format_float(4)),
       ('    page queue max effective bandwidth (GB/s)', 'dram.page_queue_max_effective_bandwidth', format_float(4)),

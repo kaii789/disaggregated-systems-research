@@ -7,6 +7,7 @@
 
 #include <map>
 #include <set>
+#include <vector>
 
 class QueueModelWindowedMG1Subqueuemodels : public QueueModel
 {
@@ -19,12 +20,16 @@ public:
 
    // SubsecondTime computeQueueDelayTrackBytes(SubsecondTime pkt_time, SubsecondTime processing_time, UInt64 num_bytes, core_id_t requester = INVALID_CORE_ID);
    SubsecondTime computeQueueDelayTrackBytes(SubsecondTime pkt_time, SubsecondTime processing_time, UInt64 num_bytes, request_t request_type, core_id_t requester = INVALID_CORE_ID);
+   SubsecondTime computeQueueDelayTrackBytesPotentialPushback(SubsecondTime pkt_time, SubsecondTime processing_time, UInt64 num_bytes, request_t request_type, std::vector<std::pair<UInt64, SubsecondTime>>& new_inflight_page_arrival_time_deltas, core_id_t requester = INVALID_CORE_ID);
+   SubsecondTime computeQueueDelayTrackBytesInflightPage(SubsecondTime pkt_time, SubsecondTime processing_time, UInt64 num_bytes, request_t request_type, core_id_t requester = INVALID_CORE_ID, bool is_inflight_page = false, UInt64 phys_page = 0);
+   void removeInflightPage(UInt64 phys_page);
 
    double getTotalQueueUtilizationPercentage(SubsecondTime pkt_time);
 
    double getPageQueueUtilizationPercentage(SubsecondTime pkt_time);
    double getCachelineQueueUtilizationPercentage(SubsecondTime pkt_time);
 
+   void finalizeStats();
 
 private:
    const SubsecondTime m_window_size;
@@ -45,6 +50,18 @@ private:
    UInt64 m_cacheline_service_time_sum; // In ps
    UInt64 m_page_service_time_sum2; // In ps^2
    UInt64 m_cacheline_service_time_sum2; // In ps^2
+
+   struct InflightPageData
+   {
+      SubsecondTime processing_time;
+      UInt64 service_time_sum, service_time_sum2;
+      SubsecondTime prev_queue_delay;
+   };
+   std::map<UInt64, InflightPageData> m_inflight_page_tracking;  // Inflight pages: processing time, total service_time_sum at previous request, total service_time_sum2 at previous request
+   UInt64 m_inflight_page_service_time_sum;                      // Sum of service time of pages in m_inflight_page_tracking, in ps
+   UInt64 m_inflight_page_service_time_sum2;                     // Sum of service time squared of pages in m_inflight_page_tracking, in ps^2
+   UInt64 m_cacheline_inserted_ahead_of_inflight_pages;          // Number of times a cacheline request led to inflight pages being shifted back
+   UInt64 m_cacheline_inserted_ahead_of_inflight_pages_no_effect;// Track similar stat in computeQueueDelayNoEffect calls
 
    const SubsecondTime m_r_added_latency; // Additional network latency from remote access
    double m_r_cacheline_queue_fraction;   // The fraction of remote bandwidth used for the cacheline queue (decimal between 0 and 1) 
@@ -90,6 +107,7 @@ private:
    SubsecondTime m_total_queue_delay;
    SubsecondTime m_total_page_queue_delay;
    SubsecondTime m_total_cacheline_queue_delay;
+   SubsecondTime m_total_cacheline_queue_delay_saved;
    
    double m_total_page_queue_utilization_during_cacheline_requests = 0;
    double m_total_cacheline_queue_utilization_during_page_requests = 0;
@@ -114,6 +132,11 @@ private:
 
    void addItemUpdateBytes(SubsecondTime pkt_time, UInt64 num_bytes, SubsecondTime pkt_queue_delay, request_t request_type);
    void removeItemsUpdateBytes(SubsecondTime earliest_time, SubsecondTime pkt_time, bool track_effective_bandwidth);
+
+   SubsecondTime applyQueueDelayFormula(request_t request_type, UInt64 total_service_time, UInt64 total_service_time2, UInt64 num_arrivals, UInt64 utilization_window_size, bool update_stats);
+   // Wrappers for two commonly used configurations
+   SubsecondTime applySingleWindowSizeFormula(request_t request_type, UInt64 total_service_time, UInt64 total_service_time2, UInt64 num_arrivals, bool update_stats);
+   SubsecondTime applyDoubleWindowSizeFormula(request_t request_type, UInt64 total_service_time, UInt64 total_service_time2, UInt64 num_arrivals, bool update_stats);
 };
 
 #endif /* __QUEUE_MODEL_WINDOWED_MG1_REMOTE_SUBQUEUEMODELS_H__ */
