@@ -190,6 +190,9 @@ class DramPerfModelDisagg : public DramPerfModel
         SubsecondTime m_total_access_latency;
         SubsecondTime m_total_local_access_latency;
         SubsecondTime m_total_remote_access_latency;
+        SubsecondTime m_total_remote_datamovement_latency;
+        UInt64 m_global_time_much_larger_than_tnow;
+        SubsecondTime m_sum_global_time_much_larger;
 
         void parseDeviceAddress(IntPtr address, UInt32 &channel, UInt32 &rank, UInt32 &bank_group, UInt32 &bank, UInt32 &column, UInt64 &dram_page);
         UInt64 parseAddressBits(UInt64 address, UInt32 &data, UInt32 offset, UInt32 size, UInt64 base_address);

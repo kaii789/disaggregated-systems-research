@@ -122,6 +122,9 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_total_access_latency(SubsecondTime::Zero())
     , m_total_local_access_latency(SubsecondTime::Zero())
     , m_total_remote_access_latency(SubsecondTime::Zero())
+    , m_total_remote_datamovement_latency(SubsecondTime::Zero())
+    , m_global_time_much_larger_than_tnow(0)
+    , m_sum_global_time_much_larger(SubsecondTime::Zero())
 {
     String name("dram"); 
     if (Sim()->getCfg()->getBool("perf_model/dram/queue_model/enabled"))
@@ -244,6 +247,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     registerStatsMetric("dram", core_id, "total-access-latency", &m_total_access_latency); // cgiannoula
     registerStatsMetric("dram", core_id, "total-local-access-latency", &m_total_local_access_latency);
     registerStatsMetric("dram", core_id, "total-remote-access-latency", &m_total_remote_access_latency);
+    registerStatsMetric("dram", core_id, "total-remote-datamovement-latency", &m_total_remote_datamovement_latency);
     registerStatsMetric("dram", core_id, "local-reads-remote-origin", &m_local_reads_remote_origin);
     registerStatsMetric("dram", core_id, "local-writes-remote-origin", &m_local_writes_remote_origin);
     registerStatsMetric("dram", core_id, "remote-reads", &m_remote_reads);
@@ -265,6 +269,9 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     registerStatsMetric("dram", core_id, "cacheline-queue-request-cancelled", &m_cacheline_queue_request_cancelled);
     registerStatsMetric("dram", core_id, "inflight-page-delayed", &m_inflight_page_delayed);
     registerStatsMetric("dram", core_id, "inflight-page-total-delay-time", &m_inflight_pages_delay_time);
+
+    registerStatsMetric("dram", core_id, "page-movement-num-global-time-much-larger", &m_global_time_much_larger_than_tnow);
+    registerStatsMetric("dram", core_id, "page-movement-global-time-much-larger-total-time", &m_sum_global_time_much_larger);
 
     // Stats for partition_queues experiments
     if (m_r_partition_queues) {
@@ -838,6 +845,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     }
     if (m_r_mode != 4 && !m_r_enable_selective_moves) {
         t_now += datamovement_queue_delay;
+        m_total_remote_datamovement_latency += datamovement_queue_delay;
     }
 
     perf->updateTime(t_now, ShmemPerf::DRAM_BUS);
@@ -895,8 +903,10 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
                     // If the page arrival time via the page queue is faster than the cacheline via the cacheline queue, use the page queue arrival time
                     // (and the cacheline request is not sent)
                     t_now += page_datamovement_queue_delay;
+                    m_total_remote_datamovement_latency += page_datamovement_queue_delay;
                     if (m_r_mode != 4 && !m_r_enable_selective_moves) {
                         t_now -= datamovement_queue_delay;  // only subtract if it was added earlier
+                        m_total_remote_datamovement_latency -= datamovement_queue_delay;
                     }
                     if (m_use_compression && (m_r_cacheline_gran || m_use_cacheline_compression))
                         t_now -= cacheline_compression_latency;  // essentially didn't separately compress cacheline, so subtract this previously added compression latency
@@ -921,8 +931,10 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             } else {
                 // Default is requesting the whole page at once (instead of also requesting cacheline), so replace time of cacheline request with the time of the page request
                 t_now += page_datamovement_queue_delay;
+                m_total_remote_datamovement_latency += page_datamovement_queue_delay;
                 if (m_r_mode != 4 && !m_r_enable_selective_moves) {
                     t_now -= datamovement_queue_delay;  // only subtract if it was added earlier
+                    m_total_remote_datamovement_latency -= datamovement_queue_delay;
                 }
                 if (m_use_compression && (m_r_cacheline_gran || m_use_cacheline_compression))
                     t_now -= cacheline_compression_latency;  // essentially didn't separately compress cacheline, so subtract this previously added compression latency
@@ -941,7 +953,12 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         m_moved_pages_no_access_yet.push_back(phys_page);
 
         m_inflight_pages.erase(phys_page);
-        m_inflight_pages[phys_page] = SubsecondTime::max(Sim()->getClockSkewMinimizationServer()->getGlobalTime(), t_now);  // t_now already contains the page compression and datamovement latencies
+        SubsecondTime global_time = Sim()->getClockSkewMinimizationServer()->getGlobalTime();
+        m_inflight_pages[phys_page] = SubsecondTime::max(global_time, t_now);  // t_now already contains the page compression and datamovment latencies
+        if (global_time > t_now + SubsecondTime::NS(50)) {  // if global time is more than 50 ns ahead of t_now
+            ++m_global_time_much_larger_than_tnow;
+            m_sum_global_time_much_larger += global_time - t_now;
+        }
         m_inflight_redundant[phys_page] = 0; 
         if (m_inflight_pages.size() > m_max_bufferspace)
             m_max_bufferspace++;
