@@ -30,9 +30,12 @@ private:
     CompressionModel *m_cacheline_compression_model;
     CompressionModel *m_dict_compression_model;
     double m_bandwidth_utilization;
-    double m_lower_bandwidth_thredhold;
-    double m_upper_bandwidth_thredhold;
+    double m_lower_bandwidth_threshold;
+    double m_upper_bandwidth_threshold;
     std::map<UInt64, String> m_addr_to_scheme;
+
+    UInt64 m_cacheline_compression_count = 0;
+    UInt64 m_dict_compression_count = 0;
 
     // Placeholder
     UInt32 m_compression_latency = 10;
