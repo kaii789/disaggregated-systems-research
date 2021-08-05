@@ -73,7 +73,7 @@ config_list = [
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "512"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
             automation.ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
-            automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "deflate"),
+            automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "zlib"),
         ]
     ),
 ]
