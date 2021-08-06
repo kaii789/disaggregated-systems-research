@@ -26,10 +26,8 @@ private:
     UInt32 m_cacheline_count;
     UInt64 m_num_overflowed_pages;
 
-    // Only used for ideal latency
-    UInt32 m_compression_latency = 30;
-    // Only used for ideal latency
-    UInt32 m_decompression_latency = 30;
+    UInt32 m_compression_latency = 10; // GB/s
+    UInt32 m_decompression_latency = 10;
 
     SInt32 m_compression_granularity;
 

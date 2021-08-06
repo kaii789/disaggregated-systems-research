@@ -9,9 +9,9 @@ CompressionModelLCP::CompressionModelLCP(String name, UInt32 id, UInt32 page_siz
 {
     // Set compression/decompression cycle latencies if configured
     if (Sim()->getCfg()->getInt("perf_model/dram/compression_model/lcp/compression_latency") != -1)
-        m_compression_latency = Sim()->getCfg()->getInt("perf_model/dram/compression_model/fpc/compression_latency");
+        m_compression_latency = Sim()->getCfg()->getInt("perf_model/dram/compression_model/lcp/compression_latency");
     if (Sim()->getCfg()->getInt("perf_model/dram/compression_model/lcp/decompression_latency") != -1)
-        m_decompression_latency = Sim()->getCfg()->getInt("perf_model/dram/compression_model/fpc/decompression_latency");
+        m_decompression_latency = Sim()->getCfg()->getInt("perf_model/dram/compression_model/lcp/decompression_latency");
 
     String compression_scheme = Sim()->getCfg()->getString("perf_model/dram/compression_model/lcp/compression_scheme");
     m_compression_model = CompressionModel::create("Cacheline Compression Model", id, m_cache_line_size, m_cache_line_size, compression_scheme);

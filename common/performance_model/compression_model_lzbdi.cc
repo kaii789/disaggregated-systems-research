@@ -1,23 +1,24 @@
-#include "compression_model_bdi.h"
+#include "compression_model_lzbdi.h"
 #include "utils.h"
 #include "stats.h"
 #include "config.hpp"
 
-CompressionModelBDI::CompressionModelBDI(String name, UInt32 id, UInt32 page_size, UInt32 cache_line_size)
+CompressionModelLZBDI::CompressionModelLZBDI(String name, UInt32 id, UInt32 page_size, UInt32 cache_line_size)
     : m_name(name)
     , m_page_size(page_size)
     , m_cache_line_size(cache_line_size)
-    , m_compression_granularity(Sim()->getCfg()->getInt("perf_model/dram/compression_model/bdi/compression_granularity"))
-    , use_additional_options(Sim()->getCfg()->getBool("perf_model/dram/compression_model/bdi/use_additional_options"))
+    , m_compression_granularity(Sim()->getCfg()->getInt("perf_model/dram/compression_model/lzbdi/compression_granularity"))
+    , use_additional_options(Sim()->getCfg()->getBool("perf_model/dram/compression_model/lzbdi/use_additional_options"))
     , m_total_compressed(0)
 {
     m_options = (use_additional_options) ? 16 : 11;
+    m_index_bits = 4;
 
     // Set compression/decompression cycle latencies if configured
-    if (Sim()->getCfg()->getInt("perf_model/dram/compression_model/bdi/compression_latency") != -1)
-        m_compression_latency = Sim()->getCfg()->getInt("perf_model/dram/compression_model/bdi/compression_latency");
-    if (Sim()->getCfg()->getInt("perf_model/dram/compression_model/bdi/decompression_latency") != -1)
-        m_decompression_latency = Sim()->getCfg()->getInt("perf_model/dram/compression_model/bdi/decompression_latency");
+    if (Sim()->getCfg()->getInt("perf_model/dram/compression_model/lzbdi/compression_latency") != -1)
+        m_compression_latency = Sim()->getCfg()->getInt("perf_model/dram/compression_model/lzbdi/compression_latency");
+    if (Sim()->getCfg()->getInt("perf_model/dram/compression_model/lzbdi/decompression_latency") != -1)
+        m_decompression_latency = Sim()->getCfg()->getInt("perf_model/dram/compression_model/lzbdi/decompression_latency");
 
     if (m_compression_granularity != -1) {
         m_cache_line_size = m_compression_granularity;
@@ -29,6 +30,7 @@ CompressionModelBDI::CompressionModelBDI(String name, UInt32 id, UInt32 page_siz
     m_compressed_cache_line_sizes = new UInt32[m_cacheline_count];
 
     // Register stats for compression_options
+    registerStatsMetric("compression", id, "num_overflowed_pages", &m_num_overflowed_pages);
     registerStatsMetric("compression", id, "bdi_total_compressed", &(m_total_compressed));
     for (UInt32 i = 0; i < 13; i++) {
         String stat_name = "bdi_usage_option-";
@@ -45,7 +47,7 @@ CompressionModelBDI::CompressionModelBDI(String name, UInt32 id, UInt32 page_siz
 
 }
 
-CompressionModelBDI::~CompressionModelBDI()
+CompressionModelLZBDI::~CompressionModelLZBDI()
 {
     delete [] m_data_buffer;
     delete [] m_compressed_data_buffer;
@@ -53,7 +55,7 @@ CompressionModelBDI::~CompressionModelBDI()
 }
 
 void
-CompressionModelBDI::finalizeStats()
+CompressionModelLZBDI::finalizeStats()
 {
     for (UInt32 i = 0; i < 16; i++) {
         m_total_compressed += m_compress_options[i];
@@ -61,7 +63,7 @@ CompressionModelBDI::finalizeStats()
 }
 
 SubsecondTime
-CompressionModelBDI::compress(IntPtr addr, size_t data_size, core_id_t core_id, UInt32 *compressed_page_size, UInt32 *compressed_cache_lines)
+CompressionModelLZBDI::compress(IntPtr addr, size_t data_size, core_id_t core_id, UInt32 *compressed_page_size, UInt32 *compressed_cache_lines)
 {
     // Get Data
     Core *core = Sim()->getCoreManager()->getCoreFromID(core_id);
@@ -84,7 +86,13 @@ CompressionModelBDI::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
         if (m_compressed_cache_line_sizes[i] < m_cache_line_size)
             total_compressed_cache_lines++;
     }
-    assert(total_bytes <= m_page_size && "[BDI] Wrong compression!");
+    UInt32 index_bytes = (m_index_bits * m_cacheline_count) / 8;
+    total_bytes  += index_bytes; // add indexing bytes to find the compresison pattern used
+    if (total_bytes > m_page_size) {
+        m_num_overflowed_pages++;
+        total_bytes = m_page_size; // if compressed data is larger than the page_size, we sent the page in uncompressed format
+    }
+    assert(total_bytes <= m_page_size && "[LZBDI] Wrong compression!");
   
     // Return compressed cache lines
     *compressed_cache_lines = total_compressed_cache_lines;
@@ -99,7 +107,7 @@ CompressionModelBDI::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
 }
 
 SubsecondTime
-CompressionModelBDI::decompress(IntPtr addr, UInt32 compressed_cache_lines, core_id_t core_id)
+CompressionModelLZBDI::decompress(IntPtr addr, UInt32 compressed_cache_lines, core_id_t core_id)
 {
     Core *core = Sim()->getCoreManager()->getCoreFromID(core_id);
     ComponentLatency decompress_latency(ComponentLatency(core->getDvfsDomain(), compressed_cache_lines * m_decompression_latency));
@@ -108,7 +116,7 @@ CompressionModelBDI::decompress(IntPtr addr, UInt32 compressed_cache_lines, core
 }
 
 SInt64
-CompressionModelBDI::readWord(void *ptr, UInt32 idx, UInt32 word_size) // idx: which word of input ptr to read 
+CompressionModelLZBDI::readWord(void *ptr, UInt32 idx, UInt32 word_size) // idx: which word of input ptr to read 
 {
     SInt64 word;
     switch (word_size)
@@ -135,7 +143,7 @@ CompressionModelBDI::readWord(void *ptr, UInt32 idx, UInt32 word_size) // idx: w
 
 
 void 
-CompressionModelBDI::writeWord(void *ptr, UInt32 idx, SInt64 word, UInt32 word_size)
+CompressionModelLZBDI::writeWord(void *ptr, UInt32 idx, SInt64 word, UInt32 word_size)
 {
     switch(word_size)
     {
@@ -158,7 +166,7 @@ CompressionModelBDI::writeWord(void *ptr, UInt32 idx, SInt64 word, UInt32 word_s
 }
 
 bool
-CompressionModelBDI::checkDeltaLimits(SInt64 delta, UInt32 delta_size)
+CompressionModelLZBDI::checkDeltaLimits(SInt64 delta, UInt32 delta_size)
 {
     bool within_limits = true;
     SInt8 cur_byte;
@@ -171,7 +179,7 @@ CompressionModelBDI::checkDeltaLimits(SInt64 delta, UInt32 delta_size)
 }
 
 void
-CompressionModelBDI::zeroValues(void* in, m_compress_info *res, void* out)
+CompressionModelLZBDI::zeroValues(void* in, m_compress_info *res, void* out)
 {
     // Zero compression compresses an all-zero cache line into a bit that just indicates that the cache line is all-zero.
     char base;
@@ -195,7 +203,7 @@ CompressionModelBDI::zeroValues(void* in, m_compress_info *res, void* out)
 }
 
 void
-CompressionModelBDI::repeatedValues(void* in, m_compress_info *res, void* out, UInt32 k)
+CompressionModelLZBDI::repeatedValues(void* in, m_compress_info *res, void* out, UInt32 k)
 {
     //  Repeated value compression checks if a cache line has the same 1/2/4/8 byte value repeated. If so, it compresses the cache line to the corresponding value
     SInt64 base;
@@ -252,7 +260,7 @@ CompressionModelBDI::repeatedValues(void* in, m_compress_info *res, void* out, U
         return;
     } 
 
-    assert(repeated == false && "[BDI] repeated_values() failed!");
+    assert(repeated == false && "[LZBDI] repeated_values() failed!");
     res->is_compressible = false;
     res->compressed_size = m_cache_line_size;
 
@@ -260,7 +268,7 @@ CompressionModelBDI::repeatedValues(void* in, m_compress_info *res, void* out, U
 }
 
 void
-CompressionModelBDI::specializedCompress(void *in, m_compress_info *res, void *out, SInt32 k, SInt32 delta_size)
+CompressionModelLZBDI::specializedCompress(void *in, m_compress_info *res, void *out, SInt32 k, SInt32 delta_size)
 {
  
     UInt32 i;
@@ -290,7 +298,7 @@ CompressionModelBDI::specializedCompress(void *in, m_compress_info *res, void *o
 }
 
 UInt32 
-CompressionModelBDI::compressCacheLine(void* in, void* out)
+CompressionModelLZBDI::compressCacheLine(void* in, void* out)
 {
     UInt32 i;
     SInt32 b, d, cur_option = 0;
@@ -400,7 +408,7 @@ CompressionModelBDI::compressCacheLine(void* in, void* out)
 
 
 // UInt32 
-// CompressionModelBDI::decompressCacheLine(void *in, void *out)
+// CompressionModelLZBDI::decompressCacheLine(void *in, void *out)
 // {
 //     char chosen_option;
 //     UInt32 i;
@@ -511,7 +519,7 @@ CompressionModelBDI::compressCacheLine(void* in, void* out)
 
 
 SubsecondTime
-CompressionModelBDI::compress_multipage(std::vector<UInt64> addr_list, UInt32 num_pages, core_id_t core_id, UInt32 *compressed_multipage_size, std::map<UInt64, UInt32> *address_to_num_cache_lines)
+CompressionModelLZBDI::compress_multipage(std::vector<UInt64> addr_list, UInt32 num_pages, core_id_t core_id, UInt32 *compressed_multipage_size, std::map<UInt64, UInt32> *address_to_num_cache_lines)
 {
     SubsecondTime total_compression_latency = SubsecondTime::Zero();
     UInt32 total_compressed_size = 0;
@@ -519,7 +527,7 @@ CompressionModelBDI::compress_multipage(std::vector<UInt64> addr_list, UInt32 nu
         UInt64 addr = addr_list.at(i);
         UInt32 compressed_page_size;
         UInt32 compressed_cache_lines;
-        total_compression_latency += CompressionModelBDI::compress(addr, m_page_size, core_id, &compressed_page_size, &compressed_cache_lines);
+        total_compression_latency += CompressionModelLZBDI::compress(addr, m_page_size, core_id, &compressed_page_size, &compressed_cache_lines);
         total_compressed_size += compressed_page_size;
         (*address_to_num_cache_lines)[addr] = compressed_cache_lines;
     }
@@ -529,12 +537,12 @@ CompressionModelBDI::compress_multipage(std::vector<UInt64> addr_list, UInt32 nu
 
 
 SubsecondTime
-CompressionModelBDI::decompress_multipage(std::vector<UInt64> addr_list, UInt32 num_pages, core_id_t core_id, std::map<UInt64, UInt32> *address_to_num_cache_lines)
+CompressionModelLZBDI::decompress_multipage(std::vector<UInt64> addr_list, UInt32 num_pages, core_id_t core_id, std::map<UInt64, UInt32> *address_to_num_cache_lines)
 {
     SubsecondTime total_compression_latency = SubsecondTime::Zero();
     for (UInt32 i = 0; i < num_pages; i++) {
         UInt64 addr = addr_list.at(i);
-        total_compression_latency += CompressionModelBDI::decompress(addr, (*address_to_num_cache_lines)[addr], core_id);
+        total_compression_latency += CompressionModelLZBDI::decompress(addr, (*address_to_num_cache_lines)[addr], core_id);
     }
     return total_compression_latency;
 }
