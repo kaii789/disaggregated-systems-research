@@ -199,9 +199,9 @@ QueueModelWindowedMG1Subqueuemodels::~QueueModelWindowedMG1Subqueuemodels()
    }
 
    if (m_cacheline_inserted_queue_delay_larger_error)
-      std::cout << "computeQueueDelayTrackBytesPotentialPushback() cacheline inserted ahead queue delay larger, something wrong?" << std::endl;
+      std::cout << "computeQueueDelayTrackBytesPotentialPushback() cacheline inserted ahead queue delay larger " << m_cacheline_inserted_queue_delay_larger_error << " times, something wrong?" << std::endl;
    if (m_delayed_queue_delay_smaller_error)
-      std::cout << "computeQueueDelayTrackBytesPotentialPushback() inflight page delayed queue delay smaller, something wrong?" << std::endl;
+      std::cout << "computeQueueDelayTrackBytesPotentialPushback() inflight page delayed queue delay smaller " << m_delayed_queue_delay_smaller_error << " times, something wrong?" << std::endl;
 }
 
 void QueueModelWindowedMG1Subqueuemodels::finalizeStats() {
@@ -302,24 +302,16 @@ QueueModelWindowedMG1Subqueuemodels::computeQueueDelayNoEffect(SubsecondTime pkt
       // }
       // Include the incoming packet in calculations to differentiate between small and large requests in decision making.
       // Don't need to update m_num_arrivals since it gets cancelled out in the formula
-      if (request_type == QueueModel::PAGE) {
-         service_time_sum = (UInt64)((1. - m_r_cacheline_queue_fraction) * (m_page_service_time_sum + processing_time.getPS()) + m_r_cacheline_queue_fraction * m_cacheline_service_time_sum);
-         // Multiply twice to simulate each processing time being adjusted by the weight
-         service_time_sum2 = (UInt64)(squared(1. - m_r_cacheline_queue_fraction) * (m_page_service_time_sum2 + processing_time.getPS() * processing_time.getPS()) + squared(m_r_cacheline_queue_fraction) * m_cacheline_service_time_sum2);
-      } else {  // request_type == QueueModel::CACHELINE
-         service_time_sum = (UInt64)((1. - m_r_cacheline_queue_fraction) * m_page_service_time_sum + m_r_cacheline_queue_fraction * (m_cacheline_service_time_sum + processing_time.getPS()));
-         // Multiply twice to simulate each processing time being adjusted by the weight
-         service_time_sum2 = (UInt64)(squared(1. - m_r_cacheline_queue_fraction) * m_page_service_time_sum2 + squared(m_r_cacheline_queue_fraction) * (m_cacheline_service_time_sum2 + processing_time.getPS() * processing_time.getPS()));
-      }
+      service_time_sum = m_page_service_time_sum + m_cacheline_service_time_sum + processing_time.getPS();
+      service_time_sum2 = m_page_service_time_sum2 + m_cacheline_service_time_sum2 + processing_time.getPS() * processing_time.getPS();
       if (request_type == QueueModel::CACHELINE && m_inflight_page_service_time_sum > 0) {
          // As if cacheline request was made before the inflight pages
-         service_time_sum = (UInt64)((1. - m_r_cacheline_queue_fraction) * (m_page_service_time_sum - m_inflight_page_service_time_sum) + m_r_cacheline_queue_fraction * (m_cacheline_service_time_sum + processing_time.getPS()));
-         // Multiply twice to simulate each processing time being adjusted by the weight
-         service_time_sum2 = (UInt64)(squared(1. - m_r_cacheline_queue_fraction) * (m_page_service_time_sum2 - m_inflight_page_service_time_sum2) + squared(m_r_cacheline_queue_fraction) * (m_cacheline_service_time_sum2 + processing_time.getPS() * processing_time.getPS()));
-
+         service_time_sum = m_page_service_time_sum + m_cacheline_service_time_sum - m_inflight_page_service_time_sum + processing_time.getPS();
+         service_time_sum2 = m_page_service_time_sum2 + m_cacheline_service_time_sum2 - m_inflight_page_service_time_sum2 + processing_time.getPS() * processing_time.getPS();
+         
          ++m_cacheline_inserted_ahead_of_inflight_pages_no_effect;       
       }
-      t_queue = applySingleWindowSizeFormula(request_type, service_time_sum, service_time_sum2, m_num_arrivals, false);
+      t_queue = applyDoubleWindowSizeFormula(request_type, service_time_sum, service_time_sum2, m_num_arrivals, false);
    }
    // Add additional network latency
    t_queue += m_r_added_latency;  // is it ok for t_queue to potentially be larger than m_window_size?
@@ -360,8 +352,8 @@ QueueModelWindowedMG1Subqueuemodels::computeQueueDelayTrackBytes(SubsecondTime p
    if (is_inflight_page) {
       struct InflightPageData inflight_page_data = {processing_time,
                                                     // the two variables below include the processing time of the current page, since this is after the addItem call in computeQueueDelayTrackBytes()
-                                                    (UInt64)((1. - m_r_cacheline_queue_fraction) * m_page_service_time_sum + m_r_cacheline_queue_fraction * m_cacheline_service_time_sum),
-                                                    (UInt64)(squared(1. - m_r_cacheline_queue_fraction) * m_page_service_time_sum2 + squared(m_r_cacheline_queue_fraction) * m_cacheline_service_time_sum2),
+                                                    m_page_service_time_sum + m_cacheline_service_time_sum,
+                                                    m_page_service_time_sum2 + m_cacheline_service_time_sum2,
                                                     queue_delay};
       m_inflight_page_tracking.insert(std::pair<UInt64, InflightPageData>(phys_page, inflight_page_data));
       // Update variables
@@ -472,45 +464,36 @@ QueueModelWindowedMG1Subqueuemodels::computeQueueDelayTrackBytesPotentialPushbac
       // }
       // Include the incoming packet in calculations to differentiate between small and large requests in decision making.
       // Don't need to update m_num_arrivals since it gets cancelled out in the formula
-      if (request_type == QueueModel::PAGE) {
-         service_time_sum = (UInt64)((1. - m_r_cacheline_queue_fraction) * (m_page_service_time_sum + processing_time.getPS()) + m_r_cacheline_queue_fraction * m_cacheline_service_time_sum);
-         // Multiply twice to simulate each processing time being adjusted by the weight
-         service_time_sum2 = (UInt64)(squared(1. - m_r_cacheline_queue_fraction) * (m_page_service_time_sum2 + processing_time.getPS() * processing_time.getPS()) + squared(m_r_cacheline_queue_fraction) * m_cacheline_service_time_sum2);
-      } else {  // request_type == QueueModel::CACHELINE
-         service_time_sum = (UInt64)((1. - m_r_cacheline_queue_fraction) * m_page_service_time_sum + m_r_cacheline_queue_fraction * (m_cacheline_service_time_sum + processing_time.getPS()));
-         // Multiply twice to simulate each processing time being adjusted by the weight
-         service_time_sum2 = (UInt64)(squared(1. - m_r_cacheline_queue_fraction) * m_page_service_time_sum2 + squared(m_r_cacheline_queue_fraction) * (m_cacheline_service_time_sum2 + processing_time.getPS() * processing_time.getPS()));
-      }
-      SubsecondTime old_queue_delay;
-      if (request_type == QueueModel::CACHELINE && compute_inflight_page_delays && m_inflight_page_service_time_sum > 0) {
-         SubsecondTime old_queue_delay = applySingleWindowSizeFormula(request_type, service_time_sum, service_time_sum2, m_num_arrivals, false);
+      service_time_sum = m_page_service_time_sum + m_cacheline_service_time_sum + processing_time.getPS();
+      service_time_sum2 = m_page_service_time_sum2 + m_cacheline_service_time_sum2 + processing_time.getPS() * processing_time.getPS();
+      SubsecondTime old_queue_delay = applyDoubleWindowSizeFormula(request_type, service_time_sum, service_time_sum2, m_num_arrivals, false);
+      if (request_type == QueueModel::CACHELINE && m_inflight_page_service_time_sum > 0) {
          // As if cacheline request was made before the inflight pages
-         service_time_sum = (UInt64)((1. - m_r_cacheline_queue_fraction) * (m_page_service_time_sum - m_inflight_page_service_time_sum) + m_r_cacheline_queue_fraction * (m_cacheline_service_time_sum + processing_time.getPS()));
-         // Multiply twice to simulate each processing time being adjusted by the weight
-         service_time_sum2 = (UInt64)(squared(1. - m_r_cacheline_queue_fraction) * (m_page_service_time_sum2 - m_inflight_page_service_time_sum2) + squared(m_r_cacheline_queue_fraction) * (m_cacheline_service_time_sum2 + processing_time.getPS() * processing_time.getPS()));
+         service_time_sum = m_page_service_time_sum + m_cacheline_service_time_sum - m_inflight_page_service_time_sum + processing_time.getPS();
+         service_time_sum2 = m_page_service_time_sum2 + m_cacheline_service_time_sum2 - m_inflight_page_service_time_sum2 + processing_time.getPS() * processing_time.getPS();
 
          ++m_cacheline_inserted_ahead_of_inflight_pages;
          // Calculate inflight page arrival times based on queue delay that would be returned if the cacheline request was previously made
          for (auto it = m_inflight_page_tracking.begin(); it != m_inflight_page_tracking.end(); ++it) {
-            UInt64 inflight_page_service_time_sum = it->second.service_time_sum + m_r_cacheline_queue_fraction * processing_time.getPS();
-            UInt64 inflight_page_service_time_sum2 = it->second.service_time_sum2 + squared(m_r_cacheline_queue_fraction) * processing_time.getPS() * processing_time.getPS();
+            UInt64 inflight_page_service_time_sum = it->second.service_time_sum + processing_time.getPS();
+            UInt64 inflight_page_service_time_sum2 = it->second.service_time_sum2 + processing_time.getPS() * processing_time.getPS();
 
-            SubsecondTime new_queue_delay = applySingleWindowSizeFormula(QueueModel::PAGE, inflight_page_service_time_sum, inflight_page_service_time_sum2, m_num_arrivals, false);
+            SubsecondTime new_queue_delay = applyDoubleWindowSizeFormula(QueueModel::PAGE, inflight_page_service_time_sum, inflight_page_service_time_sum2, m_num_arrivals, false);
             // Add additional network latency
             new_queue_delay += m_r_added_latency;  // is it ok for new_queue_delay to potentially be larger than m_window_size?
 
             if (new_queue_delay < it->second.prev_queue_delay) {
-               m_delayed_queue_delay_smaller_error = true;
+               ++m_delayed_queue_delay_smaller_error;
             } else {
                new_inflight_page_arrival_time_deltas.push_back(std::pair<UInt64, SubsecondTime>(it->first, new_queue_delay - it->second.prev_queue_delay));
                it->second.prev_queue_delay = new_queue_delay;
             }
          }
       }
-      t_queue = applySingleWindowSizeFormula(request_type, service_time_sum, service_time_sum2, m_num_arrivals, true);
+      t_queue = applyDoubleWindowSizeFormula(request_type, service_time_sum, service_time_sum2, m_num_arrivals, true);
       if (request_type == QueueModel::CACHELINE && m_inflight_page_service_time_sum > 0) {
          if (t_queue > old_queue_delay) {
-            m_cacheline_inserted_queue_delay_larger_error = true;
+            ++m_cacheline_inserted_queue_delay_larger_error;
          } else {
             m_total_cacheline_queue_delay_saved += old_queue_delay - t_queue;
          }

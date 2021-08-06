@@ -127,8 +127,8 @@ private:
    UInt64 m_total_no_effect_cacheline_requests = 0;
 
    // temp:
-   bool m_delayed_queue_delay_smaller_error = false;
-   bool m_cacheline_inserted_queue_delay_larger_error = false;
+   UInt64 m_delayed_queue_delay_smaller_error = 0;
+   UInt64 m_cacheline_inserted_queue_delay_larger_error = 0;
    
    void addItem(SubsecondTime pkt_time, SubsecondTime service_time, request_t request_type);
    void removeItems(SubsecondTime earliest_time);
