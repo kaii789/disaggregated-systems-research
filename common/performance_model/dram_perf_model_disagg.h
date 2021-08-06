@@ -82,6 +82,7 @@ class DramPerfModelDisagg : public DramPerfModel
         const bool m_r_throttle_redundant_moves;
         const bool m_r_use_separate_queue_model;  // Whether to use the separate remote queue model
         double m_r_page_queue_utilization_threshold;  // When the datamovement queue for pages has percentage utilization above this, remote pages aren't moved to local
+        double m_r_cacheline_queue_utilization_threshold;  // When the datamovement queue for cachelines has percentage utilization above this, cacheline requests on inflight pages aren't made
         double m_r_mode_5_limit_moves_threshold;  // When m_r_mode == 5, operate according to m_r_mode 2 when the page queue utilization is >= this value, otherwise operate according to m_r_mode 1
         SubsecondTime m_r_mode_5_remote_access_history_window_size;  // When m_r_mode == 5, and operating according to m_r_mode, track page accesses using the most recent window size number of ns
         bool m_use_throttled_pages_tracker;  // Whether to update m_throttled_pages_tracker. Must be true to use the ideal page throttler or print stats of throttled pages
@@ -173,7 +174,9 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_redundant_moves_type1;
         UInt64 partition_queues_cacheline_slower_than_page;  // with the new change, these situations no longer result in redundant moves
         UInt64 m_redundant_moves_type2;
-        UInt64 m_cacheline_queue_request_cancelled; // number of times a cacheline queue request is cancelled (currently, due to m_r_limit_redundant_moves)
+        UInt64 m_redundant_moves_type2_cancelled_datamovement_queue_full;
+        UInt64 m_redundant_moves_type2_cancelled_limit_redundant_moves; // number of times a cacheline queue request is cancelled due to m_r_limit_redundant_moves
+        UInt64 m_redundant_moves_type2_slower_than_page_arrival;  // these situations don't result in redundant moves
         UInt64 m_max_bufferspace;                   // the maximum number of localdram pages actually used to back inflight and inflight_evicted pages 
         UInt64 m_move_page_cancelled_bufferspace_full;         // the number of times moving a remote page to local was cancelled due to localdram bufferspace being full
         UInt64 m_move_page_cancelled_datamovement_queue_full;  // the number of times moving a remote page to local was cancelled due to the queue for pages being full

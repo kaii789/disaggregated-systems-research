@@ -199,9 +199,9 @@ QueueModelWindowedMG1Subqueuemodels::~QueueModelWindowedMG1Subqueuemodels()
    }
 
    if (m_cacheline_inserted_queue_delay_larger_error)
-      std::cout << "computeQueueDelayTrackBytesPotentialPushback() cacheline inserted ahead queue delay larger, something wrong?" << std::endl;
+      std::cout << "computeQueueDelayTrackBytesPotentialPushback() cacheline inserted ahead queue delay larger " << m_cacheline_inserted_queue_delay_larger_error << " times, something wrong?" << std::endl;
    if (m_delayed_queue_delay_smaller_error)
-      std::cout << "computeQueueDelayTrackBytesPotentialPushback() inflight page delayed queue delay smaller, something wrong?" << std::endl;
+      std::cout << "computeQueueDelayTrackBytesPotentialPushback() inflight page delayed queue delay smaller " << m_delayed_queue_delay_smaller_error << " times, something wrong?" << std::endl;
 }
 
 void QueueModelWindowedMG1Subqueuemodels::finalizeStats() {
@@ -500,7 +500,7 @@ QueueModelWindowedMG1Subqueuemodels::computeQueueDelayTrackBytesPotentialPushbac
             new_queue_delay += m_r_added_latency;  // is it ok for new_queue_delay to potentially be larger than m_window_size?
 
             if (new_queue_delay < it->second.prev_queue_delay) {
-               m_delayed_queue_delay_smaller_error = true;
+               ++m_delayed_queue_delay_smaller_error;
             } else {
                new_inflight_page_arrival_time_deltas.push_back(std::pair<UInt64, SubsecondTime>(it->first, new_queue_delay - it->second.prev_queue_delay));
                it->second.prev_queue_delay = new_queue_delay;
@@ -508,9 +508,9 @@ QueueModelWindowedMG1Subqueuemodels::computeQueueDelayTrackBytesPotentialPushbac
          }
       }
       t_queue = applySingleWindowSizeFormula(request_type, service_time_sum, service_time_sum2, m_num_arrivals, true);
-      if (request_type == QueueModel::CACHELINE && m_inflight_page_service_time_sum > 0) {
+      if (request_type == QueueModel::CACHELINE && compute_inflight_page_delays && m_inflight_page_service_time_sum > 0) {
          if (t_queue > old_queue_delay) {
-            m_cacheline_inserted_queue_delay_larger_error = true;
+            ++m_cacheline_inserted_queue_delay_larger_error;
          } else {
             m_total_cacheline_queue_delay_saved += old_queue_delay - t_queue;
          }

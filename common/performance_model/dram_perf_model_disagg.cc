@@ -77,6 +77,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_r_throttle_redundant_moves      (Sim()->getCfg()->getBool("perf_model/dram/remote_throttle_redundant_moves"))
     , m_r_use_separate_queue_model      (Sim()->getCfg()->getBool("perf_model/dram/queue_model/use_separate_remote_queue_model")) // Whether to use the separate remote queue model
     , m_r_page_queue_utilization_threshold   (Sim()->getCfg()->getFloat("perf_model/dram/remote_page_queue_utilization_threshold")) // When the datamovement queue for pages has percentage utilization above this, remote pages aren't moved to local
+    , m_r_cacheline_queue_utilization_threshold   (Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_utilization_threshold")) // When the datamovement queue for cachelines has percentage utilization above this, cacheline requests on inflight pages aren't made
     , m_use_throttled_pages_tracker    (Sim()->getCfg()->getBool("perf_model/dram/use_throttled_pages_tracker"))  // Whether to use and update m_use_throttled_pages_tracker
     , m_use_ideal_page_throttling    (Sim()->getCfg()->getBool("perf_model/dram/r_use_ideal_page_throttling"))  // Whether to use ideal page throttling (alternative currently is FCFS throttling)
     , m_r_ideal_pagethrottle_remote_access_history_window_size   (SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/r_ideal_pagethrottle_access_history_window_size")))
@@ -106,7 +107,9 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_redundant_moves_type1  (0)
     , partition_queues_cacheline_slower_than_page (0)  // with the new change, these situations no longer result in redundant moves
     , m_redundant_moves_type2  (0)
-    , m_cacheline_queue_request_cancelled(0)
+    , m_redundant_moves_type2_cancelled_datamovement_queue_full(0)
+    , m_redundant_moves_type2_cancelled_limit_redundant_moves(0)
+    , m_redundant_moves_type2_slower_than_page_arrival(0)
     , m_max_bufferspace     (0)
     , m_move_page_cancelled_bufferspace_full(0)
     , m_move_page_cancelled_datamovement_queue_full(0)
@@ -265,8 +268,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     registerStatsMetric("dram", core_id, "queue-full-page-prefetch-not-done", &m_prefetch_page_not_done_datamovement_queue_full);
     registerStatsMetric("dram", core_id, "page-local-already-page-prefetch-not-done", &m_prefetch_page_not_done_page_local_already);
     registerStatsMetric("dram", core_id, "page-not-initialized-page-prefetch-not-done", &m_prefetch_page_not_done_page_not_initialized);
-    registerStatsMetric("dram", core_id, "unique-pages-accessed", &m_unique_pages_accessed);
-    registerStatsMetric("dram", core_id, "cacheline-queue-request-cancelled", &m_cacheline_queue_request_cancelled);
+    registerStatsMetric("dram", core_id, "unique-pages-accessed", &m_unique_pages_accessed);     
     registerStatsMetric("dram", core_id, "inflight-page-delayed", &m_inflight_page_delayed);
     registerStatsMetric("dram", core_id, "inflight-page-total-delay-time", &m_inflight_pages_delay_time);
 
@@ -278,6 +280,9 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
         registerStatsMetric("dram", core_id, "redundant-moves-type1", &m_redundant_moves_type1);
         registerStatsMetric("dram", core_id, "pq-cacheline-slower-than-page", &partition_queues_cacheline_slower_than_page);
         registerStatsMetric("dram", core_id, "redundant-moves-type2", &m_redundant_moves_type2);
+        registerStatsMetric("dram", core_id, "queue-full-redundant-moves-type2-cancelled", &m_redundant_moves_type2_cancelled_datamovement_queue_full);
+        registerStatsMetric("dram", core_id, "limit-redundant-moves-redundant-moves-type2-cancelled", &m_redundant_moves_type2_cancelled_limit_redundant_moves);
+        registerStatsMetric("dram", core_id, "cacheline-slower-than-inflight-page-arrival", &m_redundant_moves_type2_slower_than_page_arrival);
         registerStatsMetric("dram", core_id, "redundant-moves-type1-time-savings", &m_redundant_moves_type1_time_savings);
         registerStatsMetric("dram", core_id, "redundant-moves-type2-time-savings", &m_redundant_moves_type2_time_savings);
     }
@@ -1205,7 +1210,15 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
             m_inflight_hits++; 
 
             if (m_r_partition_queues != 0) {
-                if (m_inflight_redundant[phys_page] < m_r_limit_redundant_moves) {
+                double cacheline_queue_utilization_percentage;
+                if (m_r_partition_queues == 1)
+                    cacheline_queue_utilization_percentage = m_data_movement_2->getCachelineQueueUtilizationPercentage(t_now);
+                else
+                    cacheline_queue_utilization_percentage = m_data_movement->getCachelineQueueUtilizationPercentage(t_now);
+                if (cacheline_queue_utilization_percentage > m_r_cacheline_queue_utilization_threshold) {
+                    // Can't make additional cacheline request
+                    ++m_redundant_moves_type2_cancelled_datamovement_queue_full;
+                } else if (m_inflight_redundant[phys_page] < m_r_limit_redundant_moves) {
                     UInt32 size = pkt_size;
                     SubsecondTime cacheline_compression_latency = SubsecondTime::Zero();  // when cacheline compression is not enabled, this is always 0
                     if (m_use_compression)
@@ -1281,6 +1294,8 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                             // LOG_PRINT("getAccessLatency (local dram) inflight page saving of %lu ns", (access_latency-(datamov_queue_delay + t_remote_queue_request + cacheline_compression_latency - pkt_time)).getNS());
                             m_redundant_moves_type2_time_savings += (access_latency - (datamov_queue_delay + t_remote_queue_request + cacheline_compression_latency - pkt_time));
                             access_latency = datamov_queue_delay + t_remote_queue_request + cacheline_compression_latency - pkt_time;
+                        } else {
+                            ++m_redundant_moves_type2_slower_than_page_arrival;
                         }
                     } else {
                         // Always request cacheline via the cacheline queue, then use the earlier arrival time to determine access_latency
@@ -1311,7 +1326,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                         }
                     }
                 } else {
-                    ++m_cacheline_queue_request_cancelled;
+                    ++m_redundant_moves_type2_cancelled_limit_redundant_moves;
                     // std::cout << "Inflight page " << phys_page << " redundant moves > limit, = " << m_inflight_redundant[phys_page] << std::endl;
                 }
             }
