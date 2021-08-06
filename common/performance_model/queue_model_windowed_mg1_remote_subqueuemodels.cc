@@ -491,7 +491,7 @@ QueueModelWindowedMG1Subqueuemodels::computeQueueDelayTrackBytesPotentialPushbac
          }
       }
       t_queue = applyDoubleWindowSizeFormula(request_type, service_time_sum, service_time_sum2, m_num_arrivals, true);
-      if (request_type == QueueModel::CACHELINE && m_inflight_page_service_time_sum > 0) {
+      if (request_type == QueueModel::CACHELINE && compute_inflight_page_delays && m_inflight_page_service_time_sum > 0) {
          if (t_queue > old_queue_delay) {
             ++m_cacheline_inserted_queue_delay_larger_error;
          } else {

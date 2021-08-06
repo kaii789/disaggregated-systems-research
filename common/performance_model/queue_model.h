@@ -46,6 +46,9 @@ public:
    virtual double getPageQueueUtilizationPercentage(SubsecondTime pkt_time) {
       return 0.0;  // placeholder since the method is currently only implemented in the windowed_mg1_remote* QueueModel's
    };
+   virtual double getCachelineQueueUtilizationPercentage(SubsecondTime pkt_time) {
+      return 0.0;  // placeholder since the method is currently only implemented in the windowed_mg1_remote* QueueModel's
+   };
 
    virtual void finalizeStats() {};
 

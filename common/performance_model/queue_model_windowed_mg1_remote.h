@@ -22,7 +22,11 @@ public:
    double getPageQueueUtilizationPercentage(SubsecondTime pkt_time) {
       // For windowed_mg1_remote, when called on the correct QueueModel the page queue takes up the whole queue
       return getTotalQueueUtilizationPercentage(pkt_time);
-   }
+   };
+   double getCachelineQueueUtilizationPercentage(SubsecondTime pkt_time) {
+      // For windowed_mg1_remote, when called on the correct QueueModel the cacheline queue takes up the whole queue
+      return getTotalQueueUtilizationPercentage(pkt_time);
+   };
 
 private:
    const SubsecondTime m_window_size;
