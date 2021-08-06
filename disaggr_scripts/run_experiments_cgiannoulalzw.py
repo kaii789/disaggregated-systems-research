@@ -43,6 +43,13 @@ if __name__ == "__main__":
         sniper_root=subfolder_sniper_root_relpath
     )
 
+    hpcg_base_options = "cp {sniper_root}/benchmarks/hpcg/linux_serial/bin/hpcg.dat .;{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/hpcg/linux_serial/bin/xhpcg".format(
+    sniper_root=subfolder_sniper_root_relpath
+    )
+    
+    sls_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/sls/bin/sls -f /home/shared/sls.in".format(
+    sniper_root=subfolder_sniper_root_relpath
+    )
 
     ###  Ligra command strings  ###
     # Do only 1 timed round to save time during initial experiments
@@ -630,7 +637,8 @@ if __name__ == "__main__":
         for bw_scalefactor in [8]:
             command_str = nw_base_options.format(
                 "2048",
-                sniper_options="-g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -s stop-by-icount:{}".format(
+                sniper_options="g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -s stop-by-icount:{}".format(
+                    int(16777216),
                     int(bw_scalefactor),
                     str(remote_init),
                     int(1 * ONE_BILLION),
@@ -838,12 +846,12 @@ if __name__ == "__main__":
             )
 
 
-    # timeseries power_demand, bw_factor [4, 16] 
-    timeseries_power_compression_experiments_remoteinit_true = []
+    # timeseries bw_factor [4, 16] 
+    timeseries_compression_experiments_remoteinit_true = []
     for remote_init in ["true"]:  # "false"
         for bw_scalefactor in [8]:
             command_str = timeseries_base_options.format(
-                "power_demand.txt",
+                "e0103.txt",
                 sniper_options="-g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -s stop-by-icount:{}".format(
                     int(bw_scalefactor),
                     str(remote_init),
@@ -851,9 +859,9 @@ if __name__ == "__main__":
                 ),
             )
 
-            timeseries_power_compression_experiments_remoteinit_true.append(
+            timeseries_compression_experiments_remoteinit_true.append(
                 Experiment(
-                    experiment_name="timeseries_power_bw_scalefactor_{}_remoteinit_{}_compression_series".format(
+                    experiment_name="timeseries_bw_scalefactor_{}_remoteinit_{}_compression_series".format(
                         bw_scalefactor,
                         remote_init,
                     ),
@@ -862,6 +870,57 @@ if __name__ == "__main__":
                     output_root_directory=".",
                 )
             )
+
+    # sls bw_factor [4, 16] 
+    sls_compression_experiments_remoteinit_true = []
+    for remote_init in ["true"]:  # "false"
+        for bw_scalefactor in [8]:
+            command_str = sls_base_options.format(
+                sniper_options="-g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -s stop-by-icount:{}".format(
+                    int(bw_scalefactor),
+                    str(remote_init),
+                    int(1 * ONE_BILLION),
+                ),
+            )
+
+            sls_compression_experiments_remoteinit_true.append(
+                Experiment(
+                    experiment_name="sls_bw_scalefactor_{}_remoteinit_{}_compression_series".format(
+                        bw_scalefactor,
+                        remote_init,
+                    ),
+                    command_str=command_str,
+                    experiment_run_configs=compression_series_experiment_run_configs,
+                    output_root_directory=".",
+                )
+            )
+
+
+    # hpcg bw_factor [4, 16] 
+    hpcg_compression_experiments_remoteinit_true = []
+    for remote_init in ["true"]:  # "false"
+        for bw_scalefactor in [8]:
+            command_str = hpcg_base_options.format(
+                sniper_options="-g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -s stop-by-icount:{}".format(
+                    int(bw_scalefactor),
+                    str(remote_init),
+                    int(1 * ONE_BILLION),
+                ),
+            )
+
+            hpcg_compression_experiments_remoteinit_true.append(
+                Experiment(
+                    experiment_name="hpcg_bw_scalefactor_{}_remoteinit_{}_compression_series".format(
+                        bw_scalefactor,
+                        remote_init,
+                    ),
+                    command_str=command_str,
+                    experiment_run_configs=compression_series_experiment_run_configs,
+                    output_root_directory=".",
+                )
+            )
+
+
 
 
 
@@ -877,6 +936,10 @@ if __name__ == "__main__":
     experiments.extend(components_rmat1M_compression_experiments_remoteinit_true)
     experiments.extend(radii_rmat1M_compression_experiments_remoteinit_true)
     experiments.extend(pagerank_rmat1M_compression_experiments_remoteinit_true)
+    experiments.extend(timeseries_compression_experiments_remoteinit_true)
+    experiments.extend(hpcg_compression_experiments_remoteinit_true)
+    experiments.extend(nw_compression_experiments_remoteinit_true)
+    experiments.extend(sls_compression_experiments_remoteinit_true)
 
 
     ### Run Sniper experiments using ExperimentManager ###
