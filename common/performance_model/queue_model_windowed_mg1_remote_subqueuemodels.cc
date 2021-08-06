@@ -467,7 +467,7 @@ QueueModelWindowedMG1Subqueuemodels::computeQueueDelayTrackBytesPotentialPushbac
       service_time_sum = m_page_service_time_sum + m_cacheline_service_time_sum + processing_time.getPS();
       service_time_sum2 = m_page_service_time_sum2 + m_cacheline_service_time_sum2 + processing_time.getPS() * processing_time.getPS();
       SubsecondTime old_queue_delay = applyDoubleWindowSizeFormula(request_type, service_time_sum, service_time_sum2, m_num_arrivals, false);
-      if (request_type == QueueModel::CACHELINE && m_inflight_page_service_time_sum > 0) {
+      if (request_type == QueueModel::CACHELINE && compute_inflight_page_delays && m_inflight_page_service_time_sum > 0) {
          // As if cacheline request was made before the inflight pages
          service_time_sum = m_page_service_time_sum + m_cacheline_service_time_sum - m_inflight_page_service_time_sum + processing_time.getPS();
          service_time_sum2 = m_page_service_time_sum2 + m_cacheline_service_time_sum2 - m_inflight_page_service_time_sum2 + processing_time.getPS() * processing_time.getPS();
