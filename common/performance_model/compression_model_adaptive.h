@@ -25,17 +25,24 @@ private:
     UInt32 m_cache_line_size;
     UInt32 m_cacheline_count;
 
-    String m_cacheline_compression_scheme;
-    String m_dict_compression_scheme;
-    CompressionModel *m_cacheline_compression_model;
-    CompressionModel *m_dict_compression_model;
+    String m_low_compression_scheme;
+    String m_high_compression_scheme;
+    CompressionModel *m_low_compression_model;
+    CompressionModel *m_high_compression_model;
     double m_bandwidth_utilization;
     double m_lower_bandwidth_threshold;
     double m_upper_bandwidth_threshold;
     std::map<UInt64, String> m_addr_to_scheme;
 
-    UInt64 m_cacheline_compression_count = 0;
-    UInt64 m_dict_compression_count = 0;
+    UInt64 m_low_compression_count = 0;
+    SubsecondTime m_low_total_compression_latency = SubsecondTime::Zero();
+    SubsecondTime m_low_total_decompression_latency = SubsecondTime::Zero();
+    UInt64 m_low_bytes_saved = 0;
+
+    UInt64 m_high_compression_count = 0;
+    SubsecondTime m_high_total_compression_latency = SubsecondTime::Zero();
+    SubsecondTime m_high_total_decompression_latency = SubsecondTime::Zero();
+    UInt64 m_high_bytes_saved = 0;
 
     // Placeholder
     UInt32 m_compression_latency = 10;

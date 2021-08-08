@@ -177,6 +177,23 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
       results['compression.avg-cacheline-compression-latency'] = [total_cacheline_compression_latency / data_moves]
       results['compression.avg-cacheline-decompression-latency'] = [total_cacheline_decompression_latency / data_moves]
 
+    if 'compression.adaptive-low-compression-count' in results:
+      low_bytes_saved = results['compression.adaptive-low-bytes-saved'][0]
+      low_total_compression_latency = results['compression.adaptive-low-total-compression-latency'][0]
+      low_total_decompression_latency = results['compression.adaptive-low-total-decompression-latency'][0]
+
+      results['compression.adaptive-low-avg-compression-ratio'] = [float((data_moves * gran_size)) / float(((data_moves * gran_size) - low_bytes_saved))]
+      results['compression.adaptive-low-avg-compression-latency'] = [low_total_compression_latency / data_moves]
+      results['compression.adaptive-low-avg-decompression-latency'] = [low_total_decompression_latency / data_moves]
+
+      high_bytes_saved = results['compression.adaptive-high-bytes-saved'][0]
+      high_total_compression_latency = results['compression.adaptive-high-total-compression-latency'][0]
+      high_total_decompression_latency = results['compression.adaptive-high-total-decompression-latency'][0]
+
+      results['compression.adaptive-high-avg-compression-ratio'] = [float((data_moves * gran_size)) / float(((data_moves * gran_size) - high_bytes_saved))]
+      results['compression.adaptive-high-avg-compression-latency'] = [high_total_compression_latency / data_moves]
+      results['compression.adaptive-high-avg-decompression-latency'] = [high_total_decompression_latency / data_moves]
+
     # print("bytes_saved", bytes_saved)
     # print("data moves", data_moves)
     # print("avg compression ratio", results['compression.avg-compression-ratio'])
@@ -313,10 +330,19 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
         template.append(('    {}% percentile - accesses'.format(i), 'compression.lz-accesses-count-p{}'.format(i), str))
         template.append(('    {}% percentile - max_entry_bytes'.format(i), 'compression.lz-max_entry_bytes-count-p{}'.format(i), str))
 
-  if 'compression.adaptive-cacheline-compression-count' in results:
+  if 'compression.adaptive-low-compression-count' in results:
     template += [
-      ('  adaptive cacheline compression count', 'compression.adaptive-cacheline-compression-count', str),
-      ('  adaptive dict compression count', 'compression.adaptive-dict-compression-count', str),
+      ('  adaptive low compression count', 'compression.adaptive-low-compression-count', str),
+      ('  adaptive low bytes saved', 'compression.adaptive-low-bytes-saved', str),
+      ('  adaptive low avg compression ratio', 'compression.adaptive-low-avg-compression-ratio', str),
+      ('  adaptive low avg compression latency(ns)', 'compression.adaptive-low-avg-compression-latency', format_ns(2)),
+      ('  adaptive low avg decompression latency(ns)', 'compression.adaptive-low-avg-decompression-latency', format_ns(2)),
+
+      ('  adaptive high compression count', 'compression.adaptive-high-compression-count', str),
+      ('  adaptive high bytes saved', 'compression.adaptive-high-bytes-saved', str),
+      ('  adaptive high avg compression ratio', 'compression.adaptive-high-avg-compression-ratio', str),
+      ('  adaptive high avg compression latency(ns)', 'compression.adaptive-high-avg-compression-latency', format_ns(2)),
+      ('  adaptive high avg decompression latency(ns)', 'compression.adaptive-high-avg-decompression-latency', format_ns(2)),
     ]
 
   # if 'dram.redundant-moves-temp1-time-savings' in results:

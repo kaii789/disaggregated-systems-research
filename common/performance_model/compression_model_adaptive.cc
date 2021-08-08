@@ -14,16 +14,23 @@ CompressionModelAdaptive::CompressionModelAdaptive(String name, UInt32 id, UInt3
     if (Sim()->getCfg()->getInt("perf_model/dram/compression_model/adaptive/decompression_latency") != -1)
         m_decompression_latency = Sim()->getCfg()->getInt("perf_model/dram/compression_model/adaptive/decompression_latency");
 
-    m_cacheline_compression_scheme = Sim()->getCfg()->getString("perf_model/dram/compression_model/adaptive/cacheline_compression_scheme");
-    m_dict_compression_scheme = Sim()->getCfg()->getString("perf_model/dram/compression_model/adaptive/dict_compression_scheme");
-    m_cacheline_compression_model = CompressionModel::create("Cacheline Compression Model", id, m_page_size, m_cache_line_size, m_cacheline_compression_scheme);
-    m_dict_compression_model = CompressionModel::create("Dictionary Compression Model", id, m_page_size, m_cache_line_size, m_dict_compression_scheme);
+    m_low_compression_scheme = Sim()->getCfg()->getString("perf_model/dram/compression_model/adaptive/low_compression_scheme");
+    m_high_compression_scheme = Sim()->getCfg()->getString("perf_model/dram/compression_model/adaptive/high_compression_scheme");
+    m_low_compression_model = CompressionModel::create("Cacheline Compression Model", id, m_page_size, m_cache_line_size, m_low_compression_scheme);
+    m_high_compression_model = CompressionModel::create("Dictionary Compression Model", id, m_page_size, m_cache_line_size, m_high_compression_scheme);
 
     m_lower_bandwidth_threshold = Sim()->getCfg()->getFloat("perf_model/dram/compression_model/adaptive/lower_bandwidth_threshold");
     m_upper_bandwidth_threshold = Sim()->getCfg()->getFloat("perf_model/dram/compression_model/adaptive/upper_bandwidth_threshold");
 
-    registerStatsMetric("compression", id, "adaptive-cacheline-compression-count", &m_cacheline_compression_count);
-    registerStatsMetric("compression", id, "adaptive-dict-compression-count", &m_dict_compression_count);
+    registerStatsMetric("compression", id, "adaptive-low-compression-count", &m_low_compression_count);
+    registerStatsMetric("compression", id, "adaptive-low-total-compression-latency", &m_low_total_compression_latency);
+    registerStatsMetric("compression", id, "adaptive-low-total-decompression-latency", &m_low_total_decompression_latency);
+    registerStatsMetric("compression", id, "adaptive-low-bytes-saved", &m_low_bytes_saved);
+
+    registerStatsMetric("compression", id, "adaptive-high-compression-count", &m_high_compression_count);
+    registerStatsMetric("compression", id, "adaptive-high-total-compression-latency", &m_high_total_compression_latency);
+    registerStatsMetric("compression", id, "adaptive-high-total-decompression-latency", &m_high_total_decompression_latency);
+    registerStatsMetric("compression", id, "adaptive-high-bytes-saved", &m_high_bytes_saved);
 
     m_cacheline_count = m_page_size / m_cache_line_size;
 }
@@ -47,14 +54,20 @@ CompressionModelAdaptive::compress(IntPtr addr, size_t data_size, core_id_t core
 
     // Compress depending on bandwidth
     if (m_bandwidth_utilization >= m_lower_bandwidth_threshold && m_bandwidth_utilization < m_upper_bandwidth_threshold) {
-        total_compression_latency = m_cacheline_compression_model->compress(addr, data_size, core_id, &compressed_size, &compressed_cachelines);
-        m_addr_to_scheme[addr] = m_cacheline_compression_scheme;
-        m_cacheline_compression_count += 1;
+        total_compression_latency = m_low_compression_model->compress(addr, data_size, core_id, &compressed_size, &compressed_cachelines);
+        m_addr_to_scheme[addr] = m_low_compression_scheme;
+        m_low_compression_count += 1;
+        if (m_compression_latency != 0)
+            m_low_total_compression_latency += total_compression_latency;
+        m_low_bytes_saved += data_size - compressed_size;
     }
     else if (m_bandwidth_utilization >= m_upper_bandwidth_threshold) {
-        total_compression_latency = m_dict_compression_model->compress(addr, data_size, core_id, &compressed_size, &compressed_cachelines);
-        m_addr_to_scheme[addr] = m_dict_compression_scheme;
-        m_dict_compression_count += 1;
+        total_compression_latency = m_high_compression_model->compress(addr, data_size, core_id, &compressed_size, &compressed_cachelines);
+        m_addr_to_scheme[addr] = m_high_compression_scheme;
+        m_high_compression_count += 1;
+        if (m_compression_latency != 0)
+            m_high_total_compression_latency += total_compression_latency;
+        m_high_bytes_saved += data_size - compressed_size;
     }
 
     // assert(compressed_size <= m_page_size && "[Adaptive] Wrong compression!");
@@ -72,12 +85,21 @@ CompressionModelAdaptive::compress(IntPtr addr, size_t data_size, core_id_t core
 SubsecondTime
 CompressionModelAdaptive::decompress(IntPtr addr, UInt32 compressed_cache_lines, core_id_t core_id)
 {
-    if (m_addr_to_scheme[addr] == m_cacheline_compression_scheme)
-        return m_cacheline_compression_model->decompress(addr, compressed_cache_lines, core_id);
-    else if (m_addr_to_scheme[addr] == m_dict_compression_scheme)
-        return m_dict_compression_model->decompress(addr, compressed_cache_lines, core_id);
+    SubsecondTime latency = SubsecondTime::Zero();
+    if (m_addr_to_scheme[addr] == m_low_compression_scheme) {
+        latency = m_low_compression_model->decompress(addr, compressed_cache_lines, core_id);
+        if (m_decompression_latency != 0)
+            m_low_total_decompression_latency += latency;
+    }
+    else if (m_addr_to_scheme[addr] == m_high_compression_scheme) {
+        latency = m_high_compression_model->decompress(addr, compressed_cache_lines, core_id);
+        if (m_decompression_latency != 0)
+            m_high_total_decompression_latency += latency;
+    }
 
-    return SubsecondTime::Zero();
+    if (m_decompression_latency == 0)
+        return SubsecondTime::Zero();
+    return latency;
 }
 
 void
