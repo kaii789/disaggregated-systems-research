@@ -637,7 +637,7 @@ if __name__ == "__main__":
         for bw_scalefactor in [8]:
             command_str = nw_base_options.format(
                 "2048",
-                sniper_options="g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -s stop-by-icount:{}".format(
+                sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={} -s stop-by-icount:{}".format(
                     int(16777216),
                     int(bw_scalefactor),
                     str(remote_init),
