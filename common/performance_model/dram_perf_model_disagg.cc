@@ -1192,9 +1192,9 @@ DramPerfModelDisagg::updateBandwidth()
 {
     // Randomly choose bw scalefactor between [4, 16]
     float bw_scalefactor = (rand() % 13) + 4;
-    m_r_bus_bandwidth =  (m_dram_speed * m_data_bus_width / (1000 * bw_scalefactor)); // Remote memory
-    m_r_part_bandwidth =   (m_dram_speed * m_data_bus_width / (1000 * bw_scalefactor / (1 - Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_fraction")))); // Remote memory - Partitioned Queues => Page Queue
-    m_r_part2_bandwidth =  (m_dram_speed * m_data_bus_width / (1000 * bw_scalefactor / Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_fraction"))); // Remote memory - Partitioned Queues => Cacheline Queue
+    m_r_bus_bandwidth.changeBandwidth(m_dram_speed * m_data_bus_width / (1000 * bw_scalefactor)); // Remote memory
+    m_r_part_bandwidth.changeBandwidth((m_dram_speed * m_data_bus_width / (1000 * bw_scalefactor / (1 - Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_fraction"))))); // Remote memory - Partitioned Queues => Page Queue
+    m_r_part2_bandwidth.changeBandwidth((m_dram_speed * m_data_bus_width / (1000 * bw_scalefactor / Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_fraction")))); // Remote memory - Partitioned Queues => Cacheline Queue
 }
 
 bool
