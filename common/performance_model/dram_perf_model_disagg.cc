@@ -272,6 +272,9 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     }
     // Make sure last one is p100
     registerStatsMetric("dram", core_id, "page-access-count-p100", &(page_usage_count_stats[m_page_usage_stats_num_points - 1]));
+
+    // RNG
+    srand (time(NULL));
 }
 
 DramPerfModelDisagg::~DramPerfModelDisagg()
@@ -1188,7 +1191,6 @@ void
 DramPerfModelDisagg::updateBandwidth()
 {
     // Randomly choose bw scalefactor between [4, 16]
-    srand (time(NULL));
     float bw_scalefactor = (rand() % 13) + 4;
     m_r_bus_bandwidth =  (m_dram_speed * m_data_bus_width / (1000 * bw_scalefactor)); // Remote memory
     m_r_part_bandwidth =   (m_dram_speed * m_data_bus_width / (1000 * bw_scalefactor / (1 - Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_fraction")))); // Remote memory - Partitioned Queues => Page Queue
