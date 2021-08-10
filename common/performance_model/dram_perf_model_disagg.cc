@@ -41,6 +41,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_r_bus_bandwidth     (m_dram_speed * m_data_bus_width / (1000 * Sim()->getCfg()->getFloat("perf_model/dram/remote_mem_bw_scalefactor"))) // Remote memory
     , m_r_part_bandwidth    (m_dram_speed * m_data_bus_width / (1000 * Sim()->getCfg()->getFloat("perf_model/dram/remote_mem_bw_scalefactor") / (1 - Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_fraction")))) // Remote memory - Partitioned Queues => Page Queue
     , m_r_part2_bandwidth   (m_dram_speed * m_data_bus_width / (1000 * Sim()->getCfg()->getFloat("perf_model/dram/remote_mem_bw_scalefactor") / Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_fraction"))) // Remote memory - Partitioned Queues => Cacheline Queue
+    , m_use_dynamic_bandwidth (Sim()->getCfg()->getBool("perf_model/dram/use_dynamic_bandwidth"))
     , m_bank_keep_open      (SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/ddr/bank_keep_open")))
     , m_bank_open_delay     (SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/ddr/bank_open_delay")))
     , m_bank_close_delay    (SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/ddr/bank_close_delay")))
@@ -955,8 +956,11 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
 SubsecondTime
 DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, core_id_t requester, IntPtr address, DramCntlrInterface::access_t access_type, ShmemPerf *perf)
 {
+    if ((m_local_reads_remote_origin + m_local_writes_remote_origin + m_remote_reads + m_remote_writes) % 1000 == 0 && m_use_dynamic_bandwidth)
+        updateBandwidth();
+
     UInt64 phys_page = address & ~((UInt64(1) << floorLog2(m_page_size)) - 1);
-    if (m_r_cacheline_gran) 
+    if (m_r_cacheline_gran)
         phys_page =  address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1); // Was << 6
     UInt64 cacheline =  address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1); // Was << 6
 
@@ -1180,8 +1184,18 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
     }
 }
 
+void
+DramPerfModelDisagg::updateBandwidth()
+{
+    // Randomly choose bw scalefactor between [4, 16]
+    srand (time(NULL));
+    float bw_scalefactor = (rand() % 13) + 4;
+    m_r_bus_bandwidth =  (m_dram_speed * m_data_bus_width / (1000 * bw_scalefactor)); // Remote memory
+    m_r_part_bandwidth =   (m_dram_speed * m_data_bus_width / (1000 * bw_scalefactor / (1 - Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_fraction")))); // Remote memory - Partitioned Queues => Page Queue
+    m_r_part2_bandwidth =  (m_dram_speed * m_data_bus_width / (1000 * bw_scalefactor / Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_fraction"))); // Remote memory - Partitioned Queues => Cacheline Queue
+}
 
-bool 
+bool
 DramPerfModelDisagg::isRemoteAccess(IntPtr address, core_id_t requester, DramCntlrInterface::access_t access_type) 
 {
     UInt64 num_local_pages = m_localdram_size/m_page_size;

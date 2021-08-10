@@ -48,6 +48,7 @@ class DramPerfModelDisagg : public DramPerfModel
         ComponentBandwidth m_r_bus_bandwidth;   // Remote
         ComponentBandwidth m_r_part_bandwidth;  // Remote - Partitioned Queues => Page Queue
         ComponentBandwidth m_r_part2_bandwidth; // Remote - Partitioned Queues => Cacheline Queue
+        bool m_use_dynamic_bandwidth;
         const SubsecondTime m_bank_keep_open;
         const SubsecondTime m_bank_open_delay;
         const SubsecondTime m_bank_close_delay;
@@ -192,6 +193,7 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 parseAddressBits(UInt64 address, UInt32 &data, UInt32 offset, UInt32 size, UInt64 base_address);
         SubsecondTime possiblyEvict(UInt64 phys_page, SubsecondTime pkt_time, core_id_t requester); 
         void possiblyPrefetch(UInt64 phys_page, SubsecondTime pkt_time, core_id_t requester); 
+        void updateBandwidth();
 
     public:
         DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_size, AddressHomeLookup* address_home_lookup);
