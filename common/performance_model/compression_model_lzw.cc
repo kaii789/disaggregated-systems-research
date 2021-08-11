@@ -33,6 +33,7 @@ CompressionModelLZW::CompressionModelLZW(String name, UInt32 id, UInt32 page_siz
     if (m_compression_granularity == -1)
         m_compression_granularity = m_page_size;
 
+    m_size_limit = Sim()->getCfg()->getBool("perf_model/dram/compression_model/lzw/size_limit");
     if ((Sim()->getCfg()->getInt("perf_model/dram/compression_model/lzw/dictionary_size") != -1) && (Sim()->getCfg()->getInt("perf_model/dram/compression_model/lzw/entry_size") != -1)) {
         compression_CAM = new CAMLZ("lzw_dictionary", Sim()->getCfg()->getInt("perf_model/dram/compression_model/lzw/dictionary_size"),  Sim()->getCfg()->getInt("perf_model/dram/compression_model/lzw/entry_size"), Sim()->getCfg()->getBool("perf_model/dram/compression_model/lzw/size_limit"));
     } else {
@@ -215,15 +216,23 @@ CompressionModelLZW::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
     // Return compressed pages size in Bytes
     *compressed_page_size = total_bytes;
 
-    // Return compression latency
-    ComponentLatency compress_latency(ComponentLatency(core->getDvfsDomain(), m_compression_latency * total_accesses));
-
     // If the page has been overflowed and is about to be sent in an uncompressed format (i.e., its size is m_page_size),
     // fix the compressed_cache_lines to be 0, such that the decompression latency to be added will be 0 (page is left uncompresed)
     if (total_bytes == m_page_size)
         *compressed_cache_lines = 0;
 
-    return compress_latency.getLatency();
+    // Return compression latency
+    if (m_size_limit == false) {
+        ComponentLatency compress_latency(ComponentLatency(core->getDvfsDomain(), m_compression_latency * total_accesses));
+        return compress_latency.getLatency();
+    } else {
+        double compression_latency =  1.1 * total_accesses; // In nanoseconds - Assuming 1.1nsec per access in Dictionary table of 768 entries and 64 bytes each entry
+        return SubsecondTime::NS(compression_latency);
+    }
+    
+    // Never reaches here
+    return SubsecondTime::Zero();
+
 }
 
 SubsecondTime
@@ -232,9 +241,16 @@ CompressionModelLZW::decompress(IntPtr addr, UInt32 compressed_cache_lines, core
     Core *core = Sim()->getCoreManager()->getCoreFromID(core_id);
     // Decompression algorithm works exactly the same as compression algorith.
     // Thus, decompression latency is equal to decompression algorithm
-    ComponentLatency decompress_latency(ComponentLatency(core->getDvfsDomain(), m_decompression_latency * compressed_cache_lines));
-    return decompress_latency.getLatency();
-
+    if (m_size_limit == false) {
+        ComponentLatency decompress_latency(ComponentLatency(core->getDvfsDomain(), m_decompression_latency * compressed_cache_lines));
+        return decompress_latency.getLatency();
+    } else {
+        double decompression_latency =  1.1 * compressed_cache_lines; // In nanoseconds - Assuming 1.1nsec per access in Dictionary table of 768 entries and 64 bytes each entry
+        return SubsecondTime::NS(decompression_latency);
+    }
+ 
+    // Never reaches here
+    return SubsecondTime::Zero();
 }
 
 

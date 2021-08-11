@@ -45,6 +45,7 @@ private:
     SInt32 m_compression_granularity;
     
     CAMLZ *compression_CAM; 
+    bool m_size_limit;
 
     SInt64 readWord(void*, UInt32, UInt32);
     void writeWord(void*, UInt32, SInt64, UInt32);
