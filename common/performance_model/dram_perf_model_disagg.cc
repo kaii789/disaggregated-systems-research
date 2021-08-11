@@ -1194,7 +1194,7 @@ void
 DramPerfModelDisagg::updateBandwidth()
 {
     m_update_bandwidth_count += 1;
-    if (m_use_dynamic_bandwidth && m_update_bandwidth_count % 10 == 0) {
+    if (m_use_dynamic_bandwidth && m_update_bandwidth_count % 20 == 0) {
         // Randomly choose bw scalefactor between [4, 16]
         float bw_scalefactor = (rand() % 13) + 4;
         m_r_bus_bandwidth.changeBandwidth(m_dram_speed * m_data_bus_width / (1000 * bw_scalefactor)); // Remote memory
