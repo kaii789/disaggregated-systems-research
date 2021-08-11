@@ -33,7 +33,31 @@ config_list = [
             automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
         ]
     ),
-    # 2) Deflate 5 GB/s
+    # 2) Deflate 1 GB/s
+    automation.ExperimentRunConfig(
+        [
+            automation.ConfigEntry("perf_model/l3_cache", "cache_size", "512"),
+            automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+            automation.ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+            automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "zlib"),
+            automation.ConfigEntry("perf_model/dram/compression_model/zlib", "compression_latency", "1"),
+            automation.ConfigEntry("perf_model/dram/compression_model/zlib", "decompression_latency", "1"),
+            automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
+        ]
+    ),
+    # 3) Deflate 2 GB/s
+    automation.ExperimentRunConfig(
+        [
+            automation.ConfigEntry("perf_model/l3_cache", "cache_size", "512"),
+            automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+            automation.ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+            automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "zlib"),
+            automation.ConfigEntry("perf_model/dram/compression_model/zlib", "compression_latency", "2"),
+            automation.ConfigEntry("perf_model/dram/compression_model/zlib", "decompression_latency", "2"),
+            automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
+        ]
+    ),
+    # 4) Deflate 5 GB/s
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "512"),
@@ -45,7 +69,7 @@ config_list = [
             automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
         ]
     ),
-    # 3) Adaptive Deflate 1 GB/s
+    # 5) Adaptive Deflate 1 GB/s
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "512"),
@@ -57,7 +81,7 @@ config_list = [
             automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
         ]
     ),
-    # 4) Adaptive Deflate 2 GB/s
+    # 6) Adaptive Deflate 2 GB/s
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "512"),
@@ -69,7 +93,7 @@ config_list = [
             automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
         ]
     ),
-    # 5) Adaptive Deflate 5 GB/s
+    # 7) Adaptive Deflate 5 GB/s
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "512"),
@@ -81,7 +105,7 @@ config_list = [
             automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
         ]
     ),
-    # 6) Adaptive Deflate 10 GB/s
+    # 8) Adaptive Deflate 10 GB/s
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "512"),
@@ -450,7 +474,7 @@ def run_sls():
     return experiments
 
 def graph(res_name, benchmark_list, local_dram_list, bw_scalefactor_list):
-    labels = ["Remote Bandwidth Scalefactor", "C0", "1 GB/s", "2 GB/s", "5 GB/s", "10 GB/s"]
+    labels = ["Remote Bandwidth Scalefactor", "C0", "LZBDI", "Deflate 5GB/s", "Adaptive 1 GB/s", "Adaptive 2 GB/s", "Adaptive 5 GB/s", "Adaptive 10 GB/s"]
     # "stream_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_combo"
 
     process = 0
@@ -519,11 +543,11 @@ def gen_settings_for_graph(benchmark_name):
         local_dram_list = ["4MB"]
         bw_scalefactor_list = [4]
     elif benchmark_name == "triangle_reg":
-        res_name = "triangle_reg_16MB_adaptive_fixed"
+        res_name = "triangle_reg_16MB_ac_dynamic_bw"
         benchmark_list = []
         benchmark_list.append("ligra_{}_".format("triangle"))
         local_dram_list = ["16MB"]
-        bw_scalefactor_list = [4, 16]
+        bw_scalefactor_list = [4]
     elif benchmark_name == "bc_reg":
         res_name = "bc_reg_4MB_comparison"
         benchmark_list = []
@@ -544,12 +568,12 @@ def gen_settings_for_graph(benchmark_name):
         local_dram_list = ["2MB"]
         bw_scalefactor_list = [4]
     elif benchmark_name == "darknet19":
-        res_name = "darknet19_2MB_adaptive_fixed"
+        res_name = "darknet19_2MB_ac_dynamic_bw"
         benchmark_list = []
         for model in ["darknet19"]:
             benchmark_list.append("darknet_{}_".format(model))
         local_dram_list = ["2MB"]
-        bw_scalefactor_list = [4, 16]
+        bw_scalefactor_list = [4]
     elif benchmark_name == "resnet50":
         res_name = "resnet50_2MB_comparison"
         benchmark_list = []
@@ -625,5 +649,5 @@ with open(log_filename, "w") as log_file:
     print(log_str, file=log_file)
 
 # TODO: Generate graph
-# res_name, benchmark_list, local_dram_list, bw_scalefactor_list = gen_settings_for_graph("darknet19")
+# res_name, benchmark_list, local_dram_list, bw_scalefactor_list = gen_settings_for_graph("triangle_reg")
 # graph(res_name, benchmark_list, local_dram_list, bw_scalefactor_list)
