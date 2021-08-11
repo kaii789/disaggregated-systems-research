@@ -190,7 +190,7 @@ class DramPerfModelDisagg : public DramPerfModel
         SubsecondTime m_total_remote_access_latency;
 
         // Dynamic BW
-        int m_update_bandwidth_count = 0;
+        long long int m_update_bandwidth_count = 0;
 
         void parseDeviceAddress(IntPtr address, UInt32 &channel, UInt32 &rank, UInt32 &bank_group, UInt32 &bank, UInt32 &column, UInt64 &dram_page);
         UInt64 parseAddressBits(UInt64 address, UInt32 &data, UInt32 offset, UInt32 size, UInt64 base_address);
