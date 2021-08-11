@@ -49,7 +49,7 @@ CompressionModelLZ78::CompressionModelLZ78(String name, UInt32 id, UInt32 page_s
     registerStatsMetric("compression", id, "avg_max_dictionary_entry", &m_avg_max_dict_entry);
     registerStatsMetric("compression", id, "avg_avg_dictionary_entry", &m_avg_avg_dict_entry);
     registerStatsMetric("compression", id, "max_dictionary_entry", &m_max_dict_entry);
-    registerStatsMetric("compression", id, "num_overflowed_pages", &m_num_overflowed_pages);
+    registerStatsMetric("compression", id, "lz78_num_overflowed_pages", &m_num_overflowed_pages);
 
     // Register stats for dictionary table
     for (UInt32 i = 0; i < m_dictsize_saved_stats_num_points - 1; ++i) {

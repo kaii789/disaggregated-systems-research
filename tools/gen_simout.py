@@ -259,8 +259,16 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
       ('  avg compression ratio', 'compression.avg-compression-ratio', str),
       ('  avg compression latency(ns)', 'compression.avg-compression-latency', format_ns(2)),
       ('  avg decompression latency(ns)', 'compression.avg-decompression-latency', format_ns(2)),
-      ('  overflowed_pages', 'compression.num_overflowed_pages', str),
+      # ('  overflowed_pages', 'compression.num_overflowed_pages', str),
     ]
+
+    if 'lzbdi_num_overflowed_pages' in results:
+      template += [('  lzbdi overflowed_pages', 'compression.lzbdi_num_overflowed_pages', str),]
+    if 'lz78_num_overflowed_pages' in results:
+      template += [('  lz78 overflowed_pages', 'compression.lz78_num_overflowed_pages', str),]
+    if 'lzw_num_overflowed_pages' in results:
+      template += [('  lzw overflowed_pages', 'compression.lzw_num_overflowed_pages', str),]
+
   if cacheline_bytes_saved != 0:
     template += [
       ('  cacheline bytes saved', 'compression.cacheline-bytes-saved', str),
@@ -277,7 +285,7 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
             ('  avg_max_dictionary_entry', 'compression.avg_max_dictionary_entry', str),
             ('  avg_avg_dictionary_entry', 'compression.avg_avg_dictionary_entry', str),
             ('  max_dictionary_entry', 'compression.max_dictionary_entry', str),
-            ('  overflowed_pages', 'compression.num_overflowed_pages', str),
+            # ('  overflowed_pages', 'compression.num_overflowed_pages', str),
         ]
 
   bdi_total_compressed = results['compression.bdi_total_compressed'][0] if 'compression.bdi_total_compressed' in results else 0
