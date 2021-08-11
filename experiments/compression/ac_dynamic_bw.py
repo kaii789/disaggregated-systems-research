@@ -33,7 +33,27 @@ config_list = [
             automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
         ]
     ),
-    # 2) Deflate 1 GB/s
+    # 2) LZ78
+    automation.ExperimentRunConfig(
+        [
+            automation.ConfigEntry("perf_model/l3_cache", "cache_size", "512"),
+            automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+            automation.ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+            automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lz78"),
+            automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
+        ]
+    ),
+    # 3) LZW
+    automation.ExperimentRunConfig(
+        [
+            automation.ConfigEntry("perf_model/l3_cache", "cache_size", "512"),
+            automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+            automation.ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+            automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lzw"),
+            automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
+        ]
+    ),
+    # 4) Deflate 1 GB/s
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "512"),
@@ -45,7 +65,7 @@ config_list = [
             automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
         ]
     ),
-    # 3) Deflate 2 GB/s
+    # 5) Deflate 2 GB/s
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "512"),
@@ -57,7 +77,7 @@ config_list = [
             automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
         ]
     ),
-    # 4) Deflate 5 GB/s
+    # 6) Deflate 5 GB/s
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "512"),
@@ -69,7 +89,29 @@ config_list = [
             automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
         ]
     ),
-    # 5) Adaptive Deflate 1 GB/s
+    # 7) Adaptive LZ78
+    automation.ExperimentRunConfig(
+        [
+            automation.ConfigEntry("perf_model/l3_cache", "cache_size", "512"),
+            automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+            automation.ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+            automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "adaptive"),
+            automation.ConfigEntry("perf_model/dram/compression_model/adaptive", "high_compression_scheme", "lz78"),
+            automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
+        ]
+    ),
+    # 8) Adaptive LZW
+    automation.ExperimentRunConfig(
+        [
+            automation.ConfigEntry("perf_model/l3_cache", "cache_size", "512"),
+            automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+            automation.ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+            automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "adaptive"),
+            automation.ConfigEntry("perf_model/dram/compression_model/adaptive", "high_compression_scheme", "lzw"),
+            automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
+        ]
+    ),
+    # 9) Adaptive Deflate 1 GB/s
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "512"),
@@ -81,7 +123,7 @@ config_list = [
             automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
         ]
     ),
-    # 6) Adaptive Deflate 2 GB/s
+    # 10) Adaptive Deflate 2 GB/s
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "512"),
@@ -93,7 +135,7 @@ config_list = [
             automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
         ]
     ),
-    # 7) Adaptive Deflate 5 GB/s
+    # 11) Adaptive Deflate 5 GB/s
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "512"),
@@ -105,7 +147,7 @@ config_list = [
             automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
         ]
     ),
-    # 8) Adaptive Deflate 10 GB/s
+    # 12) Adaptive Deflate 10 GB/s
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "512"),
