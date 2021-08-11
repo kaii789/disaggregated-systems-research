@@ -24,6 +24,7 @@ class DramPerfModelNormal : public DramPerfModel
 
       ~DramPerfModelNormal();
       void finalizeStats() { return; }
+      void updateBandwidth() { return; }
 
       SubsecondTime getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, core_id_t requester, IntPtr address, DramCntlrInterface::access_t access_type, ShmemPerf *perf);
 };

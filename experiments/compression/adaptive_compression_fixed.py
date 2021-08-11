@@ -22,58 +22,48 @@ config_list = [
             automation.ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
         ]
     ),
-    # 1) BDI
+    # 1) Deflate 1 GB/s
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "512"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
             automation.ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
-            automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "bdi"),
+            automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "adaptive"),
+            automation.ConfigEntry("perf_model/dram/compression_model/zlib", "compression_latency", "1"),
+            automation.ConfigEntry("perf_model/dram/compression_model/zlib", "decompression_latency", "1"),
         ]
     ),
-    # 2) LZBDI
+    # 2) Deflate 2 GB/s
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "512"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
             automation.ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
-            automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lzbdi"),
+            automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "adaptive"),
+            automation.ConfigEntry("perf_model/dram/compression_model/zlib", "compression_latency", "2"),
+            automation.ConfigEntry("perf_model/dram/compression_model/zlib", "decompression_latency", "2"),
         ]
     ),
-    # 3) FPC
+    # 3) Deflate 5 GB/s
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "512"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
             automation.ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
-            automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "fpc"),
+            automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "adaptive"),
+            automation.ConfigEntry("perf_model/dram/compression_model/zlib", "compression_latency", "5"),
+            automation.ConfigEntry("perf_model/dram/compression_model/zlib", "decompression_latency", "5"),
         ]
     ),
-    # 4) LZ78
+    # 4) Deflate 10 GB/s
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "512"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
             automation.ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
-            automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lz78"),
-        ]
-    ),
-    # 5) LZW
-    automation.ExperimentRunConfig(
-        [
-            automation.ConfigEntry("perf_model/l3_cache", "cache_size", "512"),
-            automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
-            automation.ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
-            automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lzw"),
-        ]
-    ),
-    # 6) Deflate
-    automation.ExperimentRunConfig(
-        [
-            automation.ConfigEntry("perf_model/l3_cache", "cache_size", "512"),
-            automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
-            automation.ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
-            automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "zlib"),
+            automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "adaptive"),
+            automation.ConfigEntry("perf_model/dram/compression_model/zlib", "compression_latency", "10"),
+            automation.ConfigEntry("perf_model/dram/compression_model/zlib", "decompression_latency", "10"),
         ]
     ),
 ]
@@ -126,7 +116,7 @@ nw_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sni
 hpcg_base_options = "cp {sniper_root}/benchmarks/hpcg/linux_serial/bin/hpcg.dat .;{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/hpcg/linux_serial/bin/xhpcg".format(
     sniper_root=subfolder_sniper_root_relpath
 )
-sls_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/sls/bin/sls -f /home/shared/sls.in".format(
+sls_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/sls/bin/sls -f {sniper_root}/benchmarks/sls/sls_inputs/sls.in".format(
     sniper_root=subfolder_sniper_root_relpath
 )
 
@@ -315,7 +305,7 @@ def run_sssp(input):
     net_lat = 120
     for remote_init in ["true"]:  # "false"
         for num_B in [524288]:
-            for bw_scalefactor in [16]:
+            for bw_scalefactor in [4, 16]:
                 localdram_size_str = "{}B".format(num_B)
                 command_str = sssp_base_options.format(
                     input,
@@ -348,7 +338,7 @@ def run_hpcg():
     experiments = []
     net_lat = 120
     for num_MB in [32]:
-        for bw_scalefactor in [16]:
+        for bw_scalefactor in [4, 16]:
             localdram_size_str = "{}MB".format(num_MB)
             command_str = hpcg_base_options.format(
                 sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
@@ -377,7 +367,7 @@ def run_nw(type):
     experiments = []
     net_lat = 120
     for num_MB in [4]:
-        for bw_scalefactor in [16]:
+        for bw_scalefactor in [4, 16]:
             localdram_size_str = "{}MB".format(num_MB)
             command_str = nw_base_options.format(
                 type, 
@@ -407,7 +397,7 @@ def run_sls():
     experiments = []
     net_lat = 120
     for num_MB in [16]:
-        for bw_scalefactor in [16]:
+        for bw_scalefactor in [4, 16]:
             localdram_size_str = "{}MB".format(num_MB)
             command_str = sls_base_options.format(
                 sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
@@ -433,7 +423,7 @@ def run_sls():
     return experiments
 
 def graph(res_name, benchmark_list, local_dram_list, bw_scalefactor_list):
-    labels = ["Remote Bandwidth Scalefactor", "BDI", "FPC", "LZ78(ideal)", "LZW(ideal)", "Deflate"]
+    labels = ["Remote Bandwidth Scalefactor", "C0", "1 GB/s", "2 GB/s", "5 GB/s", "10 GB/s"]
     # "stream_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_combo"
 
     process = 0
@@ -502,11 +492,11 @@ def gen_settings_for_graph(benchmark_name):
         local_dram_list = ["4MB"]
         bw_scalefactor_list = [4]
     elif benchmark_name == "triangle_reg":
-        res_name = "triangle_reg_16MB_comparison"
+        res_name = "triangle_reg_16MB_adaptive_fixed"
         benchmark_list = []
         benchmark_list.append("ligra_{}_".format("triangle"))
         local_dram_list = ["16MB"]
-        bw_scalefactor_list = [4]
+        bw_scalefactor_list = [4, 16]
     elif benchmark_name == "bc_reg":
         res_name = "bc_reg_4MB_comparison"
         benchmark_list = []
@@ -527,12 +517,12 @@ def gen_settings_for_graph(benchmark_name):
         local_dram_list = ["2MB"]
         bw_scalefactor_list = [4]
     elif benchmark_name == "darknet19":
-        res_name = "darknet19_2MB_comparison"
+        res_name = "darknet19_2MB_adaptive_fixed"
         benchmark_list = []
         for model in ["darknet19"]:
             benchmark_list.append("darknet_{}_".format(model))
         local_dram_list = ["2MB"]
-        bw_scalefactor_list = [4]
+        bw_scalefactor_list = [4, 16]
     elif benchmark_name == "resnet50":
         res_name = "resnet50_2MB_comparison"
         benchmark_list = []
@@ -551,7 +541,7 @@ def gen_settings_for_graph(benchmark_name):
         benchmark_list = []
         benchmark_list.append("stream_0_")
         local_dram_list = ["2MB"]
-        bw_scalefactor_list = [4]
+        bw_scalefactor_list = [4, 16]
     elif benchmark_name == "hpcg":
         res_name = "hpcg_32MB_comparison"
         benchmark_list = []
@@ -585,7 +575,6 @@ experiments = []
 # experiments.extend(run_ligra("Components", "regular_input", 4))
 # experiments.extend(run_nw("2048"))
 # experiments.extend(run_sls())
-# experiments.extend(run_ligra("PageRank", "regular_input", 8))
 
 log_filename = "run-sniper-repeat2_1.log"
 num = 2
@@ -609,5 +598,5 @@ with open(log_filename, "w") as log_file:
     print(log_str, file=log_file)
 
 # TODO: Generate graph
-# res_name, benchmark_list, local_dram_list, bw_scalefactor_list = gen_settings_for_graph("triangle_reg")
+# res_name, benchmark_list, local_dram_list, bw_scalefactor_list = gen_settings_for_graph("darknet19")
 # graph(res_name, benchmark_list, local_dram_list, bw_scalefactor_list)

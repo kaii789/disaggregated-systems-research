@@ -172,7 +172,7 @@ static void read_SLSdata(const char* fileName) {
                 while (token != NULL) {
                     //printf("token indices %s %s ", token, trimstr(token, &end_tbl));
                     int indx = atoi(trimstr(token, &end_tbl));
-                    //printf("indx %d %d %d %d", indx, batch_id, i, j);
+                    // printf("indx %d %d %d %d", indx, batch_id, i, j);
                     batch_queries[batch_id][i].poolindx[j] = indx;
                     if (end_tbl == true) {
                         i++;
@@ -186,12 +186,18 @@ static void read_SLSdata(const char* fileName) {
                 }
                 indices = false;
                 batch_id++;
+                if (batch_id == 1000) {
+                    free(line);
+                    fclose(fp);
+                    return;
+                }
             }
         }
     }
 
     //printf("\n");
     free(line);
+    fclose(fp);
 }
 
 /*

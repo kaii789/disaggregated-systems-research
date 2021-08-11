@@ -61,6 +61,8 @@ using std::endl;
 #include "TestSymmetry.hpp"
 #include "TestNorms.hpp"
 
+#include "sim_api.h"
+
 /*!
   Main driver program: Construct synthetic problem, run V&V tests, compute benchmark parameters, run benchmark, report results.
 
@@ -71,6 +73,8 @@ using std::endl;
 
 */
 int main(int argc, char * argv[]) {
+
+  SimRoiStart();
 
 #ifndef HPCG_NO_MPI
   MPI_Init(&argc, &argv);
@@ -371,6 +375,7 @@ int main(int argc, char * argv[]) {
 
 
   HPCG_Finalize();
+  SimRoiEnd();
 
   // Finish up
 #ifndef HPCG_NO_MPI

@@ -48,6 +48,7 @@ class DramPerfModelDisagg : public DramPerfModel
         ComponentBandwidth m_r_bus_bandwidth;   // Remote
         ComponentBandwidth m_r_part_bandwidth;  // Remote - Partitioned Queues => Page Queue
         ComponentBandwidth m_r_part2_bandwidth; // Remote - Partitioned Queues => Cacheline Queue
+        bool m_use_dynamic_bandwidth;
         const SubsecondTime m_bank_keep_open;
         const SubsecondTime m_bank_open_delay;
         const SubsecondTime m_bank_close_delay;
@@ -188,6 +189,9 @@ class DramPerfModelDisagg : public DramPerfModel
         SubsecondTime m_total_local_access_latency;
         SubsecondTime m_total_remote_access_latency;
 
+        // Dynamic BW
+        long long int m_update_bandwidth_count = 0;
+
         void parseDeviceAddress(IntPtr address, UInt32 &channel, UInt32 &rank, UInt32 &bank_group, UInt32 &bank, UInt32 &column, UInt64 &dram_page);
         UInt64 parseAddressBits(UInt64 address, UInt32 &data, UInt32 offset, UInt32 size, UInt64 base_address);
         SubsecondTime possiblyEvict(UInt64 phys_page, SubsecondTime pkt_time, core_id_t requester); 
@@ -198,6 +202,7 @@ class DramPerfModelDisagg : public DramPerfModel
 
         ~DramPerfModelDisagg();
         void finalizeStats();
+        void updateBandwidth();
 
         bool isRemoteAccess(IntPtr address, core_id_t requester, DramCntlrInterface::access_t access_type); 
         SubsecondTime getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_size, core_id_t requester, IntPtr address, DramCntlrInterface::access_t access_type, ShmemPerf *perf);

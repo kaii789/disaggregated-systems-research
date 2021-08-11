@@ -41,6 +41,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_r_bus_bandwidth     (m_dram_speed * m_data_bus_width / (1000 * Sim()->getCfg()->getFloat("perf_model/dram/remote_mem_bw_scalefactor"))) // Remote memory
     , m_r_part_bandwidth    (m_dram_speed * m_data_bus_width / (1000 * Sim()->getCfg()->getFloat("perf_model/dram/remote_mem_bw_scalefactor") / (1 - Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_fraction")))) // Remote memory - Partitioned Queues => Page Queue
     , m_r_part2_bandwidth   (m_dram_speed * m_data_bus_width / (1000 * Sim()->getCfg()->getFloat("perf_model/dram/remote_mem_bw_scalefactor") / Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_fraction"))) // Remote memory - Partitioned Queues => Cacheline Queue
+    , m_use_dynamic_bandwidth (Sim()->getCfg()->getBool("perf_model/dram/use_dynamic_bandwidth"))
     , m_bank_keep_open      (SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/ddr/bank_keep_open")))
     , m_bank_open_delay     (SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/ddr/bank_open_delay")))
     , m_bank_close_delay    (SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/ddr/bank_close_delay")))
@@ -271,6 +272,9 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     }
     // Make sure last one is p100
     registerStatsMetric("dram", core_id, "page-access-count-p100", &(page_usage_count_stats[m_page_usage_stats_num_points - 1]));
+
+    // RNG
+    srand (time(NULL));
 }
 
 DramPerfModelDisagg::~DramPerfModelDisagg()
@@ -684,6 +688,11 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     if (m_use_compression)
     {
         if (m_r_cacheline_gran) {
+            if (m_r_partition_queues == 1)
+                m_compression_model->update_bandwidth_utilization(m_data_movement_2->getQueueUtilizationPercentage(t_now));
+            else
+                m_compression_model->update_bandwidth_utilization(m_data_movement->getQueueUtilizationPercentage(t_now));
+
             UInt32 compressed_cache_lines;
             cacheline_compression_latency = m_compression_model->compress(phys_page, m_cache_line_size, m_core_id, &size, &compressed_cache_lines);
             if (m_cache_line_size > size)
@@ -696,6 +705,11 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             m_total_compression_latency += cacheline_compression_latency;
             t_now += cacheline_compression_latency;
         } else if (m_use_cacheline_compression) {
+            if (m_r_partition_queues == 1)
+                m_cacheline_compression_model->update_bandwidth_utilization(m_data_movement_2->getQueueUtilizationPercentage(t_now));
+            else
+                m_cacheline_compression_model->update_bandwidth_utilization(m_data_movement->getQueueUtilizationPercentage(t_now));
+
             UInt32 compressed_cache_lines;
             cacheline_compression_latency = m_cacheline_compression_model->compress(phys_page, m_cache_line_size, m_core_id, &size, &compressed_cache_lines);
             if (m_cache_line_size > size)
@@ -837,13 +851,15 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             UInt32 page_size = m_page_size;
             if (m_use_compression)
             {
+                m_compression_model->update_bandwidth_utilization(m_data_movement->getQueueUtilizationPercentage(t_now));
+
                 UInt32 compressed_cache_lines;
                 page_compression_latency = m_compression_model->compress(phys_page, m_page_size, m_core_id, &page_size, &compressed_cache_lines);
                 if (m_page_size > page_size)
                     bytes_saved += m_page_size - page_size;
                 else
                     bytes_saved -= page_size - m_page_size;
-         
+
                 address_to_compressed_size[phys_page] = page_size;
                 address_to_num_cache_lines[phys_page] = compressed_cache_lines;
                 m_total_compression_latency += page_compression_latency;
@@ -943,8 +959,14 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
 SubsecondTime
 DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, core_id_t requester, IntPtr address, DramCntlrInterface::access_t access_type, ShmemPerf *perf)
 {
+    // Updata bandwidth factor every 1K remote accesses
+    /*
+    if ((m_local_reads_remote_origin + m_local_writes_remote_origin + m_remote_reads + m_remote_writes) % 1000 == 0 && m_use_dynamic_bandwidth)
+        updateBandwidth();
+    */
+
     UInt64 phys_page = address & ~((UInt64(1) << floorLog2(m_page_size)) - 1);
-    if (m_r_cacheline_gran) 
+    if (m_r_cacheline_gran)
         phys_page =  address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1); // Was << 6
     UInt64 cacheline =  address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1); // Was << 6
 
@@ -1168,8 +1190,20 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
     }
 }
 
+void
+DramPerfModelDisagg::updateBandwidth()
+{
+    m_update_bandwidth_count += 1;
+    if (m_use_dynamic_bandwidth && m_update_bandwidth_count % 20 == 0) {
+        // Randomly choose bw scalefactor between [4, 16]
+        float bw_scalefactor = (rand() % 13) + 4;
+        m_r_bus_bandwidth.changeBandwidth(m_dram_speed * m_data_bus_width / (1000 * bw_scalefactor)); // Remote memory
+        m_r_part_bandwidth.changeBandwidth((m_dram_speed * m_data_bus_width / (1000 * bw_scalefactor / (1 - Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_fraction"))))); // Remote memory - Partitioned Queues => Page Queue
+        m_r_part2_bandwidth.changeBandwidth((m_dram_speed * m_data_bus_width / (1000 * bw_scalefactor / Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_fraction")))); // Remote memory - Partitioned Queues => Cacheline Queue
+    }
+}
 
-bool 
+bool
 DramPerfModelDisagg::isRemoteAccess(IntPtr address, core_id_t requester, DramCntlrInterface::access_t access_type) 
 {
     UInt64 num_local_pages = m_localdram_size/m_page_size;
@@ -1322,6 +1356,8 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
             UInt32 size = m_r_cacheline_gran ? m_cache_line_size : m_page_size;
             if (m_use_compression)
             {
+                m_compression_model->update_bandwidth_utilization(m_data_movement->getQueueUtilizationPercentage(t_now));
+
                 UInt32 gran_size = size;
                 UInt32 compressed_cache_lines;
                 SubsecondTime compression_latency = m_compression_model->compress(evicted_page, gran_size, m_core_id, &size, &compressed_cache_lines);
@@ -1370,6 +1406,8 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
             UInt32 size = m_r_cacheline_gran ? m_cache_line_size : m_page_size;
             if (m_use_compression)
             {
+                m_compression_model->update_bandwidth_utilization(m_data_movement->getQueueUtilizationPercentage(t_now));
+
                 UInt32 gran_size = size;
                 UInt32 compressed_cache_lines;
                 SubsecondTime compression_latency = m_compression_model->compress(evicted_page, gran_size, m_core_id, &size, &compressed_cache_lines);
@@ -1451,6 +1489,8 @@ DramPerfModelDisagg::possiblyPrefetch(UInt64 phys_page, SubsecondTime t_now, cor
         SubsecondTime page_compression_latency = SubsecondTime::Zero();  // when page compression is not enabled, this is always 0
         if (m_use_compression)
         {
+            m_compression_model->update_bandwidth_utilization(m_data_movement->getQueueUtilizationPercentage(t_now));
+
             UInt32 gran_size = size;
             UInt32 compressed_cache_lines;
             page_compression_latency = m_compression_model->compress(pref_page, gran_size, m_core_id, &size, &compressed_cache_lines);
