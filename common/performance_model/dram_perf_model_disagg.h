@@ -193,13 +193,13 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 parseAddressBits(UInt64 address, UInt32 &data, UInt32 offset, UInt32 size, UInt64 base_address);
         SubsecondTime possiblyEvict(UInt64 phys_page, SubsecondTime pkt_time, core_id_t requester); 
         void possiblyPrefetch(UInt64 phys_page, SubsecondTime pkt_time, core_id_t requester); 
-        void updateBandwidth();
 
     public:
         DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_size, AddressHomeLookup* address_home_lookup);
 
         ~DramPerfModelDisagg();
         void finalizeStats();
+        void updateBandwidth();
 
         bool isRemoteAccess(IntPtr address, core_id_t requester, DramCntlrInterface::access_t access_type); 
         SubsecondTime getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_size, core_id_t requester, IntPtr address, DramCntlrInterface::access_t access_type, ShmemPerf *perf);
