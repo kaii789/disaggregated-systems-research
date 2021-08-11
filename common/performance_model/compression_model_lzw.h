@@ -44,10 +44,9 @@ private:
     // Fine-grain compression granularity within the page
     UInt8 m_word_size = 1;
     SInt32 m_compression_granularity;
-    UInt8 m_cam_size = 256;
-    UInt8 m_cam_size_log2 = 8;
 
     CAMLZ *compression_CAM; 
+    bool m_size_limit;
 
     SInt64 readWord(void*, UInt32, UInt32);
     void writeWord(void*, UInt32, SInt64, UInt32);

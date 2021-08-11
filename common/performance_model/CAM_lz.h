@@ -24,8 +24,8 @@ public:
 
 private:
     string m_name;
-    UInt32 m_size = 1024;
-    UInt32 m_max_entry = 96; // bytes
+    UInt32 m_size = 768;
+    UInt32 m_max_entry = 64; // bytes
     bool m_size_limit = true;
     UInt32 m_cur_size = 0;
     UInt32 m_start_replacement_index = 1;
