@@ -13,6 +13,7 @@
 #include "compression_model_lzw.h"
 #include "compression_model_lzbdi.h"
 #include "compression_model_zlib.h"
+#include "compression_model_adaptive.h"
 
 CompressionModel*
 CompressionModel::create(String name, UInt32 id, UInt32 page_size, UInt32 cache_line_size, String compression_type)
@@ -57,10 +58,19 @@ CompressionModel::create(String name, UInt32 id, UInt32 page_size, UInt32 cache_
     {
         return new CompressionModelZlib(name, id, page_size, cache_line_size);
     }
+    else if (compression_type == "adaptive")
+    {
+        return new CompressionModelAdaptive(name, id, page_size, cache_line_size);
+    }
     else
     {
         LOG_PRINT_ERROR("Unrecognized Compression Model(%s)", compression_type.c_str());
         return (CompressionModel*) NULL;
 
     }
+}
+
+void
+CompressionModel::update_bandwidth_utilization(double bandwidth_utilization)
+{
 }

@@ -38,6 +38,8 @@ class DramPerfModel
       void disable() { m_enabled = false; }
 
       virtual void finalizeStats() = 0;
+      virtual void updateBandwidth() = 0;
+
       UInt64 getTotalAccesses() { return m_num_accesses; }
 };
 
