@@ -13,6 +13,7 @@
 #include <bitset>
 #include <map>
 #include <list>
+#include <set>
 #include <algorithm>
 
 class DramPerfModelDisagg : public DramPerfModel
@@ -48,6 +49,7 @@ class DramPerfModelDisagg : public DramPerfModel
         ComponentBandwidth m_r_bus_bandwidth;   // Remote
         ComponentBandwidth m_r_part_bandwidth;  // Remote - Partitioned Queues => Page Queue
         ComponentBandwidth m_r_part2_bandwidth; // Remote - Partitioned Queues => Cacheline Queue
+        double m_r_bw_scalefactor;              // Remote memory bandwidth is ddr bandwidth scaled down by m_r_bw_scalefactor
         const SubsecondTime m_bank_keep_open;
         const SubsecondTime m_bank_open_delay;
         const SubsecondTime m_bank_close_delay;
@@ -76,6 +78,7 @@ class DramPerfModelDisagg : public DramPerfModel
         const bool m_r_enable_selective_moves; 
         const UInt32 m_r_partition_queues; // Enable partitioned queues
         double m_r_cacheline_queue_fraction; // The fraction of remote bandwidth used for the cacheline queue (decimal between 0 and 1) 
+        bool m_use_dynamic_cl_queue_fraction_adjustment; // Whether to dynamically adjust m_r_cacheline_queue_fraction
         const bool m_r_cacheline_gran; // Move data and operate in cacheline granularity
         const UInt32 m_r_reserved_bufferspace; // Max % of local DRAM that can be reserved for pages in transit
         const UInt32 m_r_limit_redundant_moves; 
@@ -152,6 +155,26 @@ class DramPerfModelDisagg : public DramPerfModel
         PrefetcherModel *m_prefetcher_model;
         bool m_prefetch_unencountered_pages;      // Whether to prefetch pages that haven't been encountered yet in program execution
 
+        // Page spatial locality tracker
+        UInt64 m_num_recent_remote_accesses;
+        UInt64 m_num_recent_remote_additional_accesses;   // For cacheline queue requests made on inflight pages. Track this separately since they could be counted as either "remote" or "local" cacheline accesses
+        UInt64 m_num_recent_local_accesses;
+        // SubsecondTime m_recent_access_count_begin_time;
+        std::set<UInt64> m_recent_accessed_pages;
+        std::vector<double> m_page_locality_measures;
+        std::vector<double> m_modified_page_locality_measures;
+        std::vector<double> m_modified2_page_locality_measures;
+
+        // Stats for when dynamically adjusting m_r_cacheline_queue_fraction
+        UInt64 m_r_cacheline_queue_fraction_increased;
+        UInt64 m_r_cacheline_queue_fraction_decreased;
+        double m_min_r_cacheline_queue_fraction;
+        double m_max_r_cacheline_queue_fraction;
+        UInt64 m_min_r_cacheline_queue_fraction_stat_scaled;  // Min cl queue fraction * 10^4, saving double as an int for sim.out
+        UInt64 m_max_r_cacheline_queue_fraction_stat_scaled;  // Max cl queue fraction * 10^4, saving double as an int for sim.out
+
+        UInt64 m_num_accesses;                                // Total number of calls to getAccessLatency(), ie # cachelines requested
+
         // Variables to keep track of stats
         UInt64 m_dram_page_hits;
         UInt64 m_dram_page_empty;
@@ -199,8 +222,13 @@ class DramPerfModelDisagg : public DramPerfModel
 
         void parseDeviceAddress(IntPtr address, UInt32 &channel, UInt32 &rank, UInt32 &bank_group, UInt32 &bank, UInt32 &column, UInt64 &dram_page);
         UInt64 parseAddressBits(UInt64 address, UInt32 &data, UInt32 offset, UInt32 size, UInt64 base_address);
-        SubsecondTime possiblyEvict(UInt64 phys_page, SubsecondTime pkt_time, core_id_t requester); 
-        void possiblyPrefetch(UInt64 phys_page, SubsecondTime pkt_time, core_id_t requester); 
+        SubsecondTime possiblyEvict(UInt64 phys_page, SubsecondTime pkt_time, core_id_t requester);
+        void possiblyPrefetch(UInt64 phys_page, SubsecondTime pkt_time, core_id_t requester);
+        void updateBandwidth();
+
+        // Helper to print vector percentiles, for stats output
+        template<typename T>
+        void sortAndPrintVectorPercentiles(std::vector<T>& vec, std::ostringstream& percentages_buffer, std::ostringstream& counts_buffer, UInt32 num_bins = 40);
 
     public:
         DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_size, AddressHomeLookup* address_home_lookup);

@@ -50,6 +50,9 @@ public:
       return 0.0;  // placeholder since the method is currently only implemented in the windowed_mg1_remote* QueueModel's
    };
 
+   // This method currently only implemented in remote_ind_queues QueueModel
+   virtual void updateBandwidth(UInt64 bw_bits_per_us, double r_cacheline_queue_fraction) {};
+
    virtual void finalizeStats() {};
 
    static QueueModel* create(String name, UInt32 id, String model_type, SubsecondTime min_processing_time);
