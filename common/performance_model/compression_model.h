@@ -8,6 +8,7 @@
 #include "simulator.h"
 #include "subsecond_time.h"
 #include "core_manager.h"
+#include "queue_model.h"
 #include <map>
 #include <vector>
 
@@ -21,7 +22,8 @@ class CompressionModel
         virtual SubsecondTime compress_multipage(std::vector<UInt64> addr_list, UInt32 num_pages, core_id_t core_id, UInt32 *compressed_multipage_size, std::map<UInt64, UInt32> *address_to_num_cache_lines) = 0;
         virtual SubsecondTime decompress_multipage(std::vector<UInt64> addr_list, UInt32 num_pages, core_id_t core_id, std::map<UInt64, UInt32> *address_to_num_cache_lines) = 0;
         virtual void finalizeStats() = 0;
-        virtual void update_bandwidth_utilization(double bandwidth_utilization);
+        virtual void update_bandwidth_utilization(double bandwidth_utilization) {};
+        virtual void update_queue_model(QueueModel *queue_model, SubsecondTime t_now, ComponentBandwidth *bandwidth, core_id_t requester) {};
 
         static CompressionModel* create(String name, UInt32 id, UInt32 page_size, UInt32 cache_line_size, String compression_type);
 };
