@@ -61,3 +61,16 @@ echo
 echo "Compiling Rodinia..."
 cd ../../rodinia
 make
+
+# Set up SLS
+echo
+echo "Compiling SLS..."
+cd ../sls/src
+make
+
+# Set up hpcg
+echo
+echo "Compiling HPCG..."
+cd ../hpcg/linux_serial
+../configure Linux_Serial
+make

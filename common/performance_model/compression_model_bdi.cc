@@ -1,15 +1,17 @@
 #include "compression_model_bdi.h"
 #include "utils.h"
+#include "stats.h"
 #include "config.hpp"
 
-CompressionModelBDI::CompressionModelBDI(String name, UInt32 page_size, UInt32 cache_line_size)
+CompressionModelBDI::CompressionModelBDI(String name, UInt32 id, UInt32 page_size, UInt32 cache_line_size)
     : m_name(name)
     , m_page_size(page_size)
     , m_cache_line_size(cache_line_size)
     , m_compression_granularity(Sim()->getCfg()->getInt("perf_model/dram/compression_model/bdi/compression_granularity"))
     , use_additional_options(Sim()->getCfg()->getBool("perf_model/dram/compression_model/bdi/use_additional_options"))
+    , m_total_compressed(0)
 {
-    m_options = (use_additional_options) ? 21 : 8;
+    m_options = (use_additional_options) ? 16 : 11;
 
     // Set compression/decompression cycle latencies if configured
     if (Sim()->getCfg()->getInt("perf_model/dram/compression_model/bdi/compression_latency") != -1)
@@ -26,6 +28,21 @@ CompressionModelBDI::CompressionModelBDI(String name, UInt32 page_size, UInt32 c
     m_compressed_data_buffer = new char[m_page_size + m_cacheline_count];
     m_compressed_cache_line_sizes = new UInt32[m_cacheline_count];
 
+    // Register stats for compression_options
+    registerStatsMetric("compression", id, "bdi_total_compressed", &(m_total_compressed));
+    for (UInt32 i = 0; i < 13; i++) {
+        String stat_name = "bdi_usage_option-";
+        stat_name += std::to_string(i).c_str();
+        registerStatsMetric("compression", id, stat_name, &(m_compress_options[i]));
+    }
+
+    for (UInt32 i = 0; i < 13; i++) {
+        String stat_name = "bdi_bytes_saved_option-";
+        stat_name += std::to_string(i).c_str();
+        registerStatsMetric("compression", id, stat_name, &(m_bytes_saved_per_option[i]));
+    }
+
+
 }
 
 CompressionModelBDI::~CompressionModelBDI()
@@ -33,6 +50,14 @@ CompressionModelBDI::~CompressionModelBDI()
     delete [] m_data_buffer;
     delete [] m_compressed_data_buffer;
     delete [] m_compressed_cache_line_sizes;
+}
+
+void
+CompressionModelBDI::finalizeStats()
+{
+    for (UInt32 i = 0; i < 16; i++) {
+        m_total_compressed += m_compress_options[i];
+    }
 }
 
 SubsecondTime
@@ -136,22 +161,11 @@ bool
 CompressionModelBDI::checkDeltaLimits(SInt64 delta, UInt32 delta_size)
 {
     bool within_limits = true;
-    switch (delta_size)
-    {
-        case 4:
-            if ((delta < INT_MIN) || (delta > INT_MAX)) within_limits = false;
-            break;
-        case 3:
-            break;
-        case 2:
-            if ((delta < SHRT_MIN) || (delta > SHRT_MAX)) within_limits = false;
-            break;
-        case 1:
-            if ((delta < SCHAR_MIN) || (delta > SCHAR_MAX)) within_limits = false;
-            break;
-        default:
-            fprintf(stderr,"Unknown Delta Size\n");
-            exit(1);
+    SInt8 cur_byte;
+    for(SInt8 j = delta_size; j < sizeof(SInt64); j++) {     
+        cur_byte = (delta >> (8*j)) & 0xff; // Get j-th byte from the word
+        if (cur_byte != 0)
+            within_limits = false;
     }
     return within_limits;
 }
@@ -161,12 +175,14 @@ CompressionModelBDI::zeroValues(void* in, m_compress_info *res, void* out)
 {
     // Zero compression compresses an all-zero cache line into a bit that just indicates that the cache line is all-zero.
     char base;
-    UInt32 i;
+    UInt32 i = 0;
     base = ((char*)in)[0];
-    for (i = 1; i < m_cache_line_size; i++)
-        if((base - (((char*)in)[i])) != 0)
-            break;
-    
+    if (base == 0) { 
+        for (i = 1; i < m_cache_line_size; i++)
+            if((base - (((char*)in)[i])) != 0)
+                break;
+    } 
+
     if (i == m_cache_line_size) {
         res->is_compressible = true;
         res->compressed_size = 1;
@@ -179,65 +195,62 @@ CompressionModelBDI::zeroValues(void* in, m_compress_info *res, void* out)
 }
 
 void
-CompressionModelBDI::repeatedValues(void* in, m_compress_info *res, void* out)
+CompressionModelBDI::repeatedValues(void* in, m_compress_info *res, void* out, UInt32 k)
 {
     //  Repeated value compression checks if a cache line has the same 1/2/4/8 byte value repeated. If so, it compresses the cache line to the corresponding value
     SInt64 base;
     bool repeated;
     UInt32 i;
-    UInt32 k;
-    for(k = 1; k <= 8; k*=2) {
-        repeated = true;
-        switch(k)
-        {
-            case 8:   
-                base = ((SInt64*)in)[0];
-                for (i = 1; i < (m_cache_line_size / k); i++) 
-                    if ((base - ((SInt64*)in)[i]) != 0) {
-                        repeated = false;
-                        break;
-                    }
-                break;          
-            case 4:   
-                base = ((SInt32*)in)[0];
-                for (i = 1; i < (m_cache_line_size / k); i++) 
-                    if ((base - ((SInt32*)in)[i]) != 0) {
-                        repeated = false;
-                        break;
-                    }
-                break;
-            case 2:
-                base = ((SInt16*)in)[0];
-                for (i = 1; i < (m_cache_line_size / k); i++) 
-                    if ((base - ((SInt16*)in)[i]) != 0) {
-                        repeated = false;
-                        break;
-                    }
-                break;
-            case 1:
-                base = ((SInt8*)in)[0];
-                for (i = 1; i < (m_cache_line_size / k); i++) 
-                    if ((base - ((SInt8*)in)[i]) != 0) {
-                        repeated = false;
-                        break;
-                    }
-                break;
-            default:
-                fprintf(stderr,"Unknown Base Size\n");
-                exit(1);
+    repeated = true;
+    switch(k)
+    {
+        case 8:   
+            base = ((SInt64*)in)[0];
+            for (i = 1; i < (m_cache_line_size / k); i++) 
+                if ((base - ((SInt64*)in)[i]) != 0) {
+                    repeated = false;
+                    break;
+                }
+            break;          
+        case 4:   
+            base = ((SInt32*)in)[0];
+            for (i = 1; i < (m_cache_line_size / k); i++) 
+                if ((base - ((SInt32*)in)[i]) != 0) {
+                    repeated = false;
+                    break;
+                }
+            break;
+        case 2:
+            base = ((SInt16*)in)[0];
+            for (i = 1; i < (m_cache_line_size / k); i++) 
+                if ((base - ((SInt16*)in)[i]) != 0) {
+                    repeated = false;
+                    break;
+                }
+            break;
+        case 1:
+            base = ((SInt8*)in)[0];
+            for (i = 1; i < (m_cache_line_size / k); i++) 
+                if ((base - ((SInt8*)in)[i]) != 0) {
+                    repeated = false;
+                    break;
+                }
+            break;
+        default:
+            fprintf(stderr,"Unknown Base Size\n");
+            exit(1);
 
 
-        }      
+    }      
 
-        if (repeated == true) {
-            res->is_compressible = true;
-            res->compressed_size = k;
-            writeWord(out, 0, k, sizeof(char));
-            out = (void*)(((char*)out)+1); // Move out pointer by one byte
-            writeWord(out, 0, base, k * sizeof(char));
-            return;
-        } 
-    }
+    if (repeated == true) {
+        res->is_compressible = true;
+        res->compressed_size = k;
+        writeWord(out, 0, k, sizeof(char));
+        out = (void*)(((char*)out)+1); // Move out pointer by one byte
+        writeWord(out, 0, base, k * sizeof(char));
+        return;
+    } 
 
     assert(repeated == false && "[BDI] repeated_values() failed!");
     res->is_compressible = false;
@@ -297,41 +310,52 @@ CompressionModelBDI::compressCacheLine(void* in, void* out)
     zeroValues(in, &(m_options_compress_info[cur_option]), (void*) m_options_data_buffer[cur_option]);
     cur_option++;
 
-    // Option 1: a single value repeated multiple times within the cache line (8-byte granularity) 
-    repeatedValues(in, &(m_options_compress_info[cur_option]), (void*) m_options_data_buffer[cur_option]);
+
+
+    // Option 1: a single value with 1-byte size granularity repeated through the cache line 
+    repeatedValues(in, &(m_options_compress_info[cur_option]), (void*) m_options_data_buffer[cur_option], 1);
     cur_option++;
+
+    // Option 2: a single value with 2-byte size granularity repeated through the cache line 
+    repeatedValues(in, &(m_options_compress_info[cur_option]), (void*) m_options_data_buffer[cur_option], 2);
+    cur_option++;
+
+    // Option 3: a single value with 4-byte size granularity repeated through the cache line 
+    repeatedValues(in, &(m_options_compress_info[cur_option]), (void*) m_options_data_buffer[cur_option], 4);
+    cur_option++;
+
+    // Option 4: a single value with 8-byte size granularity repeated through the cache line 
+    repeatedValues(in, &(m_options_compress_info[cur_option]), (void*) m_options_data_buffer[cur_option], 8);
+    cur_option++;
+
 
     if (use_additional_options) {
         // Additional Options:
-        // Option 2: base_size = 8 bytes, delta_size = 1 byte
-        // Option 3: base_size = 8 bytes, delta_size = 2 bytes
-        // Option 4: base_size = 8 bytes, delta_size = 3 bytes
-        // Option 5: base_size = 8 bytes, delta_size = 4 bytes
-        // Option 6: base_size = 4 bytes, delta_size = 1 byte
-        // Option 7: base_size = 4 bytes, delta_size = 2 bytes
-        // Option 8: base_size = 4 bytes, delta_size = 3 bytes
-        // Option 9: base_size = 2 bytes, delta_size = 1 byte
+        // Option 5: base_size = 8 bytes, delta_size = 1 byte
+        // Option 6: base_size = 8 bytes, delta_size = 2 bytes
+        // Option 7: base_size = 8 bytes, delta_size = 3 bytes
+        // Option 8: base_size = 8 bytes, delta_size = 4 bytes
+        // Option 9: base_size = 8 bytes, delta_size = 5 bytes
+        // Option 10: base_size = 8 bytes, delta_size = 6 bytes
+        // Option 11: base_size = 8 bytes, delta_size = 7 bytes
+        // Option 12: base_size = 4 bytes, delta_size = 1 byte
+        // Option 13: base_size = 4 bytes, delta_size = 2 bytes
+        // Option 14: base_size = 4 bytes, delta_size = 3 bytes
+        // Option 15: base_size = 2 bytes, delta_size = 1 byte
         for (b = 8; b >= 2; b /= 2) {
-            if (b > 4) {
-                for(d = 1; d <= 4; d++){
-                    specializedCompress(in, &(m_options_compress_info[cur_option]), (void*)m_options_data_buffer[cur_option], b, d);
-                    cur_option++;
-                }
-            } else {
-                for(d = 1; d < b; d++){
-                    specializedCompress(in, &(m_options_compress_info[cur_option]), (void*)m_options_data_buffer[cur_option], b, d);
-                    cur_option++;
-                }
+            for(d = 1; d < b; d++){
+                specializedCompress(in, &(m_options_compress_info[cur_option]), (void*)m_options_data_buffer[cur_option], b, d);
+                cur_option++;
             }
         }
     } else {
         // Original Options:
-        // Option 2: base_size = 8 bytes, delta_size = 1 byte
-        // Option 3: base_size = 8 bytes, delta_size = 2 bytes
-        // Option 4: base_size = 8 bytes, delta_size = 4 bytes
-        // Option 5: base_size = 4 bytes, delta_size = 1 byte
-        // Option 6: base_size = 4 bytes, delta_size = 2 bytes
-        // Option 7: base_size = 2 bytes, delta_size = 1 byte
+        // Option 5: base_size = 8 bytes, delta_size = 1 byte
+        // Option 6: base_size = 8 bytes, delta_size = 2 bytes
+        // Option 7: base_size = 8 bytes, delta_size = 4 bytes
+        // Option 8: base_size = 4 bytes, delta_size = 1 byte
+        // Option 9: base_size = 4 bytes, delta_size = 2 bytes
+        // Option 10: base_size = 2 bytes, delta_size = 1 byte
         for (b = 8; b >= 2; b /= 2) {
             for(d = 1; d <= (b/2); d *= 2){
                 specializedCompress(in, &(m_options_compress_info[cur_option]), (void*)m_options_data_buffer[cur_option], b, d);
@@ -349,6 +373,12 @@ CompressionModelBDI::compressCacheLine(void* in, void* out)
                 chosen_option = i; // Update chosen option
             }
         }
+    }
+
+    // Statistics
+    if(chosen_option != 42) {
+        m_compress_options[chosen_option]++;
+        m_bytes_saved_per_option[chosen_option] += (m_cache_line_size - compressed_size); 
     }
 
     ((char*)out)[0] = (char) chosen_option; // Store chosen_option in the first byte of out data buffer

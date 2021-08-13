@@ -2,23 +2,33 @@
 #include "utils.h"
 #include "config.hpp"
 
-CompressionModelLCP::CompressionModelLCP(String name, UInt32 page_size, UInt32 cache_line_size)
+CompressionModelLCP::CompressionModelLCP(String name, UInt32 id, UInt32 page_size, UInt32 cache_line_size)
     : m_name(name)
     , m_page_size(page_size)
     , m_cache_line_size(cache_line_size)
 {
     // Set compression/decompression cycle latencies if configured
     if (Sim()->getCfg()->getInt("perf_model/dram/compression_model/lcp/compression_latency") != -1)
-        m_compression_latency = Sim()->getCfg()->getInt("perf_model/dram/compression_model/fpc/compression_latency");
+        m_compression_latency = Sim()->getCfg()->getInt("perf_model/dram/compression_model/lcp/compression_latency");
     if (Sim()->getCfg()->getInt("perf_model/dram/compression_model/lcp/decompression_latency") != -1)
-        m_decompression_latency = Sim()->getCfg()->getInt("perf_model/dram/compression_model/fpc/decompression_latency");
+        m_decompression_latency = Sim()->getCfg()->getInt("perf_model/dram/compression_model/lcp/decompression_latency");
 
     String compression_scheme = Sim()->getCfg()->getString("perf_model/dram/compression_model/lcp/compression_scheme");
-    m_compression_model = CompressionModel::create("Cacheline Compression Model", m_cache_line_size, m_cache_line_size, compression_scheme);
+    m_compression_model = CompressionModel::create("Cacheline Compression Model", id, m_cache_line_size, m_cache_line_size, compression_scheme);
 
     m_cacheline_count = m_page_size / m_cache_line_size;
     m_compressed_cache_line_sizes = new UInt32[m_cacheline_count];
 
+}
+
+CompressionModelLCP::~CompressionModelLCP()
+{
+    delete [] m_compressed_cache_line_sizes;
+}
+
+void
+CompressionModelLCP::finalizeStats()
+{
 }
 
 SubsecondTime
@@ -81,10 +91,6 @@ CompressionModelLCP::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
     return total_compression_latency;
 }
 
-CompressionModelLCP::~CompressionModelLCP()
-{
-    delete [] m_compressed_cache_line_sizes;
-}
 
 SubsecondTime
 CompressionModelLCP::decompress(IntPtr addr, UInt32 compressed_cache_lines, core_id_t core_id)

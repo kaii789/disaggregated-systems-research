@@ -10,7 +10,7 @@
 class CompressionModelIdeal : public CompressionModel
 {
 public:
-   CompressionModelIdeal(String name, UInt32 page_size, UInt32 cache_line_size);
+   CompressionModelIdeal(String name, UInt32 id, UInt32 page_size, UInt32 cache_line_size);
    ~CompressionModelIdeal();
 
    SubsecondTime compress(IntPtr addr, size_t data_size, core_id_t core_id, UInt32 *compressed_page_size, UInt32 *compressed_cache_lines);
@@ -18,6 +18,8 @@ public:
 
    SubsecondTime compress_multipage(std::vector<UInt64> addr_list, UInt32 num_pages, core_id_t core_id, UInt32 *compressed_multipage_size, std::map<UInt64, UInt32> *address_to_num_cache_lines);
    SubsecondTime decompress_multipage(std::vector<UInt64> addr_list, UInt32 num_pages, core_id_t core_id, std::map<UInt64, UInt32> *address_to_num_cache_lines);
+
+   void finalizeStats();
 
 private:
     String m_name; 

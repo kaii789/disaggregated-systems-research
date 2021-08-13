@@ -1,5 +1,6 @@
 #include "compression_model_fpc.h"
 #include "utils.h"
+#include "stats.h"
 #include "config.hpp"
 
 // Assume 32 bit word
@@ -19,7 +20,7 @@ const UInt32 CompressionModelFPC::neg_check[6]=
         0xffffffff, // N/A
         0xff80ff80}; // Two halfwords, each a byte
 
-CompressionModelFPC::CompressionModelFPC(String name, UInt32 page_size, UInt32 cache_line_size)
+CompressionModelFPC::CompressionModelFPC(String name, UInt32 id, UInt32 page_size, UInt32 cache_line_size)
     : m_name(name)
     , m_page_size(page_size)
     , m_cache_line_size(cache_line_size)
@@ -35,6 +36,35 @@ CompressionModelFPC::CompressionModelFPC(String name, UInt32 page_size, UInt32 c
     m_data_buffer = new char[m_page_size];
     m_compressed_data_buffer = new char[m_page_size + m_cacheline_count];
     m_compressed_cache_line_sizes = new UInt32[m_cacheline_count];
+
+    // Register stats for FPC patterns
+    registerStatsMetric("compression", id, "fpc_total_compressed", &(m_total_compressed));
+    for (UInt32 i = 0; i < 7; i++) {
+        String stat_name = "fpc_usage_pattern-";
+        stat_name += std::to_string(i).c_str();
+        registerStatsMetric("compression", id, stat_name, &(pattern_to_compressed_words[i]));
+
+        stat_name = "fpc_bytes_saved_pattern-";
+        stat_name += std::to_string(i).c_str();
+        registerStatsMetric("compression", id, stat_name, &(pattern_to_bytes_saved[i]));
+    }
+}
+
+CompressionModelFPC::~CompressionModelFPC()
+{
+    delete [] m_data_buffer;
+    delete [] m_compressed_data_buffer;
+    delete [] m_compressed_cache_line_sizes;
+    delete [] pattern_to_compressed_words;
+    delete [] pattern_to_bytes_saved;
+}
+
+void CompressionModelFPC::finalizeStats()
+{
+    for (UInt32 i = 0; i < 7; i++) {
+        m_total_compressed += pattern_to_compressed_words[i];
+        pattern_to_bytes_saved[i] = (UInt64)((pattern_to_bytes_saved[i] + 7) / 8);
+    }
 }
 
 SubsecondTime
@@ -74,13 +104,6 @@ CompressionModelFPC::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
     return compress_latency.getLatency();
 }
 
-CompressionModelFPC::~CompressionModelFPC()
-{
-    delete [] m_data_buffer;
-    delete [] m_compressed_data_buffer;
-    delete [] m_compressed_cache_line_sizes;
-}
-
 UInt32 CompressionModelFPC::compressCacheLine(void* _inbuf, void* _outbuf)
 {
 	UInt32 *cache_line = (UInt32*)_inbuf;
@@ -101,6 +124,8 @@ UInt32 CompressionModelFPC::compressCacheLine(void* _inbuf, void* _outbuf)
                 compressed_size_bits += prefix_len;
 				compressed_size_bits += mask_to_bits[j];
                 is_pattern_matched = true;
+                pattern_to_compressed_words[j] += 1;
+                pattern_to_bytes_saved[j] += 32 - prefix_len - mask_to_bits[j];
                 // printf("[FPC] %d %x\n", j, word);
 				break;
 			}
@@ -122,6 +147,8 @@ UInt32 CompressionModelFPC::compressCacheLine(void* _inbuf, void* _outbuf)
                 compressed_size_bits += prefix_len;
                 compressed_size_bits += 8;
                 is_pattern_matched = true;
+                pattern_to_compressed_words[6] += 1;
+                pattern_to_bytes_saved[6] += 32 - prefix_len - 8;
                 // printf("[FPC] pattern match %x\n", word);
             }
         }

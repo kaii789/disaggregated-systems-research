@@ -241,6 +241,25 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
       results['compression.avg-cacheline-compression-latency'] = [total_cacheline_compression_latency / data_moves]
       results['compression.avg-cacheline-decompression-latency'] = [total_cacheline_decompression_latency / data_moves]
 
+    if 'compression.adaptive-low-compression-count' in results:
+      low_bytes_saved = results['compression.adaptive-low-bytes-saved'][0]
+      low_total_compression_latency = results['compression.adaptive-low-total-compression-latency'][0]
+      low_total_decompression_latency = results['compression.adaptive-low-total-decompression-latency'][0]
+      low_data_moves = results['compression.adaptive-low-compression-count'][0]
+
+      results['compression.adaptive-low-avg-compression-ratio'] = [float((low_data_moves * gran_size)) / float(((low_data_moves * gran_size) - low_bytes_saved))] if low_data_moves != 0 else [0]
+      results['compression.adaptive-low-avg-compression-latency'] = [low_total_compression_latency / data_moves]
+      results['compression.adaptive-low-avg-decompression-latency'] = [low_total_decompression_latency / data_moves]
+
+      high_bytes_saved = results['compression.adaptive-high-bytes-saved'][0]
+      high_total_compression_latency = results['compression.adaptive-high-total-compression-latency'][0]
+      high_total_decompression_latency = results['compression.adaptive-high-total-decompression-latency'][0]
+      high_data_moves = results['compression.adaptive-high-compression-count'][0]
+
+      results['compression.adaptive-high-avg-compression-ratio'] = [float((high_data_moves * gran_size)) / float(((high_data_moves * gran_size) - high_bytes_saved))] if high_data_moves != 0 else [0]
+      results['compression.adaptive-high-avg-compression-latency'] = [high_total_compression_latency / data_moves]
+      results['compression.adaptive-high-avg-decompression-latency'] = [high_total_decompression_latency / data_moves]
+
     # print("bytes_saved", bytes_saved)
     # print("data moves", data_moves)
     # print("avg compression ratio", results['compression.avg-compression-ratio'])
@@ -294,21 +313,6 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     ('  remote page moved due to exceeding threshold in rmode5', 'dram.rmode5-page-moved-due-to-threshold', str),
   ]
 
-  # Compression
-  if bytes_saved != 0:
-    template += [
-      ('  bytes saved', 'compression.bytes-saved', str),
-      ('  avg compression ratio', 'compression.avg-compression-ratio', str),
-      ('  avg compression latency(ns)', 'compression.avg-compression-latency', format_ns(2)),
-      ('  avg decompression latency(ns)', 'compression.avg-decompression-latency', format_ns(2)),
-    ]
-  if cacheline_bytes_saved != 0:
-    template += [
-      ('  cacheline bytes saved', 'compression.cacheline-bytes-saved', str),
-      ('  avg cacheline compression ratio', 'compression.avg-cacheline-compression-ratio', str),
-      ('  avg cacheline compression latency(ns)', 'compression.avg-cacheline-compression-latency', format_ns(2)),
-      ('  avg cacheline decompression latency(ns)', 'compression.avg-cacheline-decompression-latency', format_ns(2)),
-    ]
 
   if 'dram.total-read-queueing-delay' in results:
     results['dram.avgqueueread'] = map(lambda (a,b): a/(b or 1), zip(results['dram.total-read-queueing-delay'], results['dram.reads']))
@@ -321,6 +325,92 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
   if 'dram-queue.total-time-used' in results:
     results['dram.bandwidth'] = map(lambda a: 100*a/time0 if time0 else float('inf'), results['dram-queue.total-time-used'])
     template.append(('  average dram bandwidth utilization', 'dram.bandwidth', lambda v: '%.2f%%' % v))
+
+
+  # Compression
+  if bytes_saved != 0:
+    template.append(('Compression', '', ''))
+    template += [
+      ('  bytes saved', 'compression.bytes-saved', str),
+      ('  avg compression ratio', 'compression.avg-compression-ratio', str),
+      ('  avg compression latency(ns)', 'compression.avg-compression-latency', format_ns(2)),
+      ('  avg decompression latency(ns)', 'compression.avg-decompression-latency', format_ns(2)),
+      # ('  overflowed_pages', 'compression.num_overflowed_pages', str),
+    ]
+
+    if 'compression.lzbdi_num_overflowed_pages' in results:
+      template += [('  lzbdi overflowed_pages', 'compression.lzbdi_num_overflowed_pages', str),]
+    if 'compression.lz78_num_overflowed_pages' in results:
+      template += [('  lz78 overflowed_pages', 'compression.lz78_num_overflowed_pages', str),]
+    if 'compression.lzw_num_overflowed_pages' in results:
+      template += [('  lzw overflowed_pages', 'compression.lzw_num_overflowed_pages', str),]
+
+  if cacheline_bytes_saved != 0:
+    template += [
+      ('  cacheline bytes saved', 'compression.cacheline-bytes-saved', str),
+      ('  avg cacheline compression ratio', 'compression.avg-cacheline-compression-ratio', str),
+      ('  avg cacheline compression latency(ns)', 'compression.avg-cacheline-compression-latency', format_ns(2)),
+      ('  avg cacheline decompression latency(ns)', 'compression.avg-cacheline-decompression-latency', format_ns(2)),
+    ]
+
+  max_dict_size = results['compression.max_dictionary_size'][0] if 'compression.max_dictionary_size' in results else 0
+  if max_dict_size != 0:
+    template += [
+            ('  avg_dictionary_size', 'compression.avg_dictionary_size', str),
+            ('  max_dictionary_size', 'compression.max_dictionary_size', str),
+            ('  avg_max_dictionary_entry', 'compression.avg_max_dictionary_entry', str),
+            ('  avg_avg_dictionary_entry', 'compression.avg_avg_dictionary_entry', str),
+            ('  max_dictionary_entry', 'compression.max_dictionary_entry', str),
+            # ('  overflowed_pages', 'compression.num_overflowed_pages', str),
+        ]
+
+  bdi_total_compressed = results['compression.bdi_total_compressed'][0] if 'compression.bdi_total_compressed' in results else 0
+  if bdi_total_compressed != 0:
+    template += [
+      ('  bdi_successful_compression', 'compression.bdi_total_compressed', str)]
+    for i in range(0, 13): 
+      bdi_option = float(results['compression.bdi_usage_option-{}'.format(i)][0]) / float(bdi_total_compressed) * 100
+      bdi_option_format = "{:.2f}".format(bdi_option)
+      results['compression.bdi_usage_option-{}'.format(i)] = [bdi_option_format]
+      template.append(('  bdi_usage(%)_option-{}'.format(i), 'compression.bdi_usage_option-{}'.format(i), str))
+    for i in range(0, 13): 
+      template.append(('  bdi_bytes_saved_option-{}'.format(i), 'compression.bdi_bytes_saved_option-{}'.format(i), str))
+
+  fpc_total_compressed = results['compression.fpc_total_compressed'][0] if 'compression.fpc_total_compressed' in results else 0
+  if fpc_total_compressed != 0:
+    template += [
+      ('  fpc_successful_compression', 'compression.fpc_total_compressed', str)]
+    for i in range(7): 
+      fpc_pattern = float(results['compression.fpc_usage_pattern-{}'.format(i)][0]) / float(fpc_total_compressed) * 100
+      fpc_pattern_format = "{:.2f}".format(fpc_pattern)
+      results['compression.fpc_usage_pattern-{}'.format(i)] = [fpc_pattern_format]
+      template.append(('  fpc_usage(%)_pattern-{}'.format(i), 'compression.fpc_usage_pattern-{}'.format(i), str))
+    for i in range(7): 
+      template.append(('  fpc_bytes_saved_pattern-{}'.format(i), 'compression.fpc_bytes_saved_pattern-{}'.format(i), str))
+
+  lz_compression = results['compression.avg_dictionary_size'][0] if 'compression.avg_dictionary_size' in results else 0
+  if lz_compression != 0:
+    template.append(('  Dictionary table stats (count within dictionary_size, entire ROI)', '', ''))
+    for i in range(10, 101, 10):  # 10, 20, ..., 100
+        template.append(('    {}% percentile - dictionary_size'.format(i), 'compression.lz-dictsize-count-p{}'.format(i), str))
+        template.append(('    {}% percentile - total_bytes_saved'.format(i), 'compression.lz-bytes_saved-count-p{}'.format(i), str))
+        template.append(('    {}% percentile - accesses'.format(i), 'compression.lz-accesses-count-p{}'.format(i), str))
+        template.append(('    {}% percentile - max_entry_bytes'.format(i), 'compression.lz-max_entry_bytes-count-p{}'.format(i), str))
+
+  if 'compression.adaptive-low-compression-count' in results:
+    template += [
+      ('  adaptive low compression count', 'compression.adaptive-low-compression-count', str),
+      ('  adaptive low bytes saved', 'compression.adaptive-low-bytes-saved', str),
+      ('  adaptive low avg compression ratio', 'compression.adaptive-low-avg-compression-ratio', str),
+      ('  adaptive low avg compression latency(ns)', 'compression.adaptive-low-avg-compression-latency', format_ns(2)),
+      ('  adaptive low avg decompression latency(ns)', 'compression.adaptive-low-avg-decompression-latency', format_ns(2)),
+
+      ('  adaptive high compression count', 'compression.adaptive-high-compression-count', str),
+      ('  adaptive high bytes saved', 'compression.adaptive-high-bytes-saved', str),
+      ('  adaptive high avg compression ratio', 'compression.adaptive-high-avg-compression-ratio', str),
+      ('  adaptive high avg compression latency(ns)', 'compression.adaptive-high-avg-compression-latency', format_ns(2)),
+      ('  adaptive high avg decompression latency(ns)', 'compression.adaptive-high-avg-decompression-latency', format_ns(2)),
+    ]
 
   # if 'dram.redundant-moves-temp1-time-savings' in results:
   template.extend([

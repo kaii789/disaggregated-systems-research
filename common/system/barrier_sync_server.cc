@@ -13,6 +13,9 @@
 #include "config.hpp"
 #include "circular_log.h"
 
+//cgiannoula
+#include "../core/memory_subsystem/parametric_dram_directory_msi/memory_manager.h"
+
 #include <algorithm>
 
 BarrierSyncServer::BarrierSyncServer()
@@ -93,8 +96,18 @@ BarrierSyncServer::synchronize(core_id_t core_id, SubsecondTime time)
    m_core_thread[master_core_id] = thread_me;
 
    bool mustWait = true;
-   if (isBarrierReached())
+   if (isBarrierReached()){
       mustWait = barrierRelease(thread_me);
+
+      // cgiannoula 
+      // Update bandwidth factor for remote memory in DisaggrModel, if dynamic_bandwidth is enabled
+      if (Sim()->getConfig()->getCachingProtocolType() == "parametric_dram_directory_msi") {
+         // Finalize statistics in dram_perf_model
+         ParametricDramDirectoryMSI::MemoryManager* m_manager = static_cast<ParametricDramDirectoryMSI::MemoryManager *> (Sim()->getCoreManager()->getCoreFromID(0)->getMemoryManager());
+         DramPerfModel* m_dram_perf_model = m_manager->getDramCntlr()->getDramPerfModel();
+         m_dram_perf_model->updateBandwidth();
+      }
+    }
 
    if (mustWait)
       m_core_cond[master_core_id]->wait(Sim()->getThreadManager()->getLock());

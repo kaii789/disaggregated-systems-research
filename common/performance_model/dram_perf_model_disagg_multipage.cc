@@ -163,7 +163,7 @@ DramPerfModelDisaggMultipage::DramPerfModelDisaggMultipage(core_id_t core_id, UI
         String compression_scheme = Sim()->getCfg()->getString("perf_model/dram/compression_model/compression_scheme");
         UInt32 gran_size = m_r_cacheline_gran ? m_cache_line_size : m_page_size;
 
-        m_compression_model = CompressionModel::create("Link Compression Model", gran_size, m_cache_line_size, compression_scheme);
+        m_compression_model = CompressionModel::create("Link Compression Model", core_id, gran_size, m_cache_line_size, compression_scheme);
         registerStatsMetric("compression", core_id, "bytes-saved", &bytes_saved);
         registerStatsMetric("compression", core_id, "total-compression-latency", &m_total_compression_latency);
         registerStatsMetric("compression", core_id, "total-decompression-latency", &m_total_decompression_latency);
