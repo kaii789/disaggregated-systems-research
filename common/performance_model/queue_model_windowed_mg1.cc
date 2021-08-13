@@ -72,7 +72,7 @@ QueueModelWindowedMG1::computeQueueDelay(SubsecondTime pkt_time, SubsecondTime p
 
 /* Get estimate of queue delay without adding the packet to the queue */
 SubsecondTime
-QueueModelWindowedMG1::computeQueueDelayNoEffect(SubsecondTime pkt_time, SubsecondTime processing_time, core_id_t requester)
+QueueModelWindowedMG1::computeQueueDelayNoEffect(SubsecondTime pkt_time, SubsecondTime processing_time, request_t request_type, core_id_t requester)
 {
    SubsecondTime t_queue = SubsecondTime::Zero();
 

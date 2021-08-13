@@ -71,6 +71,6 @@ make
 # Set up hpcg
 echo
 echo "Compiling HPCG..."
-cd ../hpcg/linux_serial
+cd ../../hpcg/linux_serial
 ../configure Linux_Serial
 make

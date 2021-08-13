@@ -61,7 +61,7 @@ QueueModelWindowedMG1Remote::QueueModelWindowedMG1Remote(String name, UInt32 id,
 
 QueueModelWindowedMG1Remote::~QueueModelWindowedMG1Remote()
 {
-   if (m_total_requests  < 1) {
+   if (m_total_requests < 1) {
       return;
    }
    // Print one time debug output in the destructor method, to be printed once when the program finishes
@@ -109,22 +109,7 @@ QueueModelWindowedMG1Remote::~QueueModelWindowedMG1Remote()
    }
 }
 
-// bool QueueModelWindowedMG1Remote::isQueueFull(SubsecondTime pkt_time) {
-//    // Remove packets that now fall outside the window
-//    // Advance the window based on the global (barrier) time, as this guarantees the earliest time any thread may be at.
-//    // Use a backup value of 10 window sizes before the current request to avoid excessive memory usage in case something fishy is going on.
-//    SubsecondTime backup = pkt_time > 10*m_window_size ? pkt_time - 10*m_window_size : SubsecondTime::Zero();
-//    SubsecondTime main = Sim()->getClockSkewMinimizationServer()->getGlobalTime() > m_window_size ? Sim()->getClockSkewMinimizationServer()->getGlobalTime() - m_window_size : SubsecondTime::Zero();
-//    SubsecondTime time_point = SubsecondTime::max(main, backup);
-//    removeItems(time_point);
-//    removeItemsUpdateBytes(time_point, pkt_time, false);
-
-//    // Use queue utilization as measure to determine whether the queue is full
-//    double utilization = (double)m_service_time_sum / m_window_size.getPS();
-//    return utilization > .99;  // TODO: which value to choose as queue full threshold?
-// }
-
-double QueueModelWindowedMG1Remote::getQueueUtilizationPercentage(SubsecondTime pkt_time) {
+double QueueModelWindowedMG1Remote::getTotalQueueUtilizationPercentage(SubsecondTime pkt_time) {
    // Remove packets that now fall outside the window
    // Advance the window based on the global (barrier) time, as this guarantees the earliest time any thread may be at.
    // Use a backup value of 10 window sizes before the current request to avoid excessive memory usage in case something fishy is going on.
@@ -155,8 +140,6 @@ QueueModelWindowedMG1Remote::computeQueueDelay(SubsecondTime pkt_time, Subsecond
    // }
    removeItems(SubsecondTime::max(main, backup));
 
-   if (m_name == "dram-datamovement-queue")
-      LOG_PRINT("m_num_arrivals=%ld before if statement", m_num_arrivals);
    if (m_num_arrivals > 1)
    {
       double utilization = (double)m_service_time_sum / m_window_size.getPS();
@@ -205,7 +188,7 @@ QueueModelWindowedMG1Remote::computeQueueDelay(SubsecondTime pkt_time, Subsecond
 
 /* Get estimate of queue delay without adding the packet to the queue */
 SubsecondTime
-QueueModelWindowedMG1Remote::computeQueueDelayNoEffect(SubsecondTime pkt_time, SubsecondTime processing_time, core_id_t requester)
+QueueModelWindowedMG1Remote::computeQueueDelayNoEffect(SubsecondTime pkt_time, SubsecondTime processing_time, request_t request_type, core_id_t requester)
 {
    SubsecondTime t_queue = SubsecondTime::Zero();
 
@@ -251,9 +234,9 @@ QueueModelWindowedMG1Remote::computeQueueDelayNoEffect(SubsecondTime pkt_time, S
 }
 
 
-// Also include the num_bytes parameter
+// Also include the num_bytes parameter; last two arguments currently not used
 SubsecondTime
-QueueModelWindowedMG1Remote::computeQueueDelayTrackBytes(SubsecondTime pkt_time, SubsecondTime processing_time, UInt64 num_bytes, core_id_t requester)
+QueueModelWindowedMG1Remote::computeQueueDelayTrackBytes(SubsecondTime pkt_time, SubsecondTime processing_time, UInt64 num_bytes, request_t request_type, core_id_t requester, bool is_inflight_page, UInt64 phys_page)
 {
    SubsecondTime t_queue = SubsecondTime::Zero();
 
@@ -269,8 +252,6 @@ QueueModelWindowedMG1Remote::computeQueueDelayTrackBytes(SubsecondTime pkt_time,
    removeItems(time_point);
    removeItemsUpdateBytes(time_point, pkt_time, true);  // only track effective bandwidth when m_total_requests is incremented and addItems() is called
 
-   if (m_name == "dram-datamovement-queue")
-      LOG_PRINT("m_num_arrivals=%ld before if statement", m_num_arrivals);
    if (m_num_arrivals > 1)
    {
       double utilization = (double)m_service_time_sum / m_window_size.getPS();
