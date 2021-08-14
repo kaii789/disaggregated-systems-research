@@ -77,6 +77,8 @@ CompressionModelAdaptive::compress(IntPtr addr, size_t data_size, core_id_t core
         UInt32 estimate_high_compressed_size = (m_high_compression_count * m_page_size - m_high_bytes_saved) / m_high_compression_count;
         SubsecondTime estimate_high_queuing_delay = m_queue_model->computeQueueDelayNoEffect(m_t_now, m_r_bandwidth->getRoundedLatency(8*estimate_high_compressed_size), m_requester);
 
+        // printf("[Adaptive] lcl: %lu, lqd: %lu, hcl: %lu, hqd: %lu\n", estimate_low_compression_latency.getNS(), estimate_low_queuing_delay.getNS(), estimate_high_compression_latency.getNS(), estimate_high_queuing_delay.getNS());
+
         use_low_compression = estimate_low_compression_latency + estimate_low_queuing_delay < estimate_high_compression_latency + estimate_high_queuing_delay;
         use_high_compression = !use_low_compression;
     }
