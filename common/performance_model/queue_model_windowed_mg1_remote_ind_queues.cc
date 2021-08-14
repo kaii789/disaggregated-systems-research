@@ -112,7 +112,7 @@ QueueModelWindowedMG1RemoteIndQueues::QueueModelWindowedMG1RemoteIndQueues(Strin
    registerStatsMetric(name, id, "num-page-effective-bandwidth-exceeded-allowable-max", &m_page_effective_bandwidth_exceeded_allowable_max);
    registerStatsMetric(name, id, "num-cacheline-effective-bandwidth-exceeded-allowable-max", &m_cacheline_effective_bandwidth_exceeded_allowable_max);
 
-   std::cout << "Using windowed_mg1_remote_subqueuemodels queue model with m_use_utilization_overflow=" << m_use_utilization_overflow;
+   std::cout << "Using windowed_mg1_remote_ind_queues queue model with m_use_utilization_overflow=" << m_use_utilization_overflow;
    if (m_use_utilization_overflow) {
       std::cout << ", utilization overflow threshold=" << m_utilization_overflow_threshold;
    }

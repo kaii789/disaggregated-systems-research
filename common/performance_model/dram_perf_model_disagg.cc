@@ -327,7 +327,6 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
 
     // For debugging
     std::cout << "Initial m_r_cacheline_queue_fraction=" << m_r_cacheline_queue_fraction << std::endl;
-    std::cout << "Initial m_min_r_cacheline_queue_fraction_stat_scaled=" << m_min_r_cacheline_queue_fraction_stat_scaled << ", Initial m_max_r_cacheline_queue_fraction_stat_scaled=" << m_max_r_cacheline_queue_fraction_stat_scaled << std::endl; 
     
     // RNG
     srand (time(NULL));
@@ -1089,7 +1088,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
 void
 DramPerfModelDisagg::updateBandwidth()
 {
-    m_update_bandwidth_count += 1;
+    /* m_update_bandwidth_count += 1;
     if (m_use_dynamic_bandwidth && m_update_bandwidth_count % 20 == 0) {
         // Randomly choose bw scalefactor between [4, 16]
         m_r_bw_scalefactor = (rand() % 13) + 4;
@@ -1098,7 +1097,7 @@ DramPerfModelDisagg::updateBandwidth()
         m_r_part2_bandwidth.changeBandwidth(m_dram_speed * m_data_bus_width / (1000 * m_r_bw_scalefactor / m_r_cacheline_queue_fraction)); // Remote memory - Partitioned Queues => Cacheline Queue
         // Currently only windowed_mg1_remote_ind_queues QueueModel updates stats tracking based on updateBandwidth()
         m_data_movement->updateBandwidth(m_r_bus_bandwidth.getBandwidthBitsPerUs(), m_r_cacheline_queue_fraction);
-    } else if (m_use_dynamic_cl_queue_fraction_adjustment) {
+    } else */ if (m_use_dynamic_cl_queue_fraction_adjustment) {
         // Same formulas here as in DramPerfModelDisagg constructor
         m_r_bus_bandwidth.changeBandwidth(m_dram_speed * m_data_bus_width / (1000 * m_r_bw_scalefactor)); // Remote memory
         m_r_part_bandwidth.changeBandwidth(m_dram_speed * m_data_bus_width / (1000 * m_r_bw_scalefactor / (1 - m_r_cacheline_queue_fraction))); // Remote memory - Partitioned Queues => Page Queue
