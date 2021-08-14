@@ -16,6 +16,9 @@ public:
    virtual SubsecondTime computeQueueDelayNoEffect(SubsecondTime pkt_time, SubsecondTime processing_time, core_id_t requester = INVALID_CORE_ID) {
       return SubsecondTime::Zero();  // placeholder since the method is currently only implemented in the windowed_mg1 QueueModel
    };
+   virtual SubsecondTime computeQueueDelayAfterAddNoEffect(SubsecondTime pkt_time, SubsecondTime processing_time, core_id_t requester = INVALID_CORE_ID) {
+      return SubsecondTime::Zero(); // the method is currently only implemented in the windowed_mg1_remote QueueModel
+   };
    virtual SubsecondTime computeQueueDelayTrackBytes(SubsecondTime pkt_time, SubsecondTime processing_time, UInt64 num_bytes, core_id_t requester = INVALID_CORE_ID) {
       return computeQueueDelay(pkt_time, processing_time, requester);  // the method is currently only implemented in the windowed_mg1_remote QueueModel
    };

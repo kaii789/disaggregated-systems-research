@@ -250,6 +250,63 @@ QueueModelWindowedMG1Remote::computeQueueDelayNoEffect(SubsecondTime pkt_time, S
    return t_queue;
 }
 
+/* Get estimate of queue delay after adding packet into queue, without actually adding packet into queue */
+SubsecondTime
+QueueModelWindowedMG1Remote::computeQueueDelayAfterAddNoEffect(SubsecondTime pkt_time, SubsecondTime processing_time, core_id_t requester)
+{
+   SubsecondTime t_queue = SubsecondTime::Zero();
+
+   // Advance the window based on the global (barrier) time, as this guarantees the earliest time any thread may be at.
+   // Use a backup value of 10 window sizes before the current request to avoid excessive memory usage in case something fishy is going on.
+   SubsecondTime backup = pkt_time > 10*m_window_size ? pkt_time - 10*m_window_size : SubsecondTime::Zero();
+   SubsecondTime main = Sim()->getClockSkewMinimizationServer()->getGlobalTime() > m_window_size ? Sim()->getClockSkewMinimizationServer()->getGlobalTime() - m_window_size : SubsecondTime::Zero();
+   SubsecondTime time_point = SubsecondTime::max(main, backup);
+   removeItems(time_point);
+   removeItemsUpdateBytes(time_point, pkt_time, false);
+
+   // Add packet
+   // addItem(pkt_time, processing_time);
+   // m_window.insert(std::pair<SubsecondTime, SubsecondTime>(pkt_time, service_time));
+   m_num_arrivals ++;
+   m_service_time_sum += processing_time.getPS();
+   m_service_time_sum2 += processing_time.getPS() * processing_time.getPS();
+
+   if (m_num_arrivals > 1)
+   {
+      double utilization = (double)m_service_time_sum / m_window_size.getPS();
+      double arrival_rate = (double)m_num_arrivals / m_window_size.getPS();
+
+      double service_time_Es2 = m_service_time_sum2 / m_num_arrivals;
+
+      // If requesters do not throttle based on returned latency, it's their problem, not ours
+      if (utilization > .9999)  // number here changed from .99 to .9999
+         utilization = .9999;
+
+      t_queue = SubsecondTime::PS(arrival_rate * service_time_Es2 / (2 * (1. - utilization)));
+
+      // Our memory is limited in time to m_window_size. It would be strange to return more latency than that.
+      // Don't update stats here for computeQueueDelayNoEffect
+      if (!m_use_separate_queue_delay_cap && t_queue > m_window_size) {
+         // Normally, use m_window_size as the cap
+         t_queue = m_window_size;
+      } else if (m_use_separate_queue_delay_cap) {
+         if (t_queue > m_queue_delay_cap) {
+            // When m_use_separate_queue_delay_cap is true, try using a custom queue_delay_cap to handle the cases when the queue is full
+            t_queue = m_queue_delay_cap;
+         }
+      }
+   }
+   // Add additional network latency
+   t_queue += m_r_added_latency;  // is it ok for t_queue to potentially be larger than m_window_size?
+
+   // Remove packet from queue
+   // m_window.insert(std::pair<SubsecondTime, SubsecondTime>(pkt_time, service_time));
+   m_num_arrivals -= 1;
+   m_service_time_sum -= processing_time.getPS();
+   m_service_time_sum2 -= processing_time.getPS() * processing_time.getPS();
+
+   return t_queue;
+}
 
 // Also include the num_bytes parameter
 SubsecondTime
