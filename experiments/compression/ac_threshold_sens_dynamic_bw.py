@@ -294,23 +294,23 @@ def run_ligra(application_name, ligra_input_selection, num_MB):
     experiments = []
     ligra_input_file = ligra_input_to_file[ligra_input_selection]
     net_lat = 120
-    for remote_init in ["false"]:  # "false"
-        for bw_scalefactor in [4]:
+    for bw_scalefactor in [4]:
+        for adaptive_bw_threshold in [0.9, 0.7, 0.6]:
             localdram_size_str = "{}MB".format(num_MB)
             command_str = ligra_base_str_options.format(
                 application_name,
                 ligra_input_file,
-                sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={}".format(
+                sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/compression_model/adaptive/upper_bandwidth_threshold={}".format(
                     int(num_MB * ONE_MB_TO_BYTES),
                     int(net_lat),
                     int(bw_scalefactor),
-                    str(remote_init),
+                    str(adaptive_bw_threshold)
                 ),
             )
 
             experiments.append(
                 automation.Experiment(
-                    experiment_name="ligra_{}_{}localdram_{}_netlat_{}_bw_scalefactor_{}_combo".format(
+                    experiment_name="ligra_{}_{}localdram_{}_netlat_{}_bw_scalefactor_{}_adaptive_bw_threshold_{}_combo".format(
                         application_name.lower(),
                         ""
                         if ligra_input_selection == "regular_input"
@@ -318,6 +318,7 @@ def run_ligra(application_name, ligra_input_selection, num_MB):
                         localdram_size_str,
                         net_lat,
                         bw_scalefactor,
+                        adaptive_bw_threshold
                     ),
                     command_str=command_str,
                     experiment_run_configs=config_list,
@@ -333,29 +334,30 @@ def run_tinynet(model_type):
     experiments = []
     net_lat = 120
     for num_MB in [2]:
-        for bw_scalefactor in [4]:
-            localdram_size_str = "{}MB".format(num_MB)
-            command_str = darknet_base_str_options.format(
-                model_type,
-                sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
-                    int(num_MB * ONE_MB_TO_BYTES),
-                    int(net_lat),
-                    int(bw_scalefactor),
-                    int(1 * ONE_BILLION),
-                ),
-            )
-            # 1 billion instructions cap
-
-            experiments.append(
-                automation.Experiment(
-                    experiment_name="darknet_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_combo".format(
-                        model_type.lower(), localdram_size_str, net_lat, bw_scalefactor
+        for bw_scalefactor in [4, 16]:
+            for adaptive_bw_threshold in [0.9, 0.7, 0.6]:
+                localdram_size_str = "{}MB".format(num_MB)
+                command_str = darknet_base_str_options.format(
+                    model_type,
+                    sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/compression_model/adaptive/upper_bandwidth_threshold={}".format(
+                        int(num_MB * ONE_MB_TO_BYTES),
+                        int(net_lat),
+                        int(bw_scalefactor),
+                        str(adaptive_bw_threshold)
                     ),
-                    command_str=command_str,
-                    experiment_run_configs=config_list,
-                    output_root_directory=".",
                 )
-            )
+                # 1 billion instructions cap
+
+                experiments.append(
+                    automation.Experiment(
+                        experiment_name="darknet_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_adaptive_bw_threshold_{}_combo".format(
+                            model_type.lower(), localdram_size_str, net_lat, bw_scalefactor, adaptive_bw_threshold
+                        ),
+                        command_str=command_str,
+                        experiment_run_configs=config_list,
+                        output_root_directory=".",
+                    )
+                )
 
     return experiments
 
@@ -526,7 +528,7 @@ def graph(res_name, benchmark_list, local_dram_list, bw_scalefactor_list):
     for benchmark in benchmark_list:
         for size in local_dram_list:
             for factor in bw_scalefactor_list:
-                dir1 = "{}localdram_{}_netlat_120_bw_scalefactor_{}_combo_output_files".format(benchmark, size, factor)
+                dir1 = "{}localdram_{}_netlat_120_bw_scalefactor_{}_adaptive_bw_threshold_{}_combo_output_files".format(benchmark, size, factor, 0.6)
                 for run in range(1, 1 + num_bars):
                     try:
                         # dir2 = "run_{}_process_{}_temp".format(run, process)
@@ -585,7 +587,7 @@ def gen_settings_for_graph(benchmark_name):
         local_dram_list = ["4MB"]
         bw_scalefactor_list = [4]
     elif benchmark_name == "triangle_reg":
-        res_name = "triangle_reg_16MB_ac_dynamic_bw"
+        res_name = "triangle_reg_16MB_threshold_60%_dynamic_bw"
         benchmark_list = []
         benchmark_list.append("ligra_{}_".format("triangle"))
         local_dram_list = ["16MB"]
@@ -610,12 +612,12 @@ def gen_settings_for_graph(benchmark_name):
         local_dram_list = ["2MB"]
         bw_scalefactor_list = [4]
     elif benchmark_name == "darknet19":
-        res_name = "darknet19_2MB_ac_dynamic_bw"
+        res_name = "darknet19_2MB_adaptive_fixed"
         benchmark_list = []
         for model in ["darknet19"]:
             benchmark_list.append("darknet_{}_".format(model))
         local_dram_list = ["2MB"]
-        bw_scalefactor_list = [4]
+        bw_scalefactor_list = [4, 16]
     elif benchmark_name == "resnet50":
         res_name = "resnet50_2MB_comparison"
         benchmark_list = []
@@ -655,6 +657,7 @@ def gen_settings_for_graph(benchmark_name):
 experiments = []
 # experiments.extend(run_ligra("BFS", "regular_input", 4))
 # experiments.extend(run_ligra("Triangle", "regular_input", 16))
+
 # experiments.extend(run_tinynet("tiny"))
 # experiments.extend(run_tinynet("darknet19"))
 # experiments.extend(run_stream("0")) # Scale
