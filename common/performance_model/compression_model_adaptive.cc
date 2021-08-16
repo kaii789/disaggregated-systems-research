@@ -15,14 +15,20 @@ CompressionModelAdaptive::CompressionModelAdaptive(String name, UInt32 id, UInt3
         m_decompression_latency = Sim()->getCfg()->getInt("perf_model/dram/compression_model/adaptive/decompression_latency");
 
     m_type = Sim()->getCfg()->getInt("perf_model/dram/compression_model/adaptive/type");
-    m_type_switch_threshold = Sim()->getCfg()->getInt("perf_model/dram/compression_model/adaptive/type_switch_threshold");
     m_low_compression_scheme = Sim()->getCfg()->getString("perf_model/dram/compression_model/adaptive/low_compression_scheme");
     m_high_compression_scheme = Sim()->getCfg()->getString("perf_model/dram/compression_model/adaptive/high_compression_scheme");
     m_low_compression_model = CompressionModel::create("Low-latency Compression Model", id, m_page_size, m_cache_line_size, m_low_compression_scheme);
     m_high_compression_model = CompressionModel::create("High-latency Compression Model", id, m_page_size, m_cache_line_size, m_high_compression_scheme);
 
+    // Fixed BW Threshold
     m_lower_bandwidth_threshold = Sim()->getCfg()->getFloat("perf_model/dram/compression_model/adaptive/lower_bandwidth_threshold");
     m_upper_bandwidth_threshold = Sim()->getCfg()->getFloat("perf_model/dram/compression_model/adaptive/upper_bandwidth_threshold");
+
+    // Estimator
+    m_type_switch_threshold = Sim()->getCfg()->getInt("perf_model/dram/compression_model/adaptive/latency_estimator/type_switch_threshold");
+
+    // Dynamic BW Threshold
+    m_high_compression_rate = Sim()->getCfg()->getInt("perf_model/dram/compression_model/adaptive/dynamic_bw_threshold/high_compression_rate");
 
     registerStatsMetric("compression", id, "adaptive-low-compression-count", &m_low_compression_count);
     registerStatsMetric("compression", id, "adaptive-low-total-compression-latency", &m_low_total_compression_latency);
@@ -81,6 +87,14 @@ CompressionModelAdaptive::compress(IntPtr addr, size_t data_size, core_id_t core
 
         use_low_compression = estimate_low_compression_latency + estimate_low_queuing_delay < estimate_high_compression_latency + estimate_high_queuing_delay;
         use_high_compression = !use_low_compression;
+    } else if (type == 2) {
+        double dynamic_bw_threshold = 0.8;
+        if (m_high_compression_rate >= 5) {
+            dynamic_bw_threshold = 0.6;
+        } else if (m_high_compression_rate >= 2) {
+            dynamic_bw_threshold = 0.7;
+        }
+        m_upper_bandwidth_threshold = dynamic_bw_threshold;
     }
 
     // Compress depending on bandwidth

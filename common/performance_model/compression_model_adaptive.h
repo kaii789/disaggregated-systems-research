@@ -50,7 +50,12 @@ private:
     SubsecondTime m_t_now;
     ComponentBandwidth *m_r_bandwidth;
     core_id_t m_requester;
+
+    // Estimator
     int m_type_switch_threshold;
+
+    // Dynamic BW Threshold
+    int m_high_compression_rate;
 
     // Placeholder
     UInt32 m_compression_latency = 10;
