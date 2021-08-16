@@ -55,7 +55,7 @@ private:
     int m_type_switch_threshold;
 
     // Dynamic BW Threshold
-    int m_high_compression_rate;
+    double m_high_compression_rate; // GB/s
 
     // Placeholder
     UInt32 m_compression_latency = 10;

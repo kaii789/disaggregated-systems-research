@@ -28,7 +28,7 @@ CompressionModelAdaptive::CompressionModelAdaptive(String name, UInt32 id, UInt3
     m_type_switch_threshold = Sim()->getCfg()->getInt("perf_model/dram/compression_model/adaptive/latency_estimator/type_switch_threshold");
 
     // Dynamic BW Threshold
-    m_high_compression_rate = Sim()->getCfg()->getInt("perf_model/dram/compression_model/adaptive/dynamic_bw_threshold/high_compression_rate");
+    m_high_compression_rate = Sim()->getCfg()->getFloat("perf_model/dram/compression_model/adaptive/dynamic_bw_threshold/high_compression_rate");
 
     registerStatsMetric("compression", id, "adaptive-low-compression-count", &m_low_compression_count);
     registerStatsMetric("compression", id, "adaptive-low-total-compression-latency", &m_low_total_compression_latency);
