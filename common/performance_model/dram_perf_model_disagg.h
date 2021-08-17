@@ -44,6 +44,7 @@ class DramPerfModelDisagg : public DramPerfModel
         const bool m_randomize_address;
         const UInt32 m_randomize_offset;
         const UInt32 m_column_bits_shift; // Position of column bits for closed-page mapping (after cutting interleaving/channel/rank/bank from bottom)
+        double m_bw_scalefactor;
         const ComponentBandwidth m_bus_bandwidth;
         ComponentBandwidth m_r_bus_bandwidth;   // Remote
         ComponentBandwidth m_r_part_bandwidth;  // Remote - Partitioned Queues => Page Queue

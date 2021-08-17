@@ -37,6 +37,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_randomize_address   (Sim()->getCfg()->getBool("perf_model/dram/ddr/randomize_address"))
     , m_randomize_offset    (Sim()->getCfg()->getInt("perf_model/dram/ddr/randomize_offset"))
     , m_column_bits_shift   (Sim()->getCfg()->getInt("perf_model/dram/ddr/column_bits_shift"))
+    , m_bw_scalefactor      (Sim()->getCfg()->getFloat("perf_model/dram/remote_mem_bw_scalefactor"))
     , m_bus_bandwidth       (m_dram_speed * m_data_bus_width / 1000) // In bits/ns: MT/s=transfers/us * bits/transfer
     , m_r_bus_bandwidth     (m_dram_speed * m_data_bus_width / (1000 * Sim()->getCfg()->getFloat("perf_model/dram/remote_mem_bw_scalefactor"))) // Remote memory
     , m_r_part_bandwidth    (m_dram_speed * m_data_bus_width / (1000 * Sim()->getCfg()->getFloat("perf_model/dram/remote_mem_bw_scalefactor") / (1 - Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_fraction")))) // Remote memory - Partitioned Queues => Page Queue
@@ -1207,11 +1208,13 @@ DramPerfModelDisagg::updateBandwidth()
 {
     m_update_bandwidth_count += 1;
     if (m_use_dynamic_bandwidth && m_update_bandwidth_count % 20 == 0) {
-        // Randomly choose bw scalefactor between [4, 16]
-        float bw_scalefactor = (rand() % 13) + 4;
-        m_r_bus_bandwidth.changeBandwidth(m_dram_speed * m_data_bus_width / (1000 * bw_scalefactor)); // Remote memory
-        m_r_part_bandwidth.changeBandwidth((m_dram_speed * m_data_bus_width / (1000 * bw_scalefactor / (1 - Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_fraction"))))); // Remote memory - Partitioned Queues => Page Queue
-        m_r_part2_bandwidth.changeBandwidth((m_dram_speed * m_data_bus_width / (1000 * bw_scalefactor / Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_fraction")))); // Remote memory - Partitioned Queues => Cacheline Queue
+        // Round robin 4 to 16 BW scalefactor
+        m_bw_scalefactor = (int)(m_bw_scalefactor + 1) % 17;
+        if (m_bw_scalefactor == 0)
+            m_bw_scalefactor = 4;
+        m_r_bus_bandwidth.changeBandwidth(m_dram_speed * m_data_bus_width / (1000 * m_bw_scalefactor)); // Remote memory
+        m_r_part_bandwidth.changeBandwidth((m_dram_speed * m_data_bus_width / (1000 * m_bw_scalefactor / (1 - Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_fraction"))))); // Remote memory - Partitioned Queues => Page Queue
+        m_r_part2_bandwidth.changeBandwidth((m_dram_speed * m_data_bus_width / (1000 * m_bw_scalefactor / Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_fraction")))); // Remote memory - Partitioned Queues => Cacheline Queue
     }
 }
 
