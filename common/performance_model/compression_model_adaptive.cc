@@ -95,6 +95,8 @@ CompressionModelAdaptive::compress(IntPtr addr, size_t data_size, core_id_t core
             dynamic_bw_threshold = 0.7;
         }
         m_upper_bandwidth_threshold = dynamic_bw_threshold;
+        use_low_compression = m_bandwidth_utilization >= m_lower_bandwidth_threshold && m_bandwidth_utilization < m_upper_bandwidth_threshold;
+        use_high_compression = m_bandwidth_utilization >= m_upper_bandwidth_threshold;
     }
 
     // Compress depending on bandwidth
