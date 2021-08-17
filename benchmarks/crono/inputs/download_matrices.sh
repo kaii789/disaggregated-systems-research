@@ -8,9 +8,8 @@ echo "Starting download..."
 # Matrix download links found from: https://sparse.tamu.edu/
 # roadNet-PA
 if [ ! -f "roadNet-PA.mtx" ]; then
-  echo "downloading PA"
   wget -N https://suitesparse-collection-website.herokuapp.com/MM/SNAP/roadNet-PA.tar.gz
-  printf "Extracting roadNet-PA.mtx..."
+  echo "Extracting roadNet-PA.mtx..."
   # Extract matrix directly into the inputs folder
   tar xzf roadNet-PA.tar.gz --strip-components=1
   rm "roadNet-PA.tar.gz"
@@ -20,7 +19,7 @@ fi
 if [ ! -f "roadNet-CA.mtx" ]; then
   wget -N https://suitesparse-collection-website.herokuapp.com/MM/SNAP/roadNet-CA.tar.gz
   # Extract matrix directly into the inputs folder
-  printf "Extracting roadNet-CA.mtx..."
+  echo "Extracting roadNet-CA.mtx..."
   tar xzf roadNet-CA.tar.gz --strip-components=1
   rm "roadNet-CA.tar.gz"
 fi
@@ -28,16 +27,26 @@ fi
 # bcsstk32
 if [ ! -f "bcsstk32.mtx" ]; then
   wget -N https://suitesparse-collection-website.herokuapp.com/MM/HB/bcsstk32.tar.gz
-  printf "Extracting bcsstk32.mtx..."
+  echo "Extracting bcsstk32.mtx..."
   # Extract matrix directly into the inputs folder
   tar xzf bcsstk32.tar.gz --strip-components=1
   rm "bcsstk32.tar.gz"
 fi
 
+# pkustk14 (matrix is 92.3MB, .tar.gz file is 16.1MB)
+if [ ! -f "pkustk14.mtx" ]; then
+  wget -N https://suitesparse-collection-website.herokuapp.com/MM/Chen/pkustk14.tar.gz
+  echo "Extracting pkustk14.mtx..."
+  tar xzf pkustk14.tar.gz
+  mv pkustk14/pkustk14.mtx .
+  rm -r pkustk14
+  rm "pkustk14.tar.gz"
+fi
+
 # cit-Patents (matrix is 261.7MB, .tar.gz file is 92.8MB)
 if [ ! -f "cit-Patents.mtx" ]; then
   wget -N https://suitesparse-collection-website.herokuapp.com/MM/SNAP/cit-Patents.tar.gz
-  printf "Extracting cit-Patents.mtx..."
+  echo "Extracting cit-Patents.mtx..."
   tar xzf cit-Patents.tar.gz
   mv cit-Patents/cit-Patents.mtx .
   rm -r cit-Patents
@@ -47,7 +56,7 @@ fi
 # soc-Pokec (matrix is 424MB, .tar.gz file is 430.4MB)
 if [ ! -f "soc-Pokec.mtx" ]; then
   wget -N https://suitesparse-collection-website.herokuapp.com/MM/SNAP/soc-Pokec.tar.gz
-  printf "Extracting soc-Pokec.mtx..."
+  echo "Extracting soc-Pokec.mtx..."
   tar xzf soc-Pokec.tar.gz
   mv soc-Pokec/soc-Pokec.mtx .
   rm -r soc-Pokec
@@ -57,7 +66,7 @@ fi
 # com-Orkut (matrix is 1.8GB, .tar.gz file is 927.8MB)
 if [ ! -f "com-Orkut.mtx" ]; then
   wget -N https://suitesparse-collection-website.herokuapp.com/MM/SNAP/com-Orkut.tar.gz
-  printf "Extracting com-Orkut.mtx..."
+  echo "Extracting com-Orkut.mtx..."
   tar xzf com-Orkut.tar.gz
   mv com-Orkut/com-Orkut.mtx .
   rm -r com-Orkut
