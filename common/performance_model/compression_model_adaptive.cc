@@ -14,13 +14,21 @@ CompressionModelAdaptive::CompressionModelAdaptive(String name, UInt32 id, UInt3
     if (Sim()->getCfg()->getInt("perf_model/dram/compression_model/adaptive/decompression_latency") != -1)
         m_decompression_latency = Sim()->getCfg()->getInt("perf_model/dram/compression_model/adaptive/decompression_latency");
 
+    m_type = Sim()->getCfg()->getInt("perf_model/dram/compression_model/adaptive/type");
     m_low_compression_scheme = Sim()->getCfg()->getString("perf_model/dram/compression_model/adaptive/low_compression_scheme");
     m_high_compression_scheme = Sim()->getCfg()->getString("perf_model/dram/compression_model/adaptive/high_compression_scheme");
     m_low_compression_model = CompressionModel::create("Low-latency Compression Model", id, m_page_size, m_cache_line_size, m_low_compression_scheme);
     m_high_compression_model = CompressionModel::create("High-latency Compression Model", id, m_page_size, m_cache_line_size, m_high_compression_scheme);
 
+    // Fixed BW Threshold
     m_lower_bandwidth_threshold = Sim()->getCfg()->getFloat("perf_model/dram/compression_model/adaptive/lower_bandwidth_threshold");
     m_upper_bandwidth_threshold = Sim()->getCfg()->getFloat("perf_model/dram/compression_model/adaptive/upper_bandwidth_threshold");
+
+    // Estimator
+    m_type_switch_threshold = Sim()->getCfg()->getInt("perf_model/dram/compression_model/adaptive/latency_estimator/type_switch_threshold");
+
+    // Dynamic BW Threshold
+    m_high_compression_rate = Sim()->getCfg()->getFloat("perf_model/dram/compression_model/adaptive/dynamic_bw_threshold/high_compression_rate");
 
     registerStatsMetric("compression", id, "adaptive-low-compression-count", &m_low_compression_count);
     registerStatsMetric("compression", id, "adaptive-low-total-compression-latency", &m_low_total_compression_latency);
@@ -52,8 +60,47 @@ CompressionModelAdaptive::compress(IntPtr addr, size_t data_size, core_id_t core
     UInt32 compressed_size = data_size;
     SubsecondTime total_compression_latency = SubsecondTime::Zero();
 
+    int type = m_type;
+    if (type == 1 && (m_low_compression_count < m_type_switch_threshold || m_high_compression_count < m_type_switch_threshold))
+        type = 0;
+
+    bool use_low_compression;
+    bool use_high_compression;
+    if (type == 0) {
+        // Fixed BW Threshold
+        use_low_compression = m_bandwidth_utilization >= m_lower_bandwidth_threshold && m_bandwidth_utilization < m_upper_bandwidth_threshold;
+        use_high_compression = m_bandwidth_utilization >= m_upper_bandwidth_threshold;
+    } else if (type == 1) {
+        // Compression latency + queuing latency predictor
+        // use_low_compression
+        // use_high_compression
+
+        SubsecondTime estimate_low_compression_latency = SubsecondTime::NS((double)m_low_total_compression_latency.getNS() / (double)m_low_compression_count);
+        UInt32 estimate_low_compressed_size = (m_low_compression_count * m_page_size - m_low_bytes_saved) / m_low_compression_count;
+        SubsecondTime estimate_low_queuing_delay = m_queue_model->computeQueueDelayAfterAddNoEffect(m_t_now, m_r_bandwidth->getRoundedLatency(8*estimate_low_compressed_size), m_requester);
+
+        SubsecondTime estimate_high_compression_latency = SubsecondTime::NS((double)m_high_total_compression_latency.getNS() / (double)m_high_compression_count);
+        UInt32 estimate_high_compressed_size = (m_high_compression_count * m_page_size - m_high_bytes_saved) / m_high_compression_count;
+        SubsecondTime estimate_high_queuing_delay = m_queue_model->computeQueueDelayAfterAddNoEffect(m_t_now, m_r_bandwidth->getRoundedLatency(8*estimate_high_compressed_size), m_requester);
+
+        // printf("[Adaptive] lcl: %lu, lqd: %lu, hcl: %lu, hqd: %lu\n", estimate_low_compression_latency.getNS(), estimate_low_queuing_delay.getNS(), estimate_high_compression_latency.getNS(), estimate_high_queuing_delay.getNS());
+
+        use_low_compression = estimate_low_compression_latency + estimate_low_queuing_delay < estimate_high_compression_latency + estimate_high_queuing_delay;
+        use_high_compression = !use_low_compression;
+    } else if (type == 2) {
+        double dynamic_bw_threshold = 0.8;
+        if (m_high_compression_rate >= 5) {
+            dynamic_bw_threshold = 0.6;
+        } else if (m_high_compression_rate >= 2) {
+            dynamic_bw_threshold = 0.7;
+        }
+        m_upper_bandwidth_threshold = dynamic_bw_threshold;
+        use_low_compression = m_bandwidth_utilization >= m_lower_bandwidth_threshold && m_bandwidth_utilization < m_upper_bandwidth_threshold;
+        use_high_compression = m_bandwidth_utilization >= m_upper_bandwidth_threshold;
+    }
+
     // Compress depending on bandwidth
-    if (m_bandwidth_utilization >= m_lower_bandwidth_threshold && m_bandwidth_utilization < m_upper_bandwidth_threshold) {
+    if (use_low_compression) {
         total_compression_latency = m_low_compression_model->compress(addr, data_size, core_id, &compressed_size, &compressed_cachelines);
         m_addr_to_scheme[addr] = m_low_compression_scheme;
         m_low_compression_count += 1;
@@ -61,7 +108,7 @@ CompressionModelAdaptive::compress(IntPtr addr, size_t data_size, core_id_t core
             m_low_total_compression_latency += total_compression_latency;
         m_low_bytes_saved += data_size - compressed_size;
     }
-    else if (m_bandwidth_utilization >= m_upper_bandwidth_threshold) {
+    else if (use_high_compression) {
         total_compression_latency = m_high_compression_model->compress(addr, data_size, core_id, &compressed_size, &compressed_cachelines);
         m_addr_to_scheme[addr] = m_high_compression_scheme;
         m_high_compression_count += 1;
@@ -107,6 +154,15 @@ CompressionModelAdaptive::update_bandwidth_utilization(double bandwidth_utilizat
 {
     m_bandwidth_utilization = bandwidth_utilization;
     // printf("[Adaptive] %f\n", m_bandwidth_utilization);
+}
+
+void
+CompressionModelAdaptive::update_queue_model(QueueModel* queue_model, SubsecondTime t_now, ComponentBandwidth *bandwidth, core_id_t requester)
+{
+    m_queue_model = queue_model;
+    m_t_now = t_now;
+    m_r_bandwidth = bandwidth;
+    m_requester = requester;
 }
 
 SubsecondTime

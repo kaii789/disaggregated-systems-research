@@ -33,6 +33,10 @@ public:
       return computeQueueDelayTrackBytes(pkt_time, processing_time, num_bytes, request_type, requester);  // placeholder since the method is currently only implemented in the windowed_mg1_remote_subqueuemodels QueueModel
    };
 
+   virtual SubsecondTime computeQueueDelayAfterAddNoEffect(SubsecondTime pkt_time, SubsecondTime processing_time, core_id_t requester = INVALID_CORE_ID) {
+      return SubsecondTime::Zero(); // the method is currently only implemented in the windowed_mg1_remote QueueModel
+   };
+
    // virtual SubsecondTime computeQueueDelayTrackBytesInflightPage(SubsecondTime pkt_time, SubsecondTime processing_time, UInt64 num_bytes, request_t request_type, core_id_t requester = INVALID_CORE_ID, bool is_inflight_page = false, UInt64 phys_page = 0) {
    //    return computeQueueDelayTrackBytes(pkt_time, processing_time, num_bytes, request_type, requester);  // placeholder since the method is currently only implemented in the windowed_mg1_remote_subqueuemodels QueueModel
    // };

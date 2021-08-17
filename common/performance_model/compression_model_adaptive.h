@@ -18,6 +18,7 @@ public:
 
    void finalizeStats();
    void update_bandwidth_utilization(double bandwidth_utilization);
+   void update_queue_model(QueueModel *queue_model, SubsecondTime t_now, ComponentBandwidth *bandwidth, core_id_t requester);
 
 private:
     String m_name;
@@ -25,6 +26,7 @@ private:
     UInt32 m_cache_line_size;
     UInt32 m_cacheline_count;
 
+    int m_type;
     String m_low_compression_scheme;
     String m_high_compression_scheme;
     CompressionModel *m_low_compression_model;
@@ -43,6 +45,17 @@ private:
     SubsecondTime m_high_total_compression_latency = SubsecondTime::Zero();
     SubsecondTime m_high_total_decompression_latency = SubsecondTime::Zero();
     UInt64 m_high_bytes_saved = 0;
+
+    QueueModel* m_queue_model;
+    SubsecondTime m_t_now;
+    ComponentBandwidth *m_r_bandwidth;
+    core_id_t m_requester;
+
+    // Estimator
+    int m_type_switch_threshold;
+
+    // Dynamic BW Threshold
+    double m_high_compression_rate; // GB/s
 
     // Placeholder
     UInt32 m_compression_latency = 10;
