@@ -325,6 +325,12 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     // Make sure last one is p100
     registerStatsMetric("dram", core_id, "page-access-count-p100", &(page_usage_count_stats[m_page_usage_stats_num_points - 1]));
 
+    // Stats for BW utilization
+    for (int i = 0; i < 10; i++) {
+        m_bw_utilization_decile_to_count[i] = 0;
+        registerStatsMetric("dram", core_id, ("bw-utilization-decile-" + std::to_string(i)).c_str(), &m_bw_utilization_decile_to_count[i]);
+    }
+
     // For debugging
     std::cout << "Initial m_r_cacheline_queue_fraction=" << m_r_cacheline_queue_fraction << std::endl;
     std::cout << "Initial m_min_r_cacheline_queue_fraction_stat_scaled=" << m_min_r_cacheline_queue_fraction_stat_scaled << ", Initial m_max_r_cacheline_queue_fraction_stat_scaled=" << m_max_r_cacheline_queue_fraction_stat_scaled << std::endl; 
@@ -1128,6 +1134,14 @@ DramPerfModelDisagg::updateBandwidth()
     }
 }
 
+void
+DramPerfModelDisagg::update_bw_utilization_count(SubsecondTime pkt_time)
+{
+    double bw_utilization = m_data_movement->getPageQueueUtilizationPercentage(pkt_time);
+    int decile = (int)(bw_utilization * 10);
+    m_bw_utilization_decile_to_count[decile] += 1;
+}
+
 SubsecondTime
 DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, core_id_t requester, IntPtr address, DramCntlrInterface::access_t access_type, ShmemPerf *perf)
 {
@@ -1137,10 +1151,14 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
         updateBandwidth();
     */
 
+    // Update BW utilization count
+    update_bw_utilization_count(pkt_time);
+
     UInt64 phys_page = address & ~((UInt64(1) << floorLog2(m_page_size)) - 1);
     if (m_r_cacheline_gran)
         phys_page =  address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1); // Was << 6
     UInt64 cacheline =  address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1); // Was << 6
+
 
     if (m_page_usage_map.count(phys_page) == 0) {
         ++m_unique_pages_accessed;

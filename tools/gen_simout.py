@@ -260,6 +260,9 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
       results['compression.adaptive-high-avg-compression-latency'] = [high_total_compression_latency / data_moves]
       results['compression.adaptive-high-avg-decompression-latency'] = [high_total_decompression_latency / data_moves]
 
+      results['compression.adaptive-low-compression-percentage'] = [(float(low_data_moves) / float(low_data_moves + high_data_moves)) * 100]
+      results['compression.adaptive-high-compression-percentage'] = [(float(high_data_moves) / float(low_data_moves + high_data_moves)) * 100]
+
     # print("bytes_saved", bytes_saved)
     # print("data moves", data_moves)
     # print("avg compression ratio", results['compression.avg-compression-ratio'])
@@ -326,6 +329,13 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     results['dram.bandwidth'] = map(lambda a: 100*a/time0 if time0 else float('inf'), results['dram-queue.total-time-used'])
     template.append(('  average dram bandwidth utilization', 'dram.bandwidth', lambda v: '%.2f%%' % v))
 
+  if "dram.bw-utilization-decile-0" in results:
+    total_count = results["dram.accesses"][0]
+    for i in range(10):
+      decile_count = results["dram.bw-utilization-decile-{}".format(i)][0]
+      percentage = ((float)(decile_count) / (float)(total_count)) * 100
+      results["dram.bw-utilization-decile-percentage-{}".format(i)] = [percentage]
+      template.append(('  bw utilization % decile {}'.format(i), "dram.bw-utilization-decile-percentage-{}".format(i), str))
 
   # Compression
   if bytes_saved != 0:
@@ -399,12 +409,14 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
 
   if 'compression.adaptive-low-compression-count' in results:
     template += [
+      ('  adaptive low compression %', 'compression.adaptive-low-compression-percentage', str),
       ('  adaptive low compression count', 'compression.adaptive-low-compression-count', str),
       ('  adaptive low bytes saved', 'compression.adaptive-low-bytes-saved', str),
       ('  adaptive low avg compression ratio', 'compression.adaptive-low-avg-compression-ratio', str),
       ('  adaptive low avg compression latency(ns)', 'compression.adaptive-low-avg-compression-latency', format_ns(2)),
       ('  adaptive low avg decompression latency(ns)', 'compression.adaptive-low-avg-decompression-latency', format_ns(2)),
 
+      ('  adaptive high compression %', 'compression.adaptive-high-compression-percentage', str),
       ('  adaptive high compression count', 'compression.adaptive-high-compression-count', str),
       ('  adaptive high bytes saved', 'compression.adaptive-high-bytes-saved', str),
       ('  adaptive high avg compression ratio', 'compression.adaptive-high-avg-compression-ratio', str),
