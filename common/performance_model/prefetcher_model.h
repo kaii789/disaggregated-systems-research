@@ -4,6 +4,8 @@
 #include "fixed_types.h"
 #include "subsecond_time.h"
 
+#include <vector>
+
 class PrefetcherModel
 {
    public:

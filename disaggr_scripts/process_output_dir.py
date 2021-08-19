@@ -162,7 +162,7 @@ def get_stats_from_files(
                                     stat_settings[index].line_beginning
                                 )
                             )
-                        y_values[index].append(np.nan)  # ignore missing stats
+                            y_values[index].append(np.nan)  # ignore missing stats
                     # raise ValueError("\n".join(error_strs))
                     print("\n".join(error_strs))
             else:
@@ -268,6 +268,7 @@ def process_and_graph_experiment_series(
     graph_experiment_folders: bool = True,
     graphing_function: Optional[Callable[[str, Optional[TextIO]], bool]] = None,
     first_experiment_no: int = 1,
+    stat_settings: Optional[List[StatSetting]] = None,
 ):
     """Run this script in the directory containing experiment folders, ie the
     containing folder of the run.py file.
@@ -294,14 +295,8 @@ def process_and_graph_experiment_series(
                                 shutil.copy2(src_path, dst_path)
 
                 # Record some stats
-                # print(filename)
-                print(filename, file=log_file)
-                get_and_print_stats(
-                    filename_path,
-                    print_to_terminal=False,
-                    log_file=log_file,
-                    first_experiment_no=first_experiment_no,
-                    stat_settings=[
+                if stat_settings is None:
+                    stat_settings_old_pq_implementation = [
                         StatSetting("IPC", float),
                         StatSetting(
                             "remote dram avg access latency",
@@ -339,6 +334,11 @@ def process_and_graph_experiment_series(
                             name_for_legend="datamovement utilization full (%)",
                         ),
                         StatSetting(
+                            "remote datamovement max effective bandwidth (GB/s)",
+                            float,
+                            name_for_legend="datamovement max effective bw (GB/s)",
+                        ),
+                        StatSetting(
                             "remote datamovement2 % capped by window size",
                             float,
                             name_for_legend="datamovement2 capped by window size (%)",
@@ -349,11 +349,84 @@ def process_and_graph_experiment_series(
                             name_for_legend="datamovement2 utilization full (%)",
                         ),
                         StatSetting(
+                            "remote datamovement2 max effective bandwidth (GB/s)",
+                            float,
+                            name_for_legend="datamovement2 max effective bw (GB/s)",
+                        ),
+                        StatSetting(
                             "remote page move cancelled due to full queue",
                             int,
                             name_for_legend="remote page moves cancelled due to full queue",
                         ),
-                    ],
+                    ]
+                    stat_settings_new_pq_implementation = [
+                        StatSetting("IPC", float),
+                        StatSetting(
+                            "remote dram avg access latency",
+                            float,
+                            name_for_legend="remote dram avg access latency (ns)",
+                        ),
+                        StatSetting(
+                            "remote both queues total avg access latency",
+                            float,
+                            name_for_legend="  both queues total avg access latency (ns)",
+                        ),
+                        StatSetting(
+                            "remote datamovement queue model avg access latency",
+                            float,
+                            name_for_legend="    page queue avg access latency (ns)",
+                        ),
+                        StatSetting(
+                            "remote datamovement2 queue model avg access latency",
+                            float,
+                            name_for_legend="    cacheline queue avg access latency (ns)",
+                        ),
+                        StatSetting(
+                            "local dram avg access latency",
+                            float,
+                            name_for_legend="local dram avg access latency (ns)",
+                        ),
+                        StatSetting(
+                            "average dram access latency",
+                            float,
+                            name_for_legend="avg dram access latency (ns)",
+                        ),
+                        StatSetting(
+                            "page queue max effective bandwidth (GB/s)",
+                            float,
+                            name_for_legend="page queue max effective bandwidth (GB/s)",
+                        ),
+                        StatSetting(
+                            "cacheline queue max effective bandwidth (GB/s)",
+                            float,
+                            name_for_legend="cl queue max effective bandwidth (GB/s)",
+                        ),
+                        StatSetting(
+                            "remote datamovement % capped by window size",
+                            float,
+                            name_for_legend="datamovement capped by window size (%)",
+                        ),
+                        StatSetting(
+                            "remote datamovement % queue utilization full",
+                            float,
+                            name_for_legend="datamovement utilization full (%)",
+                        ),
+                        StatSetting(
+                            "remote page move cancelled due to full queue",
+                            int,
+                            name_for_legend="remote page moves cancelled due to full queue",
+                        ),
+                    ]
+                    # stat_settings = stat_settings_old_pq_implementation
+                    stat_settings = stat_settings_new_pq_implementation
+                # print(filename)
+                print(filename, file=log_file)
+                get_and_print_stats(
+                    filename_path,
+                    print_to_terminal=False,
+                    log_file=log_file,
+                    first_experiment_no=first_experiment_no,
+                    stat_settings=stat_settings,
                 )
                 # print()
                 print(file=log_file)

@@ -8,7 +8,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from scipy import interpolate
 
-from typing import Any, Callable, Dict, List, Tuple, Optional, TextIO, TypeVar
+from typing import Any, Callable, Dict, Iterable, List, Tuple, Optional, TextIO, TypeVar
 
 PathLike = TypeVar("PathLike", str, bytes, os.PathLike)  # Type for file/directory paths
 
@@ -292,13 +292,19 @@ def save_graph_pq(
     stat_settings: List[StatSetting],
     x_axis: Optional[List[str]] = None,
     pq0_index: Optional[int] = None,
+    pq0_guideline_indices: Iterable[int] = (),
     labels: Optional[List[str]] = None,
     log_file: Optional[TextIO] = None,
     title_str: Optional[str] = None,
-    figsize_tuple: Tuple[float, float] = (6.4, 4.8),
+    figsize_tuple: Optional[Tuple[float, float]] = None,
 ):
     plt.clf()
     plt.close("all")
+
+    if len(y_values) == 0:
+        # No data passed in
+        print("No y_value lists in parameter y_values, skipping")
+        return
 
     if not x_axis:
         if len(y_values[0]) == 16:  # PQ and cacheline combined series
@@ -320,7 +326,8 @@ def save_graph_pq(
                 "pq1\ncl=\n0.55",
                 "pq1\ncl=\n0.6",
             ]
-            figsize_tuple = (10, 4.8)  # (width, height) in inches
+            if figsize_tuple is None:
+                figsize_tuple = (10, 4.8)  # (width, height) in inches
         elif len(y_values[0]) == 13:  # PQ and cacheline combined series, edited (pq_new_series)
             x_axis = [
                 "no\nremote\nmem\n",
@@ -337,7 +344,8 @@ def save_graph_pq(
                 "pq1\ncl=\n0.3",
                 "pq1\ncl=\n0.5",
             ]
-            figsize_tuple = (9, 4.8)  # (width, height) in inches
+            if figsize_tuple is None:
+                figsize_tuple = (9, 4.8)  # (width, height) in inches
             pq0_index = 2
         elif len(y_values[0]) == 12:  # PQ and cacheline combined series, edited (pq_newer_series)
             x_axis = [
@@ -354,7 +362,9 @@ def save_graph_pq(
                 "pq1\ncl=\n0.3",
                 "pq1\ncl=\n0.5",
             ]
-            figsize_tuple = (9, 4.8)  # (width, height) in inches
+            if figsize_tuple is None:
+                figsize_tuple = (9, 4.8)  # (width, height) in inches
+                # figsize_tuple = (9, 6)  # (width, height) in inches
             pq0_index = 2
         elif len(y_values[0]) == 11:  # PQ and cacheline combined series, edited (pq_newer_series), TEMP
             x_axis = [
@@ -370,11 +380,13 @@ def save_graph_pq(
                 "pq1\ncl=\n0.2",
                 "pq1\ncl=\n0.3",
             ]
-            figsize_tuple = (9, 4.8)  # (width, height) in inches
+            if figsize_tuple is None:
+                figsize_tuple = (9, 4.8)  # (width, height) in inches
             pq0_index = 2
         else:
             raise ValueError("number of experiment runs={}, inaccurate?".format(len(y_values[0])))
-
+    if not figsize_tuple:
+        figsize_tuple = (6.4, 4.8)  # default figure size
     if not labels:
         labels = [stat_settings[i].name_for_legend.strip() for i in range(len(y_values))]
 
@@ -402,7 +414,7 @@ def save_graph_pq(
     # Plot as graph
     plt.figure(figsize=figsize_tuple)
     if pq0_index is not None:
-        for i in range(len(y_values)):
+        for i in pq0_guideline_indices:
             plt.axhline(y=y_values[i][pq0_index])  # horizontal line at pq0 IPC for easier comparison
 
     line_style_list = [".--", ".--", ".--", ".--", ".--", ".--"]
@@ -426,8 +438,8 @@ def save_graph_pq(
         )
     # Uniform scale among experiments for the same application and input
     y_axis_top = 0.55
-    if "bcsstk" in output_directory_path:
-        y_axis_top = 1.4
+    # if "bcsstk" in output_directory_path:
+    #     y_axis_top = 1.4
     data_y_max = max([max(y_values[i]) for i in range(len(y_values))])
     if data_y_max > y_axis_top:
         y_axis_top = data_y_max + max(0.2, data_y_max * 0.05)
@@ -452,23 +464,23 @@ def pq_graphing(dir_path, log_file: Optional[TextIO] = None):
     dirname = os.path.basename(os.path.normpath(dir_path))
     if "partition_queue" in dirname:
         # Partition queue series
-        plot_graph_pq.run_from_cmdline(dir_path, log_file=log_file)
+        plot_graph_pq.run_from_experiment(dir_path, log_file=log_file)
         return True
     elif "pq_cacheline_combined" in dirname:
         # PQ + cacheline combined series
-        plot_graph_pq.run_from_cmdline(dir_path, log_file=log_file)
+        plot_graph_pq.run_from_experiment(dir_path, log_file=log_file)
         return True
     elif "pq_new_series" in dirname:
         # PQ + cacheline combined series, edited (13 runs)
-        plot_graph_pq.run_from_cmdline(dir_path, log_file=log_file)
+        plot_graph_pq.run_from_experiment(dir_path, log_file=log_file)
         return True
     elif "pq_newer_series" in dirname:
         # PQ + cacheline combined series, edited (12 runs)
-        plot_graph_pq.run_from_cmdline(dir_path, log_file=log_file)
+        plot_graph_pq.run_from_experiment(dir_path, log_file=log_file)
         return True
     # elif "cacheline_ratio_series" in dirname:
     #     # Cacheline ratio series
-    #     plot_graph.run_from_cmdline(dir_path, "perf_model/dram", "remote_cacheline_queue_fraction")
+    #     plot_graph.run_from_experiment(dir_path, "perf_model/dram", "remote_cacheline_queue_fraction")
     #     return True
     else:
         # Unknown series type
@@ -597,7 +609,7 @@ def ideal_window_size_combining(output_directory_path: PathLike):
         if current_experiment_name_root != last_experiment_name_root:
             if last_experiment_name_root is not None:
                 # Wrap up previous series
-                save_graph_pq(output_directory_path, graph_y_values, graph_stat_settings, labels, title_str=last_experiment_name_root)
+                save_graph_pq(output_directory_path, graph_y_values, graph_stat_settings, labels=labels, title_str=last_experiment_name_root)
                 graph_y_values.clear()
                 graph_stat_settings.clear()
             # Starting new series
@@ -637,7 +649,7 @@ def ideal_window_size_combining(output_directory_path: PathLike):
 
     # last series
     if len(graph_y_values) > 0:
-        save_graph_pq(output_directory_path, graph_y_values, graph_stat_settings, labels, title_str=last_experiment_name_root)
+        save_graph_pq(output_directory_path, graph_y_values, graph_stat_settings, labels=labels, title_str=last_experiment_name_root)
     if len(passed_over_directories) > 0:
         print("\nPassed over {} directories:".format(len(passed_over_directories)))
         for dirname in passed_over_directories:
@@ -672,7 +684,7 @@ def ideal_thresholds_combining(output_directory_path: PathLike):
         if current_experiment_name_root != last_experiment_name_root:
             if last_experiment_name_root is not None:
                 # Wrap up previous series
-                save_graph_pq(output_directory_path, graph_y_values, graph_stat_settings, labels, title_str=last_experiment_name_root)
+                save_graph_pq(output_directory_path, graph_y_values, graph_stat_settings, labels=labels, title_str=last_experiment_name_root)
                 graph_y_values.clear()
                 graph_stat_settings.clear()
             # Starting new series
@@ -697,7 +709,7 @@ def ideal_thresholds_combining(output_directory_path: PathLike):
 
     # last series
     if len(graph_y_values) > 0:
-        save_graph_pq(output_directory_path, graph_y_values, graph_stat_settings, labels, title_str=last_experiment_name_root)
+        save_graph_pq(output_directory_path, graph_y_values, graph_stat_settings, labels=labels, title_str=last_experiment_name_root)
     if len(passed_over_directories) > 0:
         print("\nPassed over {} directories:".format(len(passed_over_directories)))
         for dirname in passed_over_directories:
@@ -744,7 +756,7 @@ def limit_redundant_moves_combining(output_directory_path: PathLike):
         if current_experiment_name_root != last_experiment_name_root:
             if last_experiment_name_root is not None:
                 # Wrap up previous series
-                save_graph_pq(output_directory_path, graph_y_values, graph_stat_settings, labels, title_str=last_experiment_name_root)
+                save_graph_pq(output_directory_path, graph_y_values, graph_stat_settings, labels=labels, title_str=last_experiment_name_root)
                 graph_y_values.clear()
                 graph_stat_settings.clear()
             # Starting new series
@@ -783,7 +795,7 @@ def limit_redundant_moves_combining(output_directory_path: PathLike):
 
     # last series
     if len(graph_y_values) > 0:
-        save_graph_pq(output_directory_path, graph_y_values, graph_stat_settings, labels, title_str=last_experiment_name_root)
+        save_graph_pq(output_directory_path, graph_y_values, graph_stat_settings, labels=labels, title_str=last_experiment_name_root)
     if len(passed_over_directories) > 0:
         print("\nPassed over {} directories:".format(len(passed_over_directories)))
         for dirname in passed_over_directories:
@@ -798,6 +810,8 @@ def D5B_ideal_pagemove_throttling_combining(output_directory_path: PathLike, res
     graph_stat_settings = []
 
     labels = ["IPC, FCFS baseline", "IPC, Ideal baseline"]
+    figsize_tuple = (9, 4.8)
+    pq0_guideline_indices = (0, 1)  # draw pq0 guideline only for the first two series, the FCFS baseline and the ideal page throttling baseline
 
     for filename in natsort.os_sorted(os.listdir(results_dir_path)):
         filename_path = os.path.join(results_dir_path, filename)
@@ -814,7 +828,7 @@ def D5B_ideal_pagemove_throttling_combining(output_directory_path: PathLike, res
         if current_experiment_name_root != last_experiment_name_root:
             if last_experiment_name_root is not None:
                 # Wrap up previous series
-                save_graph_pq(output_directory_path, graph_y_values, graph_stat_settings, labels, title_str=last_experiment_name_root)
+                save_graph_pq(output_directory_path, graph_y_values, graph_stat_settings, figsize_tuple=figsize_tuple, labels=labels, title_str=last_experiment_name_root, pq0_guideline_indices=pq0_guideline_indices)
                 graph_y_values.clear()
                 graph_stat_settings.clear()
             # Starting new series
@@ -843,7 +857,7 @@ def D5B_ideal_pagemove_throttling_combining(output_directory_path: PathLike, res
 
     # last series
     if len(graph_y_values) > 0:
-        save_graph_pq(output_directory_path, graph_y_values, graph_stat_settings, labels, title_str=last_experiment_name_root)
+        save_graph_pq(output_directory_path, graph_y_values, graph_stat_settings, figsize_tuple=figsize_tuple, labels=labels, title_str=last_experiment_name_root, pq0_guideline_indices=pq0_guideline_indices)
     if len(passed_over_directories) > 0:
         print("\nPassed over {} directories:".format(len(passed_over_directories)))
         for dirname in passed_over_directories:
@@ -851,14 +865,15 @@ def D5B_ideal_pagemove_throttling_combining(output_directory_path: PathLike, res
 
 
 def process_D5B_dir():
-    output_directory_path = "/home/jonathan/Desktop/experiment_results/experimentrun_D5_next_l3cache"
+    results_dir_path = "/home/jonathan/Desktop/experiment_results/experimentrun_D5_next_l3cache"
+    graph_output_dir_path = "/home/jonathan/Desktop/experiment_results/Ideal vs FCFS (D5B)"
     passed_over_directories = []
-    for filename in natsort.os_sorted(os.listdir(output_directory_path)):
-        filename_path = os.path.join(output_directory_path, filename)
+    for filename in natsort.os_sorted(os.listdir(results_dir_path)):
+        filename_path = os.path.join(results_dir_path, filename)
         if not os.path.isdir(filename_path):
             continue
-        if filename.startswith("experimentrun") and "test" not in filename.lower() and "ligra other" not in filename:
-            D5B_ideal_pagemove_throttling_combining("/home/jonathan/Desktop/experiment_results/Ideal vs FCFS (D5B)", filename_path)
+        if filename.startswith("experimentrun_D5B") and "test" not in filename.lower():
+            D5B_ideal_pagemove_throttling_combining(graph_output_dir_path, filename_path)
         else:
             passed_over_directories.append(filename)
     if len(passed_over_directories) > 0:
@@ -1051,7 +1066,7 @@ def get_stats_from_files_custom(
                                     stat_settings[index].line_beginning
                                 )
                             )
-                        y_values[index].append(np.nan)  # ignore missing stats
+                            y_values[index].append(np.nan)  # ignore missing stats
                     # raise ValueError("\n".join(error_strs))
                     print("\n".join(error_strs))
             else:
@@ -1193,6 +1208,110 @@ def prefetcher_combining(output_directory_path: PathLike):
             print("  {}".format(dirname))
 
 
+def general_experiment_combining(output_directory_path: PathLike):
+    darknet_dir = "/home/jonathan/Desktop/experiment_results/experimentrun_D7/experimentrun_D7 (darknet)"
+    darknet_compression_dir = "/home/jonathan/Desktop/experiment_results/experimentrun_D7/experimentrun_D7 (darknet compression)"
+    ligra_dir = "/home/jonathan/Desktop/experiment_results/experimentrun_D7/experimentrun_D7 (ligra)"
+    spmv_dir = "/home/jonathan/Desktop/experiment_results/experimentrun_D7/experimentrun_D7 (spmv)"
+    sssp_dir = "/home/jonathan/Desktop/experiment_results/experimentrun_D7/experimentrun_D7 (sssp)"
+    stream_dir = "/home/jonathan/Desktop/experiment_results/experimentrun_D7/experimentrun_D7 (stream)"
+    new_experiments_dir = darknet_compression_dir
+    fcfs_baseline_throttling_dir = darknet_dir
+    ideal_baseline_throttling_dir = darknet_dir
+    experiment_series_name = "pq_newer_series"
+
+    passed_over_directories = []
+
+    last_experiment_name_root = None
+    graph_y_values = []
+    graph_stat_settings = []
+
+    labels = []
+    figsize_tuple = (9, 4.8)
+    pq0_guideline_indices = (0, )  # draw pq0 guideline only for the first series, typically the FCFS baseline
+
+    for filename in natsort.os_sorted(os.listdir(new_experiments_dir)):
+        filename_path = os.path.join(new_experiments_dir, filename)
+        if not os.path.isdir(filename_path):
+            continue
+        if not ("output_files" in filename):
+            passed_over_directories.append(filename)
+            continue
+        if "remoteinit" not in filename:
+            print("Directory {} doesn't contain the string 'remoteinit', passing over".format(filename))
+            continue
+        # The second index of the slice is the underscore right after "remoteinit_true" or "remoteinit_false"
+        current_experiment_name_root = filename[:filename.find("_", filename.find("remoteinit") + len("remoteinit") + 1)]
+        # The variation name is the part after current_experiment_name_root and before experiment_series_name, without leading and trailing "_"
+        current_experiment_variation_name = filename[filename.find("_", filename.find("remoteinit") + len("remoteinit") + 1) + 1 : filename.find(experiment_series_name) - 1]
+        if current_experiment_name_root != last_experiment_name_root:
+            if last_experiment_name_root is not None:
+                # Wrap up previous series
+                save_graph_pq(output_directory_path, graph_y_values, graph_stat_settings, figsize_tuple=figsize_tuple, labels=labels, title_str=last_experiment_name_root, pq0_guideline_indices=pq0_guideline_indices)
+                graph_y_values.clear()
+                graph_stat_settings.clear()
+            # Starting new series
+            last_experiment_name_root = current_experiment_name_root
+            labels = []
+            # Get FCFS throttling baseline results
+            baseline_experiment_output_dir_list = []
+            baseline_experiment_variation_names = []
+            for candidate_file in os.listdir(fcfs_baseline_throttling_dir):
+                candidate_file_path = os.path.join(fcfs_baseline_throttling_dir, candidate_file)
+                experiment_variation_name = candidate_file[candidate_file.find("_", candidate_file.find("remoteinit") + len("remoteinit") + 1) + 1 : candidate_file.find(experiment_series_name) - 1]
+                if os.path.isdir(candidate_file_path) and candidate_file.startswith(current_experiment_name_root) and experiment_variation_name == "":
+                    baseline_experiment_output_dir_list.append(candidate_file_path)
+                    baseline_experiment_variation_names.append(experiment_variation_name)
+    
+
+            # Graph all FCFS baselines
+            for fcfs_baseline, baseline_variation_name in zip(baseline_experiment_output_dir_list, baseline_experiment_variation_names):
+                fcfs_baseline_y_values, fcfs_baseline_stat_settings = get_stats_from_files(fcfs_baseline)
+                # Get the IPC ones, at index 0
+                graph_y_values.append(fcfs_baseline_y_values[0])
+                graph_stat_settings.append(fcfs_baseline_stat_settings[0])
+                labels.append("FCFS baseline " + baseline_variation_name)
+
+            # # Get ideal throttling default 10^5 winsize results
+            ideal_baseline_experiment_output_dir_list = []
+            ideal_baseline_experiment_variation_names = []
+            for candidate_file in os.listdir(ideal_baseline_throttling_dir):
+                candidate_file_path = os.path.join(ideal_baseline_throttling_dir, candidate_file)
+                experiment_variation_name = candidate_file[candidate_file.find("_", candidate_file.find("remoteinit") + len("remoteinit") + 1) + 1 : candidate_file.find(experiment_series_name) - 1]
+                if os.path.isdir(candidate_file_path) and candidate_file.startswith(current_experiment_name_root) and "idealwinsize" in candidate_file:
+                    ideal_baseline_experiment_output_dir_list.append(candidate_file_path)
+                    ideal_baseline_experiment_variation_names.append(experiment_variation_name)
+            if len(ideal_baseline_experiment_output_dir_list) != 1:
+                print("Error: did not find just one ideal baseline experiment with the same name root as '{}':".format(current_experiment_name_root), ideal_baseline_experiment_output_dir_list)
+            else:
+                ideal_baseline_y_values, ideal_baseline_stat_settings = get_stats_from_files(ideal_baseline_experiment_output_dir_list[0])
+                # Get the IPC ones, at index 0
+                graph_y_values.append(ideal_baseline_y_values[0])
+                graph_stat_settings.append(ideal_baseline_stat_settings[0])
+                labels.append(ideal_baseline_experiment_variation_names[0])
+
+        if current_experiment_variation_name == "" or current_experiment_variation_name == "idealwinsize_100000":
+            # Already included in FCFS/Ideal page throttling baseline
+            continue
+        # TEMP
+        # if "prefetch" in current_experiment_variation_name:
+        #     continue
+        # if "limredundantmoves" in current_experiment_variation_name or "rmode5" in current_experiment_variation_name:
+        #     continue
+        y_values, stat_settings = get_stats_from_files(filename_path)
+        # Get the IPC ones, at index 0
+        graph_y_values.append(y_values[0])
+        graph_stat_settings.append(stat_settings[0])
+        labels.append(current_experiment_variation_name)
+
+    # last series
+    if len(graph_y_values) > 0:
+        save_graph_pq(output_directory_path, graph_y_values, graph_stat_settings, figsize_tuple=figsize_tuple, labels=labels, title_str=last_experiment_name_root, pq0_guideline_indices=pq0_guideline_indices)
+    if len(passed_over_directories) > 0:
+        print("\nPassed over {} directories:".format(len(passed_over_directories)))
+        for dirname in passed_over_directories:
+            print("  {}".format(dirname))
+
 if __name__ == "__main__":
     # with open("/home/jonathan/Desktop/percentages.txt", "r") as file:
     #     line = file.readline()
@@ -1236,3 +1355,20 @@ if __name__ == "__main__":
     # pq0_bw_sensitivity_graphing()
 
     # prefetcher_combining("/home/jonathan/Desktop/experiment_results/prefetcher (next page)")
+
+    # general_experiment_combining("/home/jonathan/Desktop/experiment_results/prefetcher_D7")
+
+    # passed_over_directories = []
+    # directories_not_graphed = []
+    # for filename in natsort.os_sorted(os.listdir(output_directory_path)):
+    #     filename_path = os.path.join(output_directory_path, filename)
+    #     if os.path.isdir(filename_path) and "output_files" in filename:
+    #         for sub_filename in natsort.os_sorted(os.listdir(filename_path)):
+    #             sub_filename_path = os.path.join(filename_path, sub_filename)
+    #             if (
+    #                 os.path.isfile(sub_filename_path)
+    #                 and sub_filename.endswith(".png")
+    #             ):
+    #                 src_path = sub_filename_path
+    #                 dst_path = os.path.join(output_directory_path, sub_filename)
+    #                 shutil.copy2(src_path, dst_path)

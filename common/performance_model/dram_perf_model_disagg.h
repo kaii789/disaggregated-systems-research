@@ -13,6 +13,7 @@
 #include <bitset>
 #include <map>
 #include <list>
+#include <set>
 #include <algorithm>
 
 class DramPerfModelDisagg : public DramPerfModel
@@ -44,11 +45,11 @@ class DramPerfModelDisagg : public DramPerfModel
         const bool m_randomize_address;
         const UInt32 m_randomize_offset;
         const UInt32 m_column_bits_shift; // Position of column bits for closed-page mapping (after cutting interleaving/channel/rank/bank from bottom)
-        double m_bw_scalefactor;
         const ComponentBandwidth m_bus_bandwidth;
         ComponentBandwidth m_r_bus_bandwidth;   // Remote
         ComponentBandwidth m_r_part_bandwidth;  // Remote - Partitioned Queues => Page Queue
         ComponentBandwidth m_r_part2_bandwidth; // Remote - Partitioned Queues => Cacheline Queue
+        double m_r_bw_scalefactor;              // Remote memory bandwidth is ddr bandwidth scaled down by m_r_bw_scalefactor
         bool m_use_dynamic_bandwidth;
         const SubsecondTime m_bank_keep_open;
         const SubsecondTime m_bank_open_delay;
@@ -78,12 +79,14 @@ class DramPerfModelDisagg : public DramPerfModel
         const bool m_r_enable_selective_moves; 
         const UInt32 m_r_partition_queues; // Enable partitioned queues
         double m_r_cacheline_queue_fraction; // The fraction of remote bandwidth used for the cacheline queue (decimal between 0 and 1) 
+        bool m_use_dynamic_cl_queue_fraction_adjustment; // Whether to dynamically adjust m_r_cacheline_queue_fraction
         const bool m_r_cacheline_gran; // Move data and operate in cacheline granularity
         const UInt32 m_r_reserved_bufferspace; // Max % of local DRAM that can be reserved for pages in transit
         const UInt32 m_r_limit_redundant_moves; 
         const bool m_r_throttle_redundant_moves;
         const bool m_r_use_separate_queue_model;  // Whether to use the separate remote queue model
         double m_r_page_queue_utilization_threshold;  // When the datamovement queue for pages has percentage utilization above this, remote pages aren't moved to local
+        double m_r_cacheline_queue_utilization_threshold;  // When the datamovement queue for cachelines has percentage utilization above this, cacheline requests on inflight pages aren't made
         double m_r_mode_5_limit_moves_threshold;  // When m_r_mode == 5, operate according to m_r_mode 2 when the page queue utilization is >= this value, otherwise operate according to m_r_mode 1
         SubsecondTime m_r_mode_5_remote_access_history_window_size;  // When m_r_mode == 5, and operating according to m_r_mode, track page accesses using the most recent window size number of ns
         bool m_use_throttled_pages_tracker;  // Whether to update m_throttled_pages_tracker. Must be true to use the ideal page throttler or print stats of throttled pages
@@ -120,6 +123,9 @@ class DramPerfModelDisagg : public DramPerfModel
         std::map<UInt64, UInt32> m_inflight_redundant;    // Count the number of redundant moves that occur for each inflight page while it is being transferred
         std::map<UInt64, SubsecondTime> m_inflightevicted_pages; // Inflight pages that are being transferred from local memory to remote memory
 
+        UInt64 m_inflight_page_delayed;
+        SubsecondTime m_inflight_pages_delay_time;
+
         std::map<UInt64, UInt32> m_page_usage_map;  // track number of times each phys page is accessed
         const UInt32 m_page_usage_stats_num_points = 10;  // the number of percentiles (from above 0% to including 100%)
         std::vector<UInt64> page_usage_count_stats;       // percentiles of phys_page access counts, to be registered as stats
@@ -150,6 +156,26 @@ class DramPerfModelDisagg : public DramPerfModel
         PrefetcherModel *m_prefetcher_model;
         bool m_prefetch_unencountered_pages;      // Whether to prefetch pages that haven't been encountered yet in program execution
 
+        // Page spatial locality tracker
+        UInt64 m_num_recent_remote_accesses;
+        UInt64 m_num_recent_remote_additional_accesses;   // For cacheline queue requests made on inflight pages. Track this separately since they could be counted as either "remote" or "local" cacheline accesses
+        UInt64 m_num_recent_local_accesses;
+        // SubsecondTime m_recent_access_count_begin_time;
+        std::set<UInt64> m_recent_accessed_pages;
+        std::vector<double> m_page_locality_measures;
+        std::vector<double> m_modified_page_locality_measures;
+        std::vector<double> m_modified2_page_locality_measures;
+
+        // Stats for when dynamically adjusting m_r_cacheline_queue_fraction
+        UInt64 m_r_cacheline_queue_fraction_increased;
+        UInt64 m_r_cacheline_queue_fraction_decreased;
+        double m_min_r_cacheline_queue_fraction;
+        double m_max_r_cacheline_queue_fraction;
+        UInt64 m_min_r_cacheline_queue_fraction_stat_scaled;  // Min cl queue fraction * 10^4, saving double as an int for sim.out
+        UInt64 m_max_r_cacheline_queue_fraction_stat_scaled;  // Max cl queue fraction * 10^4, saving double as an int for sim.out
+
+        UInt64 m_num_accesses;                                // Total number of calls to getAccessLatency(), ie # cachelines requested
+
         // Variables to keep track of stats
         UInt64 m_dram_page_hits;
         UInt64 m_dram_page_empty;
@@ -172,7 +198,9 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_redundant_moves_type1;
         UInt64 partition_queues_cacheline_slower_than_page;  // with the new change, these situations no longer result in redundant moves
         UInt64 m_redundant_moves_type2;
-        UInt64 m_cacheline_queue_request_cancelled; // number of times a cacheline queue request is cancelled (currently, due to m_r_limit_redundant_moves)
+        UInt64 m_redundant_moves_type2_cancelled_datamovement_queue_full;
+        UInt64 m_redundant_moves_type2_cancelled_limit_redundant_moves; // number of times a cacheline queue request is cancelled due to m_r_limit_redundant_moves
+        UInt64 m_redundant_moves_type2_slower_than_page_arrival;  // these situations don't result in redundant moves
         UInt64 m_max_bufferspace;                   // the maximum number of localdram pages actually used to back inflight and inflight_evicted pages 
         UInt64 m_move_page_cancelled_bufferspace_full;         // the number of times moving a remote page to local was cancelled due to localdram bufferspace being full
         UInt64 m_move_page_cancelled_datamovement_queue_full;  // the number of times moving a remote page to local was cancelled due to the queue for pages being full
@@ -189,14 +217,21 @@ class DramPerfModelDisagg : public DramPerfModel
         SubsecondTime m_total_access_latency;
         SubsecondTime m_total_local_access_latency;
         SubsecondTime m_total_remote_access_latency;
+        SubsecondTime m_total_remote_datamovement_latency;
+        UInt64 m_global_time_much_larger_than_tnow;
+        SubsecondTime m_sum_global_time_much_larger;
 
         // Dynamic BW
         long long int m_update_bandwidth_count = 0;
 
         void parseDeviceAddress(IntPtr address, UInt32 &channel, UInt32 &rank, UInt32 &bank_group, UInt32 &bank, UInt32 &column, UInt64 &dram_page);
         UInt64 parseAddressBits(UInt64 address, UInt32 &data, UInt32 offset, UInt32 size, UInt64 base_address);
-        SubsecondTime possiblyEvict(UInt64 phys_page, SubsecondTime pkt_time, core_id_t requester); 
-        void possiblyPrefetch(UInt64 phys_page, SubsecondTime pkt_time, core_id_t requester); 
+        SubsecondTime possiblyEvict(UInt64 phys_page, SubsecondTime pkt_time, core_id_t requester);
+        void possiblyPrefetch(UInt64 phys_page, SubsecondTime pkt_time, core_id_t requester);
+
+        // Helper to print vector percentiles, for stats output
+        template<typename T>
+        void sortAndPrintVectorPercentiles(std::vector<T>& vec, std::ostringstream& percentages_buffer, std::ostringstream& counts_buffer, UInt32 num_bins = 40);
 
     public:
         DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_size, AddressHomeLookup* address_home_lookup);

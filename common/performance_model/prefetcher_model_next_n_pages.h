@@ -5,6 +5,8 @@
 #include "subsecond_time.h"
 #include "prefetcher_model.h"
 
+#include <vector>
+
 // Returns the next N physical pages in memory as the page prefetch candidates
 class PrefetcherModelNextNPages : public PrefetcherModel
 {
