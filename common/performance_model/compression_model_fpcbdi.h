@@ -40,6 +40,9 @@ private:
        UInt32 compressed_size; // In bytes
     } ;
 
+    static const UInt32 mask[6];
+    static const UInt32 neg_check[6];
+
     // Compression latency per cache line 
     UInt32 m_compression_latency = 5; 
     // Decompression latency per cache line
