@@ -248,8 +248,8 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
       low_data_moves = results['compression.adaptive-low-compression-count'][0]
 
       results['compression.adaptive-low-avg-compression-ratio'] = [float((low_data_moves * gran_size)) / float(((low_data_moves * gran_size) - low_bytes_saved))] if low_data_moves != 0 else [0]
-      results['compression.adaptive-low-avg-compression-latency'] = [low_total_compression_latency / data_moves]
-      results['compression.adaptive-low-avg-decompression-latency'] = [low_total_decompression_latency / data_moves]
+      results['compression.adaptive-low-avg-compression-latency'] = [low_total_compression_latency / low_data_moves] if low_data_moves > 0 else [0]
+      results['compression.adaptive-low-avg-decompression-latency'] = [low_total_decompression_latency / low_data_moves] if low_data_moves > 0 else [0]
 
       high_bytes_saved = results['compression.adaptive-high-bytes-saved'][0]
       high_total_compression_latency = results['compression.adaptive-high-total-compression-latency'][0]
@@ -257,8 +257,8 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
       high_data_moves = results['compression.adaptive-high-compression-count'][0]
 
       results['compression.adaptive-high-avg-compression-ratio'] = [float((high_data_moves * gran_size)) / float(((high_data_moves * gran_size) - high_bytes_saved))] if high_data_moves != 0 else [0]
-      results['compression.adaptive-high-avg-compression-latency'] = [high_total_compression_latency / data_moves]
-      results['compression.adaptive-high-avg-decompression-latency'] = [high_total_decompression_latency / data_moves]
+      results['compression.adaptive-high-avg-compression-latency'] = [high_total_compression_latency / high_data_moves] if high_data_moves > 0 else [0]
+      results['compression.adaptive-high-avg-decompression-latency'] = [high_total_decompression_latency / high_data_moves] if high_data_moves > 0 else [0]
 
       results['compression.adaptive-low-compression-percentage'] = [(float(low_data_moves) / float(low_data_moves + high_data_moves)) * 100]
       results['compression.adaptive-high-compression-percentage'] = [(float(high_data_moves) / float(low_data_moves + high_data_moves)) * 100]
