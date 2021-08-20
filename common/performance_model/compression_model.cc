@@ -12,6 +12,7 @@
 #include "compression_model_lz78.h"
 #include "compression_model_lzw.h"
 #include "compression_model_lzbdi.h"
+#include "compression_model_fpcbdi.h"
 #include "compression_model_zlib.h"
 #include "compression_model_adaptive.h"
 
@@ -53,6 +54,10 @@ CompressionModel::create(String name, UInt32 id, UInt32 page_size, UInt32 cache_
     else if (compression_type == "lzbdi")
     {
         return new CompressionModelLZBDI(name, id, page_size, cache_line_size);
+    }
+    else if (compression_type == "fpcbdi")
+    {
+        return new CompressionModelFPCBDI(name, id, page_size, cache_line_size);
     }
     else if (compression_type == "zlib")
     {
