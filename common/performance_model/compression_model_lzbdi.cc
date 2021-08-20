@@ -12,7 +12,7 @@ CompressionModelLZBDI::CompressionModelLZBDI(String name, UInt32 id, UInt32 page
     , m_total_compressed(0)
 {
     m_options = (use_additional_options) ? 16 : 11;
-    m_index_bits = 4;
+    m_prefix_len = (use_additional_options) ? 5: 4; // 4 bits are needed to identify 12 (one more option to identify uncompressed data line) and 5 bits are needed to identify 17 options
 
     // Set compression/decompression cycle latencies if configured
     if (Sim()->getCfg()->getInt("perf_model/dram/compression_model/lzbdi/compression_latency") != -1)
@@ -30,15 +30,15 @@ CompressionModelLZBDI::CompressionModelLZBDI(String name, UInt32 id, UInt32 page
     m_compressed_cache_line_sizes = new UInt32[m_cacheline_count];
 
     // Register stats for compression_options
-    registerStatsMetric("compression", id, "lzbdi_num_overflowed_pages", &m_num_overflowed_pages);
+    registerStatsMetric("compression", id, "num_overflowed_pages", &m_num_overflowed_pages);
     registerStatsMetric("compression", id, "bdi_total_compressed", &(m_total_compressed));
-    for (UInt32 i = 0; i < 13; i++) {
+    for (UInt32 i = 0; i < 16; i++) {
         String stat_name = "bdi_usage_option-";
         stat_name += std::to_string(i).c_str();
         registerStatsMetric("compression", id, stat_name, &(m_compress_options[i]));
     }
 
-    for (UInt32 i = 0; i < 13; i++) {
+    for (UInt32 i = 0; i < 16; i++) {
         String stat_name = "bdi_bytes_saved_option-";
         stat_name += std::to_string(i).c_str();
         registerStatsMetric("compression", id, stat_name, &(m_bytes_saved_per_option[i]));
@@ -59,6 +59,7 @@ CompressionModelLZBDI::finalizeStats()
 {
     for (UInt32 i = 0; i < 16; i++) {
         m_total_compressed += m_compress_options[i];
+        m_bytes_saved_per_option[i] += m_bits_saved_per_option[i] / 8;
     }
 }
 
@@ -77,20 +78,25 @@ CompressionModelLZBDI::compress(IntPtr addr, size_t data_size, core_id_t core_id
     }
 
     // BDI
+    UInt32 total_bits = 0;
     UInt32 total_bytes = 0;
     UInt32 total_compressed_cache_lines = 0;
     for (UInt32 i = 0; i < m_cacheline_count; i++)
     {
         m_compressed_cache_line_sizes[i] = compressCacheLine(m_data_buffer + i * m_cache_line_size, m_compressed_data_buffer + i * m_cache_line_size);
-        total_bytes += m_compressed_cache_line_sizes[i];
-        if (m_compressed_cache_line_sizes[i] < m_cache_line_size)
+        total_bits += m_compressed_cache_line_sizes[i];
+        if (m_compressed_cache_line_sizes[i] != ((m_cache_line_size * 8) + m_prefix_len))
             total_compressed_cache_lines++;
     }
-    UInt32 index_bytes = (m_index_bits * m_cacheline_count) / 8;
-    total_bytes  += index_bytes; // add indexing bytes to find the compresison pattern used
+
+    total_bytes = total_bits / 8;
+    if (total_bits % 8 != 0)
+        total_bytes++;
+
     if (total_bytes > m_page_size) {
         m_num_overflowed_pages++;
         total_bytes = m_page_size; // if compressed data is larger than the page_size, we sent the page in uncompressed format
+        total_compressed_cache_lines = 0; // if page is sent uncompressed, the decompression latency is 0
     }
     assert(total_bytes <= m_page_size && "[LZBDI] Wrong compression!");
   
@@ -100,8 +106,9 @@ CompressionModelLZBDI::compress(IntPtr addr, size_t data_size, core_id_t core_id
     // Return compressed pages size in Bytes
     *compressed_page_size = total_bytes;
 
-    // Return compression latency
+    // Return compression latency - All lines go over the compression pipeline
     ComponentLatency compress_latency(ComponentLatency(core->getDvfsDomain(), m_cacheline_count  * m_compression_latency));
+    // Even though page might be sent uncompressed, we still need to add the compression latency
     return compress_latency.getLatency();
 
 }
@@ -309,7 +316,7 @@ CompressionModelLZBDI::compressCacheLine(void* in, void* out)
     m_options_data_buffer = new char*[m_options];
     for(i = 0; i < m_options; i++) {
         m_options_compress_info[i].is_compressible = false;
-        m_options_compress_info[i].compressed_size = m_cache_line_size;
+        m_options_compress_info[i].compressed_size = m_cache_line_size * 8; // bytes to bits
         m_options_data_buffer[i] = new char[m_cache_line_size];
     }
 
@@ -372,12 +379,12 @@ CompressionModelLZBDI::compressCacheLine(void* in, void* out)
         }
     }
 
-    UInt32 compressed_size = (UInt32) m_cache_line_size;
+    UInt32 compressed_size = (UInt32) m_cache_line_size * 8;
     UInt8 chosen_option = 42; // If chosen_option == 42, cache line is not compressible (leave it uncompressed)
     for(i = 0; i < m_options; i++) {
         if(m_options_compress_info[i].is_compressible == true){
-            if(m_options_compress_info[i].compressed_size < compressed_size){
-                compressed_size = m_options_compress_info[i].compressed_size;
+            if((m_options_compress_info[i].compressed_size * 8) < compressed_size){
+                compressed_size = (m_options_compress_info[i].compressed_size * 8);
                 chosen_option = i; // Update chosen option
             }
         }
@@ -386,14 +393,17 @@ CompressionModelLZBDI::compressCacheLine(void* in, void* out)
     // Statistics
     if(chosen_option != 42) {
         m_compress_options[chosen_option]++;
-        m_bytes_saved_per_option[chosen_option] += (m_cache_line_size - compressed_size); 
+        m_bits_saved_per_option[chosen_option] += ((m_cache_line_size * 8) - compressed_size); 
     }
 
-    ((char*)out)[0] = (char) chosen_option; // Store chosen_option in the first byte of out data buffer
-    if (chosen_option == 42)
-        memcpy((void*)(((char*)out) + sizeof(char)), in, m_cache_line_size); // Store data in uncompressed format
-    else
-        memcpy((void*)(((char*)out) + sizeof(char)), m_options_data_buffer[chosen_option], compressed_size); // Stored data using the chosen compressed format
+    // Add prefix len needed for decompression
+    compressed_size += m_prefix_len;
+
+    //((char*)out)[0] = (char) chosen_option; // Store chosen_option in the first byte of out data buffer
+    //if (chosen_option == 42)
+    //    memcpy((void*)(((char*)out) + sizeof(char)), in, m_cache_line_size); // Store data in uncompressed format
+    //else
+    //    memcpy((void*)(((char*)out) + sizeof(char)), m_options_data_buffer[chosen_option], compressed_size); // Stored data using the chosen compressed format
 
 
     for(i = 0; i < m_options; i++) {

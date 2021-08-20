@@ -25,6 +25,8 @@ private:
     char *m_compressed_data_buffer;
     UInt32 *m_compressed_cache_line_sizes;
     UInt32 m_cacheline_count;
+    UInt8 m_prefix_len;
+    UInt64 m_num_overflowed_pages;
 
     // Compression latency per cache line
     UInt32 m_compression_latency = 3;

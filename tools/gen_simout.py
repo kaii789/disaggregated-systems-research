@@ -279,12 +279,8 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
       # ('  overflowed_pages', 'compression.num_overflowed_pages', str),
     ]
 
-    if 'compression.lzbdi_num_overflowed_pages' in results:
-      template += [('  lzbdi overflowed_pages', 'compression.lzbdi_num_overflowed_pages', str),]
-    if 'compression.lz78_num_overflowed_pages' in results:
-      template += [('  lz78 overflowed_pages', 'compression.lz78_num_overflowed_pages', str),]
-    if 'compression.lzw_num_overflowed_pages' in results:
-      template += [('  lzw overflowed_pages', 'compression.lzw_num_overflowed_pages', str),]
+    if 'compression.num_overflowed_pages' in results:
+      template += [('  overflowed_pages', 'compression.num_overflowed_pages', str),]
 
   if cacheline_bytes_saved != 0:
     template += [

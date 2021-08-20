@@ -41,13 +41,13 @@ private:
     } ;
 
     // Compression latency per cache line 
-    UInt32 m_compression_latency = 3; 
+    UInt32 m_compression_latency = 5; 
     // Decompression latency per cache line
-    UInt32 m_decompression_latency = 3; 
+    UInt32 m_decompression_latency = 5; 
     SInt32 m_compression_granularity;
 
     bool use_additional_options;
-
+    UInt8 m_prefix_len;
 
     SInt64 readWord(void*, UInt32, UInt32);
     void writeWord(void*, UInt32, SInt64, UInt32);
@@ -63,6 +63,7 @@ private:
     UInt64 m_num_overflowed_pages;
     UInt64 m_compress_options[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     UInt64 m_bytes_saved_per_option[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    UInt64 m_bits_saved_per_option[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 };
 
