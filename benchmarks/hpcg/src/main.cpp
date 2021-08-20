@@ -74,7 +74,6 @@ using std::endl;
 */
 int main(int argc, char * argv[]) {
 
-  SimRoiStart();
 
 #ifndef HPCG_NO_MPI
   MPI_Init(&argc, &argv);
@@ -375,7 +374,6 @@ int main(int argc, char * argv[]) {
 
 
   HPCG_Finalize();
-  SimRoiEnd();
 
   // Finish up
 #ifndef HPCG_NO_MPI

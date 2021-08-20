@@ -31,6 +31,7 @@
 #include "ComputeDotProduct.hpp"
 #include "ComputeWAXPBY.hpp"
 
+#include "sim_api.h"
 
 // Use TICK and TOCK to time a code section in MATLAB-like fashion
 #define TICK()  t0 = mytimer() //!< record current time in 't0'
@@ -60,6 +61,7 @@ int CG(const SparseMatrix & A, CGData & data, const Vector & b, Vector & x,
     const int max_iter, const double tolerance, int & niters, double & normr, double & normr0,
     double * times, bool doPreconditioning) {
 
+  SimRoiStart();
   double t_begin = mytimer();  // Start timing right away
   normr = 0.0;
   double rtz = 0.0, oldrtz = 0.0, alpha = 0.0, beta = 0.0, pAp = 0.0;
@@ -139,5 +141,6 @@ int CG(const SparseMatrix & A, CGData & data, const Vector & b, Vector & x,
 //  times[6] += t6; // exchange halo time
 //#endif
   times[0] += mytimer() - t_begin;  // Total time. All done...
+  SimRoiEnd();
   return 0;
 }
