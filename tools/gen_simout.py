@@ -348,12 +348,8 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
       # ('  overflowed_pages', 'compression.num_overflowed_pages', str),
     ]
 
-    if 'compression.lzbdi_num_overflowed_pages' in results:
-      template += [('  lzbdi overflowed_pages', 'compression.lzbdi_num_overflowed_pages', str),]
-    if 'compression.lz78_num_overflowed_pages' in results:
-      template += [('  lz78 overflowed_pages', 'compression.lz78_num_overflowed_pages', str),]
-    if 'compression.lzw_num_overflowed_pages' in results:
-      template += [('  lzw overflowed_pages', 'compression.lzw_num_overflowed_pages', str),]
+    if 'compression.num_overflowed_pages' in results:
+      template += [('  overflowed_pages', 'compression.num_overflowed_pages', str),]
 
   if cacheline_bytes_saved != 0:
     template += [
@@ -374,18 +370,34 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
             # ('  overflowed_pages', 'compression.num_overflowed_pages', str),
         ]
 
+  # BDI and LZBDI Stats
   bdi_total_compressed = results['compression.bdi_total_compressed'][0] if 'compression.bdi_total_compressed' in results else 0
   if bdi_total_compressed != 0:
     template += [
       ('  bdi_successful_compression', 'compression.bdi_total_compressed', str)]
-    for i in range(0, 13): 
+    for i in range(0, 16): 
       bdi_option = float(results['compression.bdi_usage_option-{}'.format(i)][0]) / float(bdi_total_compressed) * 100
       bdi_option_format = "{:.2f}".format(bdi_option)
       results['compression.bdi_usage_option-{}'.format(i)] = [bdi_option_format]
       template.append(('  bdi_usage(%)_option-{}'.format(i), 'compression.bdi_usage_option-{}'.format(i), str))
-    for i in range(0, 13): 
+    for i in range(0, 16): 
       template.append(('  bdi_bytes_saved_option-{}'.format(i), 'compression.bdi_bytes_saved_option-{}'.format(i), str))
 
+  # Hybrid FPCBDI Stats
+  fpcbdi_total_compressed = results['compression.fpcbdi_total_compressed'][0] if 'compression.fpcbdi_total_compressed' in results else 0
+  if fpcbdi_total_compressed != 0:
+    template += [
+      ('  fpcbdi_successful_compression', 'compression.fpcbdi_total_compressed', str)]
+    for i in range(0, 24): 
+      fpcbdi_option = float(results['compression.fpcbdi_usage_option-{}'.format(i)][0]) / float(fpcbdi_total_compressed) * 100
+      fpcbdi_option_format = "{:.2f}".format(fpcbdi_option)
+      results['compression.fpcbdi_usage_option-{}'.format(i)] = [fpcbdi_option_format]
+      template.append(('  fpcbdi_usage(%)_option-{}'.format(i), 'compression.fpcbdi_usage_option-{}'.format(i), str))
+    for i in range(0, 24): 
+      template.append(('  fpcbdi_bytes_saved_option-{}'.format(i), 'compression.fpcbdi_bytes_saved_option-{}'.format(i), str))
+
+
+  # FPC Stats
   fpc_total_compressed = results['compression.fpc_total_compressed'][0] if 'compression.fpc_total_compressed' in results else 0
   if fpc_total_compressed != 0:
     template += [
@@ -398,6 +410,7 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     for i in range(7): 
       template.append(('  fpc_bytes_saved_pattern-{}'.format(i), 'compression.fpc_bytes_saved_pattern-{}'.format(i), str))
 
+  # LZ Stats
   lz_compression = results['compression.avg_dictionary_size'][0] if 'compression.avg_dictionary_size' in results else 0
   if lz_compression != 0:
     template.append(('  Dictionary table stats (count within dictionary_size, entire ROI)', '', ''))
@@ -407,6 +420,7 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
         template.append(('    {}% percentile - accesses'.format(i), 'compression.lz-accesses-count-p{}'.format(i), str))
         template.append(('    {}% percentile - max_entry_bytes'.format(i), 'compression.lz-max_entry_bytes-count-p{}'.format(i), str))
 
+  # Adaptive Stats
   if 'compression.adaptive-low-compression-count' in results:
     template += [
       ('  adaptive low compression %', 'compression.adaptive-low-compression-percentage', str),

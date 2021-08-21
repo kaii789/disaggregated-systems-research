@@ -24,7 +24,7 @@ CompressionModelZlib::CompressionModelZlib(String name, UInt32 id, UInt32 page_s
     m_data_buffer = new char[m_page_size];
     m_compressed_data_buffer = new char[m_page_size];
 
-    registerStatsMetric("compression", id, "deflate_num_overflowed_pages", &m_num_overflowed_pages);
+    registerStatsMetric("compression", id, "num_overflowed_pages", &m_num_overflowed_pages);
 }
 
 CompressionModelZlib::~CompressionModelZlib()

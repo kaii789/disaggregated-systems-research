@@ -1,5 +1,6 @@
 #include "compression_model_fve.h"
 #include "utils.h"
+#include "stats.h"
 #include "config.hpp"
 
 
@@ -30,12 +31,20 @@ CompressionModelFVE::CompressionModelFVE(String name, UInt32 id, UInt32 page_siz
 
     compression_CAM = new CAM(m_cam_size);
     decompression_CAM = new CAM(m_cam_size);
+
+    // Register stats for compression_options
+    registerStatsMetric("compression", id, "num_overflowed_pages", &m_num_overflowed_pages);
+    m_num_overflowed_pages = 0;
+
 }
 
 CompressionModelFVE::~CompressionModelFVE()
 {
     delete compression_CAM;
     delete decompression_CAM;
+    delete m_data_buffer;
+    delete m_compressed_data_buffer;
+    delete m_compressed_cache_line_sizes;
 }
 
 void CompressionModelFVE::finalizeStats()
@@ -56,20 +65,39 @@ CompressionModelFVE::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
         core->getApplicationData(Core::NONE, Core::READ, page, m_data_buffer, data_size, Core::MEM_MODELED_NONE);
     }
 
-    // 
+    // Flush Dictionary Table for every compressed data transfer
+    // TODO: Add some latency for flushing the dictionary
+    compression_CAM->clear();
+
+    UInt32 total_bits = 0;
     UInt32 total_bytes = 0;
-    UInt32 total_compressed_cache_lines = 0;
+    UInt32 total_compressed_words = 0;
+    UInt32 curr_compressed_words;
     for (UInt32 i = 0; i < m_cacheline_count; i++)
     {
         m_compressed_cache_line_sizes[i] = compressCacheLine(m_data_buffer + i * m_cache_line_size, m_compressed_data_buffer + i * m_cache_line_size);
-        total_bytes += m_compressed_cache_line_sizes[i];
-        if (m_compressed_cache_line_sizes[i] < m_cache_line_size)
-            total_compressed_cache_lines++;
+        total_bits += m_compressed_cache_line_sizes[i];
+        //if (m_compressed_cache_line_sizes[i] < m_cache_line_size) // FIXME
+        //    total_compressed_words++;
+        curr_compressed_words = (UInt32) ((SInt32) ((SInt32) m_compressed_cache_line_sizes[i] - (SInt32) (m_cache_line_size * 8 / m_word_size_bits) - (SInt32) (m_cache_line_size * 8)) / (SInt32) (floorLog2(m_cam_size) - m_word_size_bits));
+        assert(curr_compressed_words >= 0);
+        assert(curr_compressed_words <= (m_cache_line_size * 8 / m_word_size_bits));
+        total_compressed_words += curr_compressed_words;
     }
-    //assert(total_bytes <= m_page_size && "[FVE] Wrong compression!"); 
 
-    // Return compressed cache lines
-    *compressed_cache_lines = total_compressed_cache_lines;
+    total_bytes = total_bits / 8;
+    if (total_bits % 8 != 0)
+        total_bytes++;
+
+    if (total_bytes > m_page_size) {
+        m_num_overflowed_pages++;
+        total_bytes = m_page_size; // if compressed data is larger than the page_size, we sent the page in uncompressed format
+        total_compressed_words = 0; // if page is sent uncompressed, the decompression latency is 0
+    }
+    assert(total_bytes <= m_page_size && "[FVE] Wrong compression!"); 
+
+    // Return the number of compressed words
+    *compressed_cache_lines = total_compressed_words;
 
     // Return compressed pages size in Bytes
     *compressed_page_size = total_bytes;
@@ -84,6 +112,10 @@ CompressionModelFVE::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
 SubsecondTime
 CompressionModelFVE::decompress(IntPtr addr, UInt32 compressed_cache_lines, core_id_t core_id)
 {
+    // Flush Dictionary Table for every compressed data transfer
+    // TODO: Add some latency for flushing the dictionary
+    decompression_CAM->clear();
+
     Core *core = Sim()->getCoreManager()->getCoreFromID(core_id);
     ComponentLatency decompress_latency(ComponentLatency(core->getDvfsDomain(), compressed_cache_lines * m_decompression_latency));
     return decompress_latency.getLatency();
@@ -313,7 +345,7 @@ CompressionModelFVE::compressCacheLine(void* _inbuf, void* _outbuf)
         encodeWord(&stream, word, i);
     }
 
-    return (UInt32) ((stream.bit_pos + 7) / 8);  
+    return (UInt32) (stream.bit_pos);  
 };
 
 
