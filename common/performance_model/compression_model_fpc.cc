@@ -40,6 +40,7 @@ CompressionModelFPC::CompressionModelFPC(String name, UInt32 id, UInt32 page_siz
 
     // Register stats for FPC patterns
     registerStatsMetric("compression", id, "num_overflowed_pages", &m_num_overflowed_pages);
+    m_num_overflowed_pages = 0;
     registerStatsMetric("compression", id, "fpc_total_compressed", &(m_total_compressed));
     for (UInt32 i = 0; i < 7; i++) {
         String stat_name = "fpc_usage_pattern-";

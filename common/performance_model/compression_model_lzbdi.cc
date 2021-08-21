@@ -31,6 +31,7 @@ CompressionModelLZBDI::CompressionModelLZBDI(String name, UInt32 id, UInt32 page
 
     // Register stats for compression_options
     registerStatsMetric("compression", id, "num_overflowed_pages", &m_num_overflowed_pages);
+    m_num_overflowed_pages = 0;
     registerStatsMetric("compression", id, "bdi_total_compressed", &(m_total_compressed));
     for (UInt32 i = 0; i < 16; i++) {
         String stat_name = "bdi_usage_option-";

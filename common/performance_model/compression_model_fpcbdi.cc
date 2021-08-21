@@ -49,6 +49,7 @@ CompressionModelFPCBDI::CompressionModelFPCBDI(String name, UInt32 id, UInt32 pa
 
     // Register stats for compression_options
     registerStatsMetric("compression", id, "num_overflowed_pages", &m_num_overflowed_pages);
+    m_num_overflowed_pages = 0;
     registerStatsMetric("compression", id, "fpcbdi_total_compressed", &(m_total_compressed));
     for (UInt32 i = 0; i < 24; i++) {
         String stat_name = "fpcbdi_usage_option-";
