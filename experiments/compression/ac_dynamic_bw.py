@@ -370,7 +370,7 @@ def run_stream(type):
     experiments = []
     net_lat = 120
     for num_MB in [2]:
-        for bw_scalefactor in [4, 16]:
+        for bw_scalefactor in [4]:
             localdram_size_str = "{}MB".format(num_MB)
             command_str = stream_base_options.format(
                 type,
@@ -436,7 +436,7 @@ def run_hpcg():
     experiments = []
     net_lat = 120
     for num_MB in [32]:
-        for bw_scalefactor in [4, 16]:
+        for bw_scalefactor in [4]:
             localdram_size_str = "{}MB".format(num_MB)
             command_str = hpcg_base_options.format(
                 sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
@@ -465,7 +465,7 @@ def run_nw(type):
     experiments = []
     net_lat = 120
     for num_MB in [4]:
-        for bw_scalefactor in [4, 16]:
+        for bw_scalefactor in [4]:
             localdram_size_str = "{}MB".format(num_MB)
             command_str = nw_base_options.format(
                 type, 
@@ -521,7 +521,8 @@ def run_sls():
     return experiments
 
 def graph(res_name, benchmark_list, local_dram_list, bw_scalefactor_list):
-    labels = ["Remote Bandwidth Scalefactor", "C0", "LZBDI", "LZ78", "LZW", "DF1", "DF2", "DF5", "A-LZ78", "A-LZW", "A-DF1", "A-DF2", "A-DF5", "A-DF10"]
+    # labels = ["Remote Bandwidth Scalefactor", "C0", "LZBDI", "LZ78", "LZW", "DF1", "DF2", "DF5", "A-LZ78", "A-LZW", "A-DF1", "A-DF2", "A-DF5", "A-DF10"]
+    labels = ["Remote Bandwidth Scalefactor", "C0", "LZBDI", "LZ78", "LZW", "DF1", "DF2", "DF5", "A-LZ78", "A-LZW", "A-DF1", "A-DF2", "A-DF5"]
     # "stream_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_combo"
 
     process = 0
@@ -604,7 +605,7 @@ def gen_settings_for_graph(benchmark_name):
     elif benchmark_name == "components_reg":
         res_name = "components_reg_4MB_comparison"
         benchmark_list = []
-        benchmark_list.append("ligra_{}_".format("bc"))
+        benchmark_list.append("ligra_{}_".format("components"))
         local_dram_list = ["4MB"]
         bw_scalefactor_list = [4]
     elif benchmark_name == "tinynet":
@@ -618,6 +619,13 @@ def gen_settings_for_graph(benchmark_name):
         res_name = "darknet19_2MB_ac_dynamic_bw"
         benchmark_list = []
         for model in ["darknet19"]:
+            benchmark_list.append("darknet_{}_".format(model))
+        local_dram_list = ["2MB"]
+        bw_scalefactor_list = [4]
+    elif benchmark_name == "vgg-16":
+        res_name = "vgg-16_2MB_ac_dynamic_bw"
+        benchmark_list = []
+        for model in ["vgg-16"]:
             benchmark_list.append("darknet_{}_".format(model))
         local_dram_list = ["2MB"]
         bw_scalefactor_list = [4]
@@ -635,13 +643,13 @@ def gen_settings_for_graph(benchmark_name):
         local_dram_list = ["2MB"]
         bw_scalefactor_list = [4, 16]
     elif benchmark_name == "stream_0":
-        res_name = "stream_0_2MB_combo"
+        res_name = "stream_0_2MB_ac_dynamic_bw"
         benchmark_list = []
         benchmark_list.append("stream_0_")
         local_dram_list = ["2MB"]
-        bw_scalefactor_list = [4, 16]
+        bw_scalefactor_list = [4]
     elif benchmark_name == "hpcg":
-        res_name = "hpcg_32MB_comparison"
+        res_name = "hpcg_32MB_ac_dynamic_bw"
         benchmark_list = []
         benchmark_list.append("hpcg_")
         local_dram_list = ["32MB"]
@@ -651,6 +659,12 @@ def gen_settings_for_graph(benchmark_name):
         benchmark_list = []
         benchmark_list.append("sls_")
         local_dram_list = ["16MB"]
+        bw_scalefactor_list = [4]
+    elif benchmark_name == "nw":
+        res_name = "nw_4MB_ac_dynamic_bw"
+        benchmark_list = []
+        benchmark_list.append("nw_")
+        local_dram_list = ["4MB"]
         bw_scalefactor_list = [4]
 
     return res_name, benchmark_list, local_dram_list, bw_scalefactor_list
@@ -696,5 +710,5 @@ with open(log_filename, "w") as log_file:
     print(log_str, file=log_file)
 
 # TODO: Generate graph
-# res_name, benchmark_list, local_dram_list, bw_scalefactor_list = gen_settings_for_graph("triangle_reg")
+# res_name, benchmark_list, local_dram_list, bw_scalefactor_list = gen_settings_for_graph("nw")
 # graph(res_name, benchmark_list, local_dram_list, bw_scalefactor_list)
