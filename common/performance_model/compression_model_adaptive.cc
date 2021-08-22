@@ -106,13 +106,9 @@ CompressionModelAdaptive::compress(IntPtr addr, size_t data_size, core_id_t core
 
         double weight = 1;
         if (m_bandwidth_utilization >= 0.8) {
-            weight = 10;
+            weight = 2;
         } else if (m_bandwidth_utilization >= 0.7) {
-            weight = 5;
-        } else if (m_bandwidth_utilization >= 0.6) {
-            weight = 2.5;
-        } else if (m_bandwidth_utilization >= 0.5) {
-            weight = 1.25;
+            weight = 1.5;
         }
 
         double estimate_high_compression_ratio = (double)(m_high_compression_count * m_page_size) / (double)(m_high_compression_count * m_page_size - m_high_bytes_saved);
