@@ -435,7 +435,7 @@ def run_sssp(input):
 def run_hpcg():
     experiments = []
     net_lat = 120
-    for num_MB in [32, 64, 128, 256]:
+    for num_MB in [45, 90, 135, 225]:
         for bw_scalefactor in [4, 16]:
             localdram_size_str = "{}MB".format(num_MB)
             command_str = hpcg_base_options.format(
@@ -672,8 +672,8 @@ def gen_settings_for_graph(benchmark_name):
 
 # TODO: Experiment run
 experiments = []
-experiments.extend(run_ligra("BFS", "regular_input", 4))
-experiments.extend(run_ligra("Triangle", "regular_input", 16))
+# experiments.extend(run_ligra("BFS", "regular_input", 4))
+# experiments.extend(run_ligra("Triangle", "regular_input", 16))
 # experiments.extend(run_tinynet("tiny"))
 # experiments.extend(run_tinynet("darknet19"))
 # experiments.extend(run_stream("0")) # Scale
@@ -682,9 +682,9 @@ experiments.extend(run_ligra("Triangle", "regular_input", 16))
 # experiments.extend(run_bfs("reg_8x", 32))
 # experiments.extend(run_tinynet("resnet50"))
 
-# experiments.extend(run_hpcg())
-experiments.extend(run_ligra("BC", "regular_input", 4))
-experiments.extend(run_ligra("Components", "regular_input", 4))
+experiments.extend(run_hpcg())
+# experiments.extend(run_ligra("BC", "regular_input", 4))
+# experiments.extend(run_ligra("Components", "regular_input", 4))
 # experiments.extend(run_nw("2048"))
 # experiments.extend(run_sls())
 
