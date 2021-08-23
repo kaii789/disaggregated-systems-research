@@ -36,8 +36,11 @@ CompressionModelFPC::CompressionModelFPC(String name, UInt32 id, UInt32 page_siz
     m_data_buffer = new char[m_page_size];
     m_compressed_data_buffer = new char[m_page_size + m_cacheline_count];
     m_compressed_cache_line_sizes = new UInt32[m_cacheline_count];
+    m_prefix_len = 3; // 3 bits are needed to identify 7 (one more option to identify uncompressed data line) 
 
     // Register stats for FPC patterns
+    registerStatsMetric("compression", id, "num_overflowed_pages", &m_num_overflowed_pages);
+    m_num_overflowed_pages = 0;
     registerStatsMetric("compression", id, "fpc_total_compressed", &(m_total_compressed));
     for (UInt32 i = 0; i < 7; i++) {
         String stat_name = "fpc_usage_pattern-";
@@ -80,16 +83,27 @@ CompressionModelFPC::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
     }
 
     // FPC
+    UInt32 total_bits = 0;
     UInt32 total_bytes = 0;
     UInt32 total_compressed_cache_lines = 0;
     for (UInt32 i = 0; i < m_cacheline_count; i++)
     {
         m_compressed_cache_line_sizes[i] = compressCacheLine(m_data_buffer + i * m_cache_line_size, m_compressed_data_buffer + i * m_cache_line_size);
-        total_bytes += m_compressed_cache_line_sizes[i];
-        if (m_compressed_cache_line_sizes[i] < m_cache_line_size)
+        total_bits += m_compressed_cache_line_sizes[i];
+        if (m_compressed_cache_line_sizes[i] < ((m_cache_line_size * 8) + ((m_cache_line_size * 8) / 32) * m_prefix_len))
             total_compressed_cache_lines++;
     }
     assert(total_bytes <= m_page_size && "[FPC] Wrong compression!");
+
+    total_bytes = total_bits / 8;
+    if (total_bits % 8 != 0)
+        total_bytes++;
+
+    if (total_bytes > m_page_size) {
+        m_num_overflowed_pages++;
+        total_bytes = m_page_size; // if compressed data is larger than the page_size, we sent the page in uncompressed format
+        total_compressed_cache_lines = 0; // if page is sent uncompressed, the decompression latency is 0
+    }
 
     // Return compressed cache lines
     *compressed_cache_lines = total_compressed_cache_lines;
@@ -109,7 +123,6 @@ UInt32 CompressionModelFPC::compressCacheLine(void* _inbuf, void* _outbuf)
 	UInt32 *cache_line = (UInt32*)_inbuf;
 	UInt32 compressed_size_bits = 0;
 	UInt32 mask_to_bits[6] = {3, 4, 8, 16, 16, 16};
-	const UInt8 prefix_len = 3;
 
 	for (int i = 0; i < (m_cache_line_size * 8) / 32; i++)
 	{
@@ -121,11 +134,11 @@ UInt32 CompressionModelFPC::compressCacheLine(void* _inbuf, void* _outbuf)
             // Pattern match and handle
 			if (((word | mask[j]) == mask[j]) || ((int)word < 0 && word >= neg_check[j]))
 			{
-                compressed_size_bits += prefix_len;
+                compressed_size_bits += m_prefix_len;
 				compressed_size_bits += mask_to_bits[j];
                 is_pattern_matched = true;
                 pattern_to_compressed_words[j] += 1;
-                pattern_to_bytes_saved[j] += 32 - prefix_len - mask_to_bits[j];
+                pattern_to_bytes_saved[j] += 32 - m_prefix_len - mask_to_bits[j];
                 // printf("[FPC] %d %x\n", j, word);
 				break;
 			}
@@ -144,11 +157,11 @@ UInt32 CompressionModelFPC::compressCacheLine(void* _inbuf, void* _outbuf)
                 }
             if (repeated)
             {
-                compressed_size_bits += prefix_len;
+                compressed_size_bits += m_prefix_len;
                 compressed_size_bits += 8;
                 is_pattern_matched = true;
                 pattern_to_compressed_words[6] += 1;
-                pattern_to_bytes_saved[6] += 32 - prefix_len - 8;
+                pattern_to_bytes_saved[6] += 32 - m_prefix_len - 8;
                 // printf("[FPC] pattern match %x\n", word);
             }
         }
@@ -156,12 +169,12 @@ UInt32 CompressionModelFPC::compressCacheLine(void* _inbuf, void* _outbuf)
         // None of the patterns match, so can't compress
         if (!is_pattern_matched)
         {
-            compressed_size_bits += 32;
+            compressed_size_bits += (32 + m_prefix_len);
             // printf("[FPC] uncompressed %x\n", word);
         }
 	}
 
-	return (UInt32)((compressed_size_bits + 7) / 8); // Return compressed size in bytes
+	return (UInt32)(compressed_size_bits); // Return compressed size in bits
 };
 
 SubsecondTime

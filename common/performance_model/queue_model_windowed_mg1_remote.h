@@ -18,6 +18,8 @@ public:
 
    SubsecondTime computeQueueDelayTrackBytes(SubsecondTime pkt_time, SubsecondTime processing_time, UInt64 num_bytes, request_t request_type, core_id_t requester = INVALID_CORE_ID, bool is_inflight_page = false, UInt64 phys_page = 0);
 
+   SubsecondTime computeQueueDelayAfterAddNoEffect(SubsecondTime pkt_time, SubsecondTime processing_time, core_id_t requester = INVALID_CORE_ID);
+
    double getTotalQueueUtilizationPercentage(SubsecondTime pkt_time);
    double getPageQueueUtilizationPercentage(SubsecondTime pkt_time) {
       // For windowed_mg1_remote, when called on the correct QueueModel the page queue takes up the whole queue

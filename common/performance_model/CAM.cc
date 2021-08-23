@@ -12,6 +12,16 @@ CAM::~CAM()
     delete [] LRU;
 }
 
+void
+CAM:: clear() 
+{
+    UInt32 i;
+    for(i=0; i<m_size; i++) {
+        dictionary_table[i] = (UInt64) 0; 
+        LRU[i] = 0x00;
+    }
+}
+
 UInt64
 CAM::read_value(UInt8 indx)
 {

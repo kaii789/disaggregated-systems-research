@@ -64,7 +64,7 @@ src/main.o: ../src/main.cpp $(PRIMARY_HEADERS)
 	$(CXX) -c $(CXXFLAGS) -I../src $< -o $@ -I ../../../include
 
 src/CG.o: ../src/CG.cpp ../src/CG.hpp $(PRIMARY_HEADERS)
-	$(CXX) -c $(CXXFLAGS) -I../src $< -o $@
+	$(CXX) -c $(CXXFLAGS) -I../src $< -o $@ -I ../../../include
 
 src/CG_ref.o: ../src/CG_ref.cpp ../src/CG_ref.hpp $(PRIMARY_HEADERS)
 	$(CXX) -c $(CXXFLAGS) -I../src $< -o $@

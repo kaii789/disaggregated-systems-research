@@ -64,7 +64,7 @@ src/main.o: HPCG_SRC_PATH/src/main.cpp $(PRIMARY_HEADERS)
 	$(CXX) -c $(CXXFLAGS) -IHPCG_SRC_PATH/src $< -o $@ -I ../../../include
 
 src/CG.o: HPCG_SRC_PATH/src/CG.cpp HPCG_SRC_PATH/src/CG.hpp $(PRIMARY_HEADERS)
-	$(CXX) -c $(CXXFLAGS) -IHPCG_SRC_PATH/src $< -o $@
+	$(CXX) -c $(CXXFLAGS) -IHPCG_SRC_PATH/src $< -o $@ -I ../../../include
 
 src/CG_ref.o: HPCG_SRC_PATH/src/CG_ref.cpp HPCG_SRC_PATH/src/CG_ref.hpp $(PRIMARY_HEADERS)
 	$(CXX) -c $(CXXFLAGS) -IHPCG_SRC_PATH/src $< -o $@

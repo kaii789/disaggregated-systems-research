@@ -325,6 +325,12 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     // Make sure last one is p100
     registerStatsMetric("dram", core_id, "page-access-count-p100", &(page_usage_count_stats[m_page_usage_stats_num_points - 1]));
 
+    // Stats for BW utilization
+    for (int i = 0; i < 10; i++) {
+        m_bw_utilization_decile_to_count[i] = 0;
+        registerStatsMetric("dram", core_id, ("bw-utilization-decile-" + std::to_string(i)).c_str(), &m_bw_utilization_decile_to_count[i]);
+    }
+
     // For debugging
     std::cout << "Initial m_r_cacheline_queue_fraction=" << m_r_cacheline_queue_fraction << std::endl;
     
@@ -759,12 +765,18 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     if (m_use_compression)
     {
         if (m_r_cacheline_gran) {
-            if (m_r_partition_queues == 1)
+            if (m_r_partition_queues == 1) {
                 m_compression_model->update_bandwidth_utilization(m_data_movement_2->getCachelineQueueUtilizationPercentage(t_now));
-            else if (m_r_partition_queues > 1)
+                m_compression_model->update_queue_model(m_data_movement_2, t_now, &m_r_part2_bandwidth, requester);
+            }
+            else if (m_r_partition_queues > 1) {
                 m_compression_model->update_bandwidth_utilization(m_data_movement->getCachelineQueueUtilizationPercentage(t_now));
-            else  // ie partition queues off
+                m_compression_model->update_queue_model(m_data_movement, t_now, &m_r_bus_bandwidth, requester);
+            }
+            else { // ie partition queues off
                 m_compression_model->update_bandwidth_utilization(m_data_movement->getTotalQueueUtilizationPercentage(t_now));
+                m_compression_model->update_queue_model(m_data_movement, t_now, &m_r_bus_bandwidth, requester);
+            }
 
             UInt32 compressed_cache_lines;
             cacheline_compression_latency = m_compression_model->compress(phys_page, m_cache_line_size, m_core_id, &size, &compressed_cache_lines);
@@ -778,12 +790,20 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             m_total_compression_latency += cacheline_compression_latency;
             t_now += cacheline_compression_latency;
         } else if (m_use_cacheline_compression) {
-            if (m_r_partition_queues == 1)
+            if (m_r_partition_queues == 1) {
                 m_cacheline_compression_model->update_bandwidth_utilization(m_data_movement_2->getCachelineQueueUtilizationPercentage(t_now));
-            else if (m_r_partition_queues > 1)
+                m_cacheline_compression_model->update_queue_model(m_data_movement_2, t_now, &m_r_part2_bandwidth, requester);
+            }
+            else if (m_r_partition_queues > 1) {
                 m_cacheline_compression_model->update_bandwidth_utilization(m_data_movement->getCachelineQueueUtilizationPercentage(t_now));
-            else  // ie partition queues off
+                m_cacheline_compression_model->update_queue_model(m_data_movement, t_now, &m_r_bus_bandwidth, requester);
+
+            }
+            else { // ie partition queues off
                 m_cacheline_compression_model->update_bandwidth_utilization(m_data_movement->getTotalQueueUtilizationPercentage(t_now));
+                m_cacheline_compression_model->update_queue_model(m_data_movement, t_now, &m_r_bus_bandwidth, requester);
+
+            }
 
             UInt32 compressed_cache_lines;
             cacheline_compression_latency = m_cacheline_compression_model->compress(phys_page, m_cache_line_size, m_core_id, &size, &compressed_cache_lines);
@@ -935,6 +955,10 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             if (m_use_compression)
             {
                 m_compression_model->update_bandwidth_utilization(m_data_movement->getPageQueueUtilizationPercentage(t_now));
+                if (m_r_partition_queues == 1)
+                    m_compression_model->update_queue_model(m_data_movement, t_now, &m_r_part_bandwidth, requester);
+                else
+                    m_compression_model->update_queue_model(m_data_movement, t_now, &m_r_bus_bandwidth, requester);
 
                 UInt32 compressed_cache_lines;
                 page_compression_latency = m_compression_model->compress(phys_page, m_page_size, m_core_id, &page_size, &compressed_cache_lines);
@@ -1090,8 +1114,10 @@ DramPerfModelDisagg::updateBandwidth()
 {
     /* m_update_bandwidth_count += 1;
     if (m_use_dynamic_bandwidth && m_update_bandwidth_count % 20 == 0) {
-        // Randomly choose bw scalefactor between [4, 16]
-        m_r_bw_scalefactor = (rand() % 13) + 4;
+        m_r_bw_scalefactor = (int)(m_r_bw_scalefactor + 1) % 17;
+        if (m_r_bw_scalefactor == 0)
+            m_r_bw_scalefactor = 4;
+
         m_r_bus_bandwidth.changeBandwidth(m_dram_speed * m_data_bus_width / (1000 * m_r_bw_scalefactor)); // Remote memory
         m_r_part_bandwidth.changeBandwidth(m_dram_speed * m_data_bus_width / (1000 * m_r_bw_scalefactor / (1 - m_r_cacheline_queue_fraction))); // Remote memory - Partitioned Queues => Page Queue
         m_r_part2_bandwidth.changeBandwidth(m_dram_speed * m_data_bus_width / (1000 * m_r_bw_scalefactor / m_r_cacheline_queue_fraction)); // Remote memory - Partitioned Queues => Cacheline Queue
@@ -1107,6 +1133,14 @@ DramPerfModelDisagg::updateBandwidth()
     }
 }
 
+void
+DramPerfModelDisagg::update_bw_utilization_count(SubsecondTime pkt_time)
+{
+    double bw_utilization = m_data_movement->getPageQueueUtilizationPercentage(pkt_time);
+    int decile = (int)(bw_utilization * 10);
+    m_bw_utilization_decile_to_count[decile] += 1;
+}
+
 SubsecondTime
 DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, core_id_t requester, IntPtr address, DramCntlrInterface::access_t access_type, ShmemPerf *perf)
 {
@@ -1116,10 +1150,14 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
         updateBandwidth();
     */
 
+    // Update BW utilization count
+    update_bw_utilization_count(pkt_time);
+
     UInt64 phys_page = address & ~((UInt64(1) << floorLog2(m_page_size)) - 1);
     if (m_r_cacheline_gran)
         phys_page =  address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1); // Was << 6
     UInt64 cacheline =  address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1); // Was << 6
+
 
     if (m_page_usage_map.count(phys_page) == 0) {
         ++m_unique_pages_accessed;
@@ -1685,6 +1723,10 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
             if (m_use_compression)
             {
                 m_compression_model->update_bandwidth_utilization(m_data_movement->getPageQueueUtilizationPercentage(t_now));
+                if (m_r_partition_queues == 1)
+                    m_compression_model->update_queue_model(m_data_movement, t_now, &m_r_part_bandwidth, requester);
+                else
+                    m_compression_model->update_queue_model(m_data_movement, t_now, &m_r_bus_bandwidth, requester);
 
                 UInt32 gran_size = size;
                 UInt32 compressed_cache_lines;
@@ -1741,6 +1783,10 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
             if (m_use_compression)
             {
                 m_compression_model->update_bandwidth_utilization(m_data_movement->getPageQueueUtilizationPercentage(t_now));
+                if (m_r_partition_queues == 1)
+                    m_compression_model->update_queue_model(m_data_movement, t_now, &m_r_part_bandwidth, requester);
+                else
+                    m_compression_model->update_queue_model(m_data_movement, t_now, &m_r_bus_bandwidth, requester);
 
                 UInt32 gran_size = size;
                 UInt32 compressed_cache_lines;
@@ -1831,6 +1877,10 @@ DramPerfModelDisagg::possiblyPrefetch(UInt64 phys_page, SubsecondTime t_now, cor
         if (m_use_compression)
         {
             m_compression_model->update_bandwidth_utilization(m_data_movement->getPageQueueUtilizationPercentage(t_now));
+            if (m_r_partition_queues == 1)
+                m_compression_model->update_queue_model(m_data_movement, t_now, &m_r_part_bandwidth, requester);
+            else
+                m_compression_model->update_queue_model(m_data_movement, t_now, &m_r_bus_bandwidth, requester);
 
             UInt32 gran_size = size;
             UInt32 compressed_cache_lines;
