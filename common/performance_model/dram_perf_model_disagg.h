@@ -92,6 +92,7 @@ class DramPerfModelDisagg : public DramPerfModel
         bool m_use_throttled_pages_tracker;  // Whether to update m_throttled_pages_tracker. Must be true to use the ideal page throttler or print stats of throttled pages
         bool m_use_ideal_page_throttling;  // Whether to use ideal page throttling
         SubsecondTime m_r_ideal_pagethrottle_remote_access_history_window_size;  // Track remote page accesses using the most recent window size number of ns
+        bool m_track_page_bw_utilization_stats;
 
         // Local Memory
         std::vector<QueueModel*> m_queue_model;
