@@ -167,7 +167,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     } else if (m_r_partition_queues == 2) {
         // Hardcode the queue model type for now
         m_data_movement = QueueModel::create(
-                name + "-datamovement-queue", core_id, "windowed_mg1_remote_combined",
+                name + "-datamovement-queue", core_id, "windowed_mg1_remote_ind_queues_enhanced",
                 m_r_bus_bandwidth.getRoundedLatency(8), m_r_bus_bandwidth.getBandwidthBitsPerUs(),
                 m_r_bus_bandwidth.getRoundedLatency(8*m_page_size), m_r_bus_bandwidth.getRoundedLatency(8*m_cache_line_size)); // bytes to bits
     } else if (m_r_partition_queues == 3) {
