@@ -535,12 +535,12 @@ def run_sls():
 
 def graph(res_name, benchmark_list, local_dram_list, bw_scalefactor_list):
     # labels = ["Remote Bandwidth Scalefactor", "C0", "LZBDI", "LZ78", "LZW", "DF1", "DF2", "DF5", "A-LZ78", "A-LZW", "A-DF1", "A-DF2", "A-DF5", "A-DF10"]
-    labels = ["Local Dram Size", "C0", "LZBDI", "LZ78", "LZW", "DF1", "DF2", "DF5", "A-LZ78", "A-LZW", "A-DF1", "A-DF2", "A-DF5"]
+    labels = ["Local Dram Size-Remote Bandwidth Scalefactor", "C0", "LZBDI", "LZ78", "LZW", "DF1", "DF2", "DF5", "A-LZ78", "A-LZW", "A-DF1", "A-DF2", "A-DF5"]
     # "stream_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_combo"
 
     process = 0
     num_bars = len(labels) - 1
-    res = [bw_scalefactor_list[:]] + [[] for _ in range(num_bars)]
+    res = [["{}-{}".format(size, factor) for size in local_dram_list for factor in bw_scalefactor_list]] + [[] for _ in range(num_bars)]
     compression_res = {}
     for benchmark in benchmark_list:
         for size in local_dram_list:
@@ -598,11 +598,17 @@ def gen_settings_for_graph(benchmark_name):
         local_dram_list = ["524288B"]
         bw_scalefactor_list = [4, 16]
     elif benchmark_name == "bfs_reg":
-        res_name = "bfs_reg_4MB_comparison"
+        res_name = "bfs_reg_ac_dram_sens"
         benchmark_list = []
         benchmark_list.append("ligra_{}_".format("bfs"))
-        local_dram_list = ["4MB"]
-        bw_scalefactor_list = [4]
+        local_dram_list = ["10MB", "20MB", "30MB", "50MB"]
+        bw_scalefactor_list = [4, 16]
+    elif benchmark_name == "bfs_reg":
+        res_name = "bfs_reg_ac_dram_sens"
+        benchmark_list = []
+        benchmark_list.append("ligra_{}_".format("bfs"))
+        local_dram_list = ["10MB", "20MB", "30MB", "50MB"]
+        bw_scalefactor_list = [4, 16]
     elif benchmark_name == "triangle_reg":
         res_name = "triangle_reg_16MB_ac_dynamic_bw"
         benchmark_list = []
@@ -724,5 +730,5 @@ with open(log_filename, "w") as log_file:
     print(log_str, file=log_file)
 
 # TODO: Generate graph
-# res_name, benchmark_list, local_dram_list, bw_scalefactor_list = gen_settings_for_graph("triangle_reg")
+# res_name, benchmark_list, local_dram_list, bw_scalefactor_list = gen_settings_for_graph("bfs_reg")
 # graph(res_name, benchmark_list, local_dram_list, bw_scalefactor_list)
