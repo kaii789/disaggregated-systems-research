@@ -295,40 +295,47 @@ command_strs["ligra_bfs_small_input_localdram_1MB"] = ligra_base_str_options.for
 
 
 # Ligra
-def run_ligra(application_name, ligra_input_selection, num_MB):
+def run_ligra(application_name, ligra_input_selection):
     experiments = []
     ligra_input_file = ligra_input_to_file[ligra_input_selection]
     net_lat = 120
-    for remote_init in ["false"]:  # "false"
-        for bw_scalefactor in [4, 16]:
-            localdram_size_str = "{}MB".format(num_MB)
-            command_str = ligra_base_str_options.format(
-                application_name,
-                ligra_input_file,
-                sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={}".format(
-                    int(num_MB * ONE_MB_TO_BYTES),
-                    int(net_lat),
-                    int(bw_scalefactor),
-                    str(remote_init),
-                ),
-            )
-
-            experiments.append(
-                automation.Experiment(
-                    experiment_name="ligra_{}_{}localdram_{}_netlat_{}_bw_scalefactor_{}_combo".format(
-                        application_name.lower(),
-                        ""
-                        if ligra_input_selection == "regular_input"
-                        else ligra_input_selection + "_",
-                        localdram_size_str,
-                        net_lat,
-                        bw_scalefactor,
+    app_to_local_dram_size = {
+        "BFS": [10, 20, 30, 50],
+        "Triangle": [15, 30, 45, 75],
+        "BC": [15, 30, 45, 75],
+        "Components": [12, 25, 40, 65]
+    }
+    for num_MB in app_to_local_dram_size[application_name]:
+        for remote_init in ["false"]:  # "false"
+            for bw_scalefactor in [4, 16]:
+                localdram_size_str = "{}MB".format(num_MB)
+                command_str = ligra_base_str_options.format(
+                    application_name,
+                    ligra_input_file,
+                    sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={}".format(
+                        int(num_MB * ONE_MB_TO_BYTES),
+                        int(net_lat),
+                        int(bw_scalefactor),
+                        str(remote_init),
                     ),
-                    command_str=command_str,
-                    experiment_run_configs=config_list,
-                    output_root_directory=".",
                 )
-            )
+
+                experiments.append(
+                    automation.Experiment(
+                        experiment_name="ligra_{}_{}localdram_{}_netlat_{}_bw_scalefactor_{}_combo".format(
+                            application_name.lower(),
+                            ""
+                            if ligra_input_selection == "regular_input"
+                            else ligra_input_selection + "_",
+                            localdram_size_str,
+                            net_lat,
+                            bw_scalefactor,
+                        ),
+                        command_str=command_str,
+                        experiment_run_configs=config_list,
+                        output_root_directory=".",
+                    )
+                )
 
     return experiments
 
@@ -337,7 +344,13 @@ def run_ligra(application_name, ligra_input_selection, num_MB):
 def run_tinynet(model_type):
     experiments = []
     net_lat = 120
-    for num_MB in [2]:
+    model_to_local_dram_size = {
+        "tiny": [2],
+        "darknet19": [6, 12, 18, 30],
+        "resnet50": [4, 8, 12, 20],
+        "vgg-16": [12, 24, 36, 62]
+    }
+    for num_MB in model_to_local_dram_size[model_type]:
         for bw_scalefactor in [4, 16]:
             localdram_size_str = "{}MB".format(num_MB)
             command_str = darknet_base_str_options.format(
@@ -464,7 +477,7 @@ def run_hpcg():
 def run_nw(type):
     experiments = []
     net_lat = 120
-    for num_MB in [4]:
+    for num_MB in [30, 60, 90, 145]:
         for bw_scalefactor in [4, 16]:
             localdram_size_str = "{}MB".format(num_MB)
             command_str = nw_base_options.format(
@@ -681,11 +694,12 @@ experiments = []
 # experiments.extend(run_sssp("bcsstk05.mtx"))
 # experiments.extend(run_bfs("reg_8x", 32))
 # experiments.extend(run_tinynet("resnet50"))
+# experiments.extend(run_tinynet("vgg-16"))
 
-experiments.extend(run_hpcg())
+# experiments.extend(run_hpcg())
 # experiments.extend(run_ligra("BC", "regular_input", 4))
 # experiments.extend(run_ligra("Components", "regular_input", 4))
-# experiments.extend(run_nw("2048"))
+# experiments.extend(run_nw("6144"))
 # experiments.extend(run_sls())
 
 log_filename = "run-sniper-repeat2_1.log"
