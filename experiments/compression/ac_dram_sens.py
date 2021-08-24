@@ -685,8 +685,8 @@ def gen_settings_for_graph(benchmark_name):
 
 # TODO: Experiment run
 experiments = []
-# experiments.extend(run_ligra("BFS", "regular_input", 4))
-# experiments.extend(run_ligra("Triangle", "regular_input", 16))
+# experiments.extend(run_ligra("BFS", "regular_input"))
+# experiments.extend(run_ligra("Triangle", "regular_input"))
 # experiments.extend(run_tinynet("tiny"))
 # experiments.extend(run_tinynet("darknet19"))
 # experiments.extend(run_stream("0")) # Scale
@@ -697,8 +697,8 @@ experiments = []
 # experiments.extend(run_tinynet("vgg-16"))
 
 # experiments.extend(run_hpcg())
-# experiments.extend(run_ligra("BC", "regular_input", 4))
-# experiments.extend(run_ligra("Components", "regular_input", 4))
+# experiments.extend(run_ligra("BC", "regular_input"))
+# experiments.extend(run_ligra("Components", "regular_input"))
 # experiments.extend(run_nw("6144"))
 # experiments.extend(run_sls())
 
