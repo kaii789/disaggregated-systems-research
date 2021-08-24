@@ -99,9 +99,9 @@ CompressionModelAdaptive::compress(IntPtr addr, size_t data_size, core_id_t core
         use_high_compression = m_bandwidth_utilization >= m_upper_bandwidth_threshold;
     } else if (type == 3) {
         double weight_low = 1;
-        if (m_bandwidth_utilization < 0.3) {
+        if (m_bandwidth_utilization < 0.4) {
             weight_low = 2;
-        } else if (m_bandwidth_utilization < 0.5) {
+        } else if (m_bandwidth_utilization < 0.6) {
             weight_low = 1.5;
         }
         double estimate_low_compression_ratio = (double)(m_low_compression_count * m_page_size) / (double)(m_low_compression_count * m_page_size - m_low_bytes_saved);
