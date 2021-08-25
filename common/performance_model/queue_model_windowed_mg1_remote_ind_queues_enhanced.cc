@@ -398,7 +398,7 @@ SubsecondTime
 QueueModelWindowedMG1RemoteIndQueuesEnhanced::applyQueueDelayFormula(request_t request_type, UInt64 total_service_time, UInt64 total_service_time2, UInt64 num_arrivals, UInt64 utilization_window_size, bool update_stats)
 {
    double utilization = (double)total_service_time / utilization_window_size;
-   double service_time_Es2 = total_service_time2 / num_arrivals;
+   double service_time_Es2 = total_service_time2 / m_r_cacheline_queue_fraction / num_arrivals;
    double arrival_rate = (double)num_arrivals / utilization_window_size;
 
    // If requesters do not throttle based on returned latency, it's their problem, not ours
