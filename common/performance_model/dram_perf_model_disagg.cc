@@ -1141,6 +1141,10 @@ DramPerfModelDisagg::update_bw_utilization_count(SubsecondTime pkt_time)
 {
     double bw_utilization = m_data_movement->getPageQueueUtilizationPercentage(pkt_time);
     int decile = (int)(bw_utilization * 10);
+    if (decile > 10)
+        decile = 10;  // put all utilizations above 100% here
+    else if (decile < 0)
+        std::cout << "update_bw_utilization_count() decile < 0, returned page bw utilization is wrong?" << std::endl;
     m_bw_utilization_decile_to_count[decile] += 1;
 }
 

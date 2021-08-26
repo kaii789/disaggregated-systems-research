@@ -222,7 +222,7 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_global_time_much_larger_than_tnow;
         SubsecondTime m_sum_global_time_much_larger;
 
-        UInt64 m_bw_utilization_decile_to_count[10];
+        UInt64 m_bw_utilization_decile_to_count[11];
 
         // Dynamic BW
         long long int m_update_bandwidth_count = 0;
