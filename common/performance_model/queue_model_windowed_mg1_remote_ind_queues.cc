@@ -164,7 +164,7 @@ QueueModelWindowedMG1RemoteIndQueues::~QueueModelWindowedMG1RemoteIndQueues()
    // std::cout << "CDF Y values (probability):\n" << percentages_buffer.str() << std::endl;
 
    if ((double) m_effective_bandwidth_exceeded_allowable_max / m_total_requests > 0.01) {
-      std::cout << "Queue " << m_name << " had " << 100 * (double)m_effective_bandwidth_exceeded_allowable_max / m_total_requests;
+      std::cout << "Queue " << m_name << " overall had " << 100 * (double)m_effective_bandwidth_exceeded_allowable_max / m_total_requests;
       std::cout << "% of windows with effective bandwidth that exceeded the allowable max bandwidth of " << m_specified_bw_GB_per_s * m_max_bandwidth_allowable_excess_ratio << "GB/s" << std::endl;
    }
 
@@ -329,7 +329,7 @@ QueueModelWindowedMG1RemoteIndQueues::computeQueueDelayTrackBytes(SubsecondTime 
    SubsecondTime main = Sim()->getClockSkewMinimizationServer()->getGlobalTime() > m_window_size ? Sim()->getClockSkewMinimizationServer()->getGlobalTime() - m_window_size : SubsecondTime::Zero();
    SubsecondTime time_point = SubsecondTime::max(main, backup);
    removeItems(time_point);
-   removeItemsUpdateBytes(time_point, pkt_time, true);  // only track effective bandwidth when m_total_requests is incremented and addItems() is called
+   removeItemsUpdateBytes(time_point, pkt_time, true, request_type);  // only track effective bandwidth when m_total_requests is incremented and addItems() is called
 
    double page_queue_utilization_percentage = getPageQueueUtilizationPercentage(pkt_time);
    double cacheline_queue_utilization_percentage = getCachelineQueueUtilizationPercentage(pkt_time);
@@ -468,8 +468,9 @@ QueueModelWindowedMG1RemoteIndQueues::addItemUpdateBytes(SubsecondTime pkt_time,
    }
 }
 
+// Parameter request_type only supplied when track_effective_bandwidth == true
 void
-QueueModelWindowedMG1RemoteIndQueues::removeItemsUpdateBytes(SubsecondTime earliest_time, SubsecondTime pkt_time, bool track_effective_bandwidth)
+QueueModelWindowedMG1RemoteIndQueues::removeItemsUpdateBytes(SubsecondTime earliest_time, SubsecondTime pkt_time, bool track_effective_bandwidth, request_t request_type)
 {
    // Can remove packets that arrived earlier than the current window
    // while(!m_packet_bytes.empty() && m_packet_bytes.begin()->first < earliest_time)
@@ -522,23 +523,26 @@ QueueModelWindowedMG1RemoteIndQueues::removeItemsUpdateBytes(SubsecondTime earli
          ++m_effective_bandwidth_exceeded_allowable_max;
       }
       // Calculate max effective bandwidth of page and cacheline portions--though they could exceed their specifications at times
-      double cur_page_effective_bandwidth = (double)page_bytes_in_window / effective_window_length_ps;  // in bytes/ps
-      if (cur_page_effective_bandwidth > m_page_max_effective_bandwidth) {
-         m_page_max_effective_bandwidth = cur_page_effective_bandwidth;
-         m_page_max_effective_bandwidth_bytes = page_bytes_in_window;
-         m_page_max_effective_bandwidth_ps = effective_window_length_ps;
-      }
-      if (cur_page_effective_bandwidth * 1000 > m_specified_bw_GB_per_s * (1 - m_r_cacheline_queue_fraction) * m_max_bandwidth_allowable_excess_ratio) {  // GB/s used here
-         ++m_page_effective_bandwidth_exceeded_allowable_max;
-      }
-      double cur_cacheline_effective_bandwidth = (double)cacheline_bytes_in_window / effective_window_length_ps;  // in bytes/ps
-      if (cur_cacheline_effective_bandwidth > m_cacheline_max_effective_bandwidth) {
-         m_cacheline_max_effective_bandwidth = cur_cacheline_effective_bandwidth;
-         m_cacheline_max_effective_bandwidth_bytes = cacheline_bytes_in_window;
-         m_cacheline_max_effective_bandwidth_ps = effective_window_length_ps;
-      }
-      if (cur_cacheline_effective_bandwidth * 1000 > m_specified_bw_GB_per_s * m_r_cacheline_queue_fraction * m_max_bandwidth_allowable_excess_ratio) {  // GB/s used here
-         ++m_cacheline_effective_bandwidth_exceeded_allowable_max;
+      if (request_type == QueueModel::PAGE) {
+         double cur_page_effective_bandwidth = (double)page_bytes_in_window / effective_window_length_ps;  // in bytes/ps
+         if (cur_page_effective_bandwidth > m_page_max_effective_bandwidth) {
+            m_page_max_effective_bandwidth = cur_page_effective_bandwidth;
+            m_page_max_effective_bandwidth_bytes = page_bytes_in_window;
+            m_page_max_effective_bandwidth_ps = effective_window_length_ps;
+         }
+         if (cur_page_effective_bandwidth * 1000 > m_specified_bw_GB_per_s * (1 - m_r_cacheline_queue_fraction) * m_max_bandwidth_allowable_excess_ratio) {  // GB/s used here
+            ++m_page_effective_bandwidth_exceeded_allowable_max;
+         }
+      } else {  // request_type == QueueModel::CACHELINE
+         double cur_cacheline_effective_bandwidth = (double)cacheline_bytes_in_window / effective_window_length_ps;  // in bytes/ps
+         if (cur_cacheline_effective_bandwidth > m_cacheline_max_effective_bandwidth) {
+            m_cacheline_max_effective_bandwidth = cur_cacheline_effective_bandwidth;
+            m_cacheline_max_effective_bandwidth_bytes = cacheline_bytes_in_window;
+            m_cacheline_max_effective_bandwidth_ps = effective_window_length_ps;
+         }
+         if (cur_cacheline_effective_bandwidth * 1000 > m_specified_bw_GB_per_s * m_r_cacheline_queue_fraction * m_max_bandwidth_allowable_excess_ratio) {  // GB/s used here
+            ++m_cacheline_effective_bandwidth_exceeded_allowable_max;
+         }
       }
 
       // m_effective_bandwidth_tracker.push_back(cur_effective_bandwidth);
