@@ -337,6 +337,14 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
       results["dram.bw-utilization-decile-percentage-{}".format(i)] = [percentage]
       template.append(('  bw utilization % decile {}'.format(i), "dram.bw-utilization-decile-percentage-{}".format(i), str))
 
+  if "dram.r-bw-utilization-decile-0" in results:
+    total_count = results['dram.page-moves'][0]
+    for i in range(10):
+      decile_count = results["dram.r-bw-utilization-decile-{}".format(i)][0]
+      percentage = ((float)(decile_count) / (float)(total_count)) * 100
+      results["dram.r-bw-utilization-decile-percentage-{}".format(i)] = [percentage]
+      template.append(('  remote bw utilization % decile {}'.format(i), "dram.r-bw-utilization-decile-percentage-{}".format(i), str))
+
   # Compression
   if bytes_saved != 0:
     template.append(('Compression', '', ''))

@@ -329,6 +329,8 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     for (int i = 0; i < 10; i++) {
         m_bw_utilization_decile_to_count[i] = 0;
         registerStatsMetric("dram", core_id, ("bw-utilization-decile-" + std::to_string(i)).c_str(), &m_bw_utilization_decile_to_count[i]);
+        m_r_bw_utilization_decile_to_count[i] = 0;
+        registerStatsMetric("dram", core_id, ("r-bw-utilization-decile-" + std::to_string(i)).c_str(), &m_r_bw_utilization_decile_to_count[i]);
     }
 
     // For debugging
@@ -1135,11 +1137,15 @@ DramPerfModelDisagg::updateBandwidth()
 }
 
 void
-DramPerfModelDisagg::update_bw_utilization_count(SubsecondTime pkt_time)
+DramPerfModelDisagg::update_bw_utilization_count(SubsecondTime pkt_time, bool count_only_remote)
 {
     double bw_utilization = m_data_movement->getPageQueueUtilizationPercentage(pkt_time);
     int decile = (int)(bw_utilization * 10);
-    m_bw_utilization_decile_to_count[decile] += 1;
+    if (count_only_remote) {
+        m_r_bw_utilization_decile_to_count[decile] += 1;
+    } else {
+        m_bw_utilization_decile_to_count[decile] += 1;
+    }
 }
 
 SubsecondTime
@@ -1152,7 +1158,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
     */
 
     // Update BW utilization count
-    update_bw_utilization_count(pkt_time);
+    update_bw_utilization_count(pkt_time, false);
 
     UInt64 phys_page = address & ~((UInt64(1) << floorLog2(m_page_size)) - 1);
     if (m_r_cacheline_gran)
