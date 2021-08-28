@@ -40,6 +40,12 @@ CompressionModelAdaptive::CompressionModelAdaptive(String name, UInt32 id, UInt3
     registerStatsMetric("compression", id, "adaptive-high-total-decompression-latency", &m_high_total_decompression_latency);
     registerStatsMetric("compression", id, "adaptive-high-bytes-saved", &m_high_bytes_saved);
 
+    // Stats for BW utilization
+    for (int i = 0; i < 10; i++) {
+        m_bw_utilization_decile_to_count[i] = 0;
+        registerStatsMetric("compression", id, ("adaptive-bw-utilization-decile-" + std::to_string(i)).c_str(), &m_bw_utilization_decile_to_count[i]);
+    }
+
     m_cacheline_count = m_page_size / m_cache_line_size;
 }
 
@@ -52,10 +58,19 @@ CompressionModelAdaptive::finalizeStats()
 {
 }
 
+void
+CompressionModelAdaptive::update_bw_utilization_count()
+{
+    int decile = (int)(m_bandwidth_utilization * 10);
+    m_bw_utilization_decile_to_count[decile] += 1;
+}
+
 // TODO:
 SubsecondTime
 CompressionModelAdaptive::compress(IntPtr addr, size_t data_size, core_id_t core_id, UInt32 *compressed_page_size, UInt32 *compressed_cache_lines)
 {
+    update_bw_utilization_count();
+
     UInt32 compressed_cachelines = 0;
     UInt32 compressed_size = data_size;
     SubsecondTime total_compression_latency = SubsecondTime::Zero();

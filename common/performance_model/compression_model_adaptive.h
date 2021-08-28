@@ -60,6 +60,9 @@ private:
     // Placeholder
     UInt32 m_compression_latency = 10;
     UInt32 m_decompression_latency = 10;
+
+    void update_bw_utilization_count();
+    UInt64 m_bw_utilization_decile_to_count[10];
 };
 
 #endif /* __COMPRESSION_MODEL_ADAPTIVE_H__ */
