@@ -88,6 +88,9 @@ CompressionModelLZW::~CompressionModelLZW()
 void
 CompressionModelLZW::finalizeStats()
 {
+    if (m_num_compress_pages == 0) {
+        return;
+    }
     m_avg_dict_size = m_sum_dict_size / m_num_compress_pages;
     m_avg_max_dict_entry = m_sum_max_dict_entry / m_num_compress_pages;
     m_avg_avg_dict_entry = m_sum_avg_dict_entry / m_num_compress_pages;
