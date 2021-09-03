@@ -3,6 +3,7 @@
 
 #include "compression_model.h"
 #include <map>
+#include <queue>
 
 class CompressionModelAdaptive : public CompressionModel
 {
@@ -60,6 +61,13 @@ private:
     // Placeholder
     UInt32 m_compression_latency = 10;
     UInt32 m_decompression_latency = 10;
+
+    // Compression ratio window
+    std::queue<double> high_compression_ratio_window;
+    double high_compression_ratio_sum = 0;
+
+    std::queue<double> low_compression_ratio_window;
+    double low_compression_ratio_sum = 0;
 
     void update_bw_utilization_count();
     UInt64 m_bw_utilization_decile_to_count[10];
