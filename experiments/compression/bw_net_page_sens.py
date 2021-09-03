@@ -295,75 +295,90 @@ command_strs["ligra_bfs_small_input_localdram_1MB"] = ligra_base_str_options.for
 
 
 # Ligra
-def run_ligra(application_name, ligra_input_selection, num_MB):
+def run_ligra(application_name, ligra_input_selection):
     experiments = []
     ligra_input_file = ligra_input_to_file[ligra_input_selection]
-    for remote_init in ["false"]:  # "false"
-        for bw_scalefactor in [4, 16]:
-            for net_lat in [120]:
-                for page_size in [64, 512, 1024, 2048, 4096]:
-                    localdram_size_str = "{}MB".format(num_MB)
-                    command_str = ligra_base_str_options.format(
-                        application_name,
-                        ligra_input_file,
-                        sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={}".format(
-                            page_size,
-                            int(num_MB * ONE_MB_TO_BYTES),
-                            int(net_lat),
-                            int(bw_scalefactor),
-                            str(remote_init),
-                        ),
-                    )
-
-                    experiments.append(
-                        automation.Experiment(
-                            experiment_name="ligra_{}_{}localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_combo".format(
-                                application_name.lower(),
-                                ""
-                                if ligra_input_selection == "regular_input"
-                                else ligra_input_selection + "_",
-                                localdram_size_str,
-                                net_lat,
-                                bw_scalefactor,
-                                page_size
+    app_to_local_dram_size = {
+        "BFS": [20],
+        "Triangle": [30],
+        "BC": [30],
+        "Components": [25]
+    }
+    for num_MB in app_to_local_dram_size[application_name]:
+        for remote_init in ["false"]:  # "false"
+            for bw_scalefactor in [4, 16]:
+                for net_lat in [120]:
+                    for page_size in [64, 512, 1024, 2048, 4096]:
+                        localdram_size_str = "{}MB".format(num_MB)
+                        command_str = ligra_base_str_options.format(
+                            application_name,
+                            ligra_input_file,
+                            sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={}".format(
+                                page_size,
+                                int(num_MB * ONE_MB_TO_BYTES),
+                                int(net_lat),
+                                int(bw_scalefactor),
+                                str(remote_init),
                             ),
-                            command_str=command_str,
-                            experiment_run_configs=config_list,
-                            output_root_directory=".",
                         )
-                    )
+
+                        experiments.append(
+                            automation.Experiment(
+                                experiment_name="ligra_{}_{}localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_combo".format(
+                                    application_name.lower(),
+                                    ""
+                                    if ligra_input_selection == "regular_input"
+                                    else ligra_input_selection + "_",
+                                    localdram_size_str,
+                                    net_lat,
+                                    bw_scalefactor,
+                                    page_size
+                                ),
+                                command_str=command_str,
+                                experiment_run_configs=config_list,
+                                output_root_directory=".",
+                            )
+                        )
 
     return experiments
 
 
-# Darknet tiny, 2 MB
 def run_tinynet(model_type):
     experiments = []
     net_lat = 120
-    for num_MB in [2]:
-        for bw_scalefactor in [4, 16]:
-            localdram_size_str = "{}MB".format(num_MB)
-            command_str = darknet_base_str_options.format(
-                model_type,
-                sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
-                    int(num_MB * ONE_MB_TO_BYTES),
-                    int(net_lat),
-                    int(bw_scalefactor),
-                    int(1 * ONE_BILLION),
-                ),
-            )
-            # 1 billion instructions cap
+    model_to_local_dram_size = {
+        "tiny": [2],
+        "darknet19": [12],
+        "resnet50": [8],
+        "vgg-16": [24]
+    }
+    for num_MB in model_to_local_dram_size[model_type]:
+            for bw_scalefactor in [4, 16]:
+                for net_lat in [120]:
+                    for page_size in [64, 512, 1024, 2048, 4096]:
+                        localdram_size_str = "{}MB".format(num_MB)
+                        command_str = darknet_base_str_options.format(
+                            model_type,
+                            sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+                                page_size,
+                                int(num_MB * ONE_MB_TO_BYTES),
+                                int(net_lat),
+                                int(bw_scalefactor),
+                                int(1 * ONE_BILLION),
+                            ),
+                        )
+                        # 1 billion instructions cap
 
-            experiments.append(
-                automation.Experiment(
-                    experiment_name="darknet_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_combo".format(
-                        model_type.lower(), localdram_size_str, net_lat, bw_scalefactor
-                    ),
-                    command_str=command_str,
-                    experiment_run_configs=config_list,
-                    output_root_directory=".",
-                )
-            )
+                        experiments.append(
+                            automation.Experiment(
+                                experiment_name="darknet_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_combo".format(
+                                    model_type.lower(), localdram_size_str, net_lat, bw_scalefactor, page_size
+                                ),
+                                command_str=command_str,
+                                experiment_run_configs=config_list,
+                                output_root_directory=".",
+                            )
+                        )
 
     return experiments
 
@@ -675,8 +690,8 @@ def gen_settings_for_graph(benchmark_name):
 
 # TODO: Experiment run
 experiments = []
-# experiments.extend(run_ligra("BFS", "regular_input", 50))
-experiments.extend(run_ligra("Triangle", "regular_input", 30))
+# experiments.extend(run_ligra("BFS", "regular_input"))
+# experiments.extend(run_ligra("Triangle", "regular_input"))
 # experiments.extend(run_tinynet("tiny"))
 # experiments.extend(run_tinynet("darknet19"))
 # experiments.extend(run_stream("0")) # Scale
@@ -687,8 +702,8 @@ experiments.extend(run_ligra("Triangle", "regular_input", 30))
 # experiments.extend(run_tinynet("vgg-16"))
 
 # experiments.extend(run_hpcg())
-# experiments.extend(run_ligra("BC", "regular_input", 4))
-# experiments.extend(run_ligra("Components", "regular_input", 4))
+experiments.extend(run_ligra("BC", "regular_input"))
+experiments.extend(run_ligra("Components", "regular_input"))
 # experiments.extend(run_nw("2048"))
 # experiments.extend(run_sls())
 
