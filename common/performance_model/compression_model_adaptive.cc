@@ -77,7 +77,7 @@ CompressionModelAdaptive::compress(IntPtr addr, size_t data_size, core_id_t core
 
     int type = m_type;
     if ((type == 1 || type == 3) && (m_low_compression_count < m_type_switch_threshold || m_high_compression_count < m_type_switch_threshold))
-        type = 0;
+        type = 2;
 
     bool use_low_compression;
     bool use_high_compression;
@@ -113,8 +113,11 @@ CompressionModelAdaptive::compress(IntPtr addr, size_t data_size, core_id_t core
         use_low_compression = m_bandwidth_utilization >= m_lower_bandwidth_threshold && m_bandwidth_utilization < m_upper_bandwidth_threshold;
         use_high_compression = m_bandwidth_utilization >= m_upper_bandwidth_threshold;
     } else if (type == 3) {
+        // Encourage low compression at lower bandwidth saturation
         double weight_low = 1;
-        if (m_bandwidth_utilization < 0.4) {
+        if (m_bandwidth_utilization < 0.2) {
+            weight_low = 4;
+        } else if (m_bandwidth_utilization < 0.4) {
             weight_low = 2;
         } else if (m_bandwidth_utilization < 0.6) {
             weight_low = 1.5;
@@ -125,12 +128,24 @@ CompressionModelAdaptive::compress(IntPtr addr, size_t data_size, core_id_t core
         double bandwidth = (double)(m_r_bandwidth->getBandwidthBitsPerUs()) / 8000; // GB/s
         double effective_low_data_rate = std::min(estimate_low_compression_rate, weight_low * estimate_low_compression_ratio * (1 - m_bandwidth_utilization) * bandwidth);
 
+        // Encourage high compression at higher bandwidth saturation
         double weight_high = 1;
         if (m_bandwidth_utilization >= 0.8) {
             weight_high = 2;
         } else if (m_bandwidth_utilization >= 0.7) {
             weight_high = 1.5;
         }
+        // else if (m_bandwidth_utilization >= 0.6) {
+        //     weight_high = 1.5;
+        // }
+
+        // It is possible that the compression ratio of high compression improves later on, but 
+        // we don't catch this if the compression ratio of high compression isn't so good early on
+        // double compression_weight_high = 1;
+        // if (m_bandwidth_utilization >= 0.6) {
+        //     compression_weight_high = 1.5;
+        // }
+
         double estimate_high_compression_ratio = (double)(m_high_compression_count * m_page_size) / (double)(m_high_compression_count * m_page_size - m_high_bytes_saved);
         double estimate_high_compression_latency = m_high_total_compression_latency.getNS() / (double)m_high_compression_count;
         double estimate_high_compression_rate = ((double)4000) / estimate_high_compression_latency;
