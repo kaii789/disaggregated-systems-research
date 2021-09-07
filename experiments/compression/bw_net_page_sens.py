@@ -308,7 +308,7 @@ def run_ligra(application_name, ligra_input_selection):
         for remote_init in ["false"]:  # "false"
             for bw_scalefactor in [4, 16]:
                 for net_lat in [120]:
-                    for page_size in [64, 512, 1024, 2048, 4096]:
+                    for page_size in [512, 1024, 2048, 4096]:
                         localdram_size_str = "{}MB".format(num_MB)
                         command_str = ligra_base_str_options.format(
                             application_name,
@@ -355,7 +355,7 @@ def run_tinynet(model_type):
     for num_MB in model_to_local_dram_size[model_type]:
             for bw_scalefactor in [4, 16]:
                 for net_lat in [120]:
-                    for page_size in [64, 512, 1024, 2048, 4096]:
+                    for page_size in [512, 1024, 2048, 4096]:
                         localdram_size_str = "{}MB".format(num_MB)
                         command_str = darknet_base_str_options.format(
                             model_type,
@@ -702,8 +702,8 @@ experiments = []
 # experiments.extend(run_tinynet("vgg-16"))
 
 # experiments.extend(run_hpcg())
-experiments.extend(run_ligra("BC", "regular_input"))
-experiments.extend(run_ligra("Components", "regular_input"))
+# experiments.extend(run_ligra("BC", "regular_input"))
+# experiments.extend(run_ligra("Components", "regular_input"))
 # experiments.extend(run_nw("2048"))
 # experiments.extend(run_sls())
 
