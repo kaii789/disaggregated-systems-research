@@ -226,7 +226,7 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     total_compression_latency = results['compression.total-compression-latency'][0]
     total_decompression_latency = results['compression.total-decompression-latency'][0]
 
-    gran_size = 64 if config['perf_model/dram/remote_use_cacheline_granularity'] == "true" else 4096
+    gran_size = 64 if config['perf_model/dram/remote_use_cacheline_granularity'] == "true" else int(config['perf_model/dram/page_size'])
     results['compression.avg-compression-ratio'] = [float((data_moves * gran_size)) / float(((data_moves * gran_size) - bytes_saved))]
     results['compression.avg-compression-latency'] = [total_compression_latency / data_moves]
     results['compression.avg-decompression-latency'] = [total_decompression_latency / data_moves]

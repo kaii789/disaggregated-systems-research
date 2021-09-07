@@ -134,7 +134,7 @@ CompressionModelAdaptive::compress(IntPtr addr, size_t data_size, core_id_t core
         // double estimate_low_compression_ratio = (double)(m_low_compression_count * m_page_size) / (double)(m_low_compression_count * m_page_size - m_low_bytes_saved);
         double estimate_low_compression_ratio = low_compression_ratio_sum / window_capacity;
         double estimate_low_compression_latency = m_low_total_compression_latency.getNS() / (double)m_low_compression_count;
-        double estimate_low_compression_rate = ((double)4000) / estimate_low_compression_latency; // GB/s
+        double estimate_low_compression_rate = ((double)(m_page_size)) / estimate_low_compression_latency; // GB/s
         double bandwidth = (double)(m_r_bandwidth->getBandwidthBitsPerUs()) / 8000; // GB/s
         double effective_low_data_rate = std::min(estimate_low_compression_rate, weight_low * estimate_low_compression_ratio * (1 - m_bandwidth_utilization) * bandwidth);
 
@@ -159,7 +159,7 @@ CompressionModelAdaptive::compress(IntPtr addr, size_t data_size, core_id_t core
         // double estimate_high_compression_ratio = (double)(m_high_compression_count * m_page_size) / (double)(m_high_compression_count * m_page_size - m_high_bytes_saved);
         double estimate_high_compression_ratio = high_compression_ratio_sum / window_capacity;
         double estimate_high_compression_latency = m_high_total_compression_latency.getNS() / (double)m_high_compression_count;
-        double estimate_high_compression_rate = ((double)4000) / estimate_high_compression_latency;
+        double estimate_high_compression_rate = ((double)(m_page_size)) / estimate_high_compression_latency;
         double effective_high_data_rate = std::min(weight_high * estimate_high_compression_rate, estimate_high_compression_ratio * (1 - m_bandwidth_utilization) * bandwidth);
 
         use_low_compression = effective_low_data_rate > effective_high_data_rate;
