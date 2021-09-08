@@ -74,8 +74,3 @@ CompressionModel::create(String name, UInt32 id, UInt32 page_size, UInt32 cache_
 
     }
 }
-
-void
-CompressionModel::update_bandwidth_utilization(double bandwidth_utilization)
-{
-}
