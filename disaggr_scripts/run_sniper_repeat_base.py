@@ -212,7 +212,7 @@ class ExperimentRun:
         lines.append("sleep 30")  # sleep for 30 seconds
 
         # Save a copy of the output for later reference
-        files_to_save = ["sim.cfg", "sim.out", "sim.stats.sqlite3"]
+        files_to_save = ["sim.cfg", "sim.stats.sqlite3", "sim.out"]
         for filename in files_to_save:
             lines.append(
                 'cp "{0}" "{1}"/"{2}_{0}"'.format(

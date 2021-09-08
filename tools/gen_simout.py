@@ -331,7 +331,10 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
 
   if "dram.bw-utilization-decile-0" in results:
     total_count = results["dram.accesses"][0]
-    for i in range(10):
+    end_decile = 9
+    if "dram.bw-utilization-decile-10" in results:
+      end_decile = 10
+    for i in range(end_decile + 1):  # the last number is end_decile
       decile_count = results["dram.bw-utilization-decile-{}".format(i)][0]
       percentage = ((float)(decile_count) / (float)(total_count)) * 100
       results["dram.bw-utilization-decile-percentage-{}".format(i)] = [percentage]

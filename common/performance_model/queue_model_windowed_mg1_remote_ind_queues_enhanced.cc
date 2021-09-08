@@ -1,9 +1,9 @@
-/** This file is based off of the modified queue_model_windowed_mg1_remote_subqueuemodels. 
+/** This file is based off of the modified queue_model_windowed_mg1_remote_ind_queues. 
  * At the time of writing, the main differences are:
  *  1) Tries to account for both 
 */
 
-#include "queue_model_windowed_mg1_remote_ind_queues.h"
+#include "queue_model_windowed_mg1_remote_ind_queues_enhanced.h"
 #include "simulator.h"
 #include "config.hpp"
 #include "log.h"
@@ -11,7 +11,7 @@
 
 // #include <algorithm>
 
-QueueModelWindowedMG1RemoteIndQueues::QueueModelWindowedMG1RemoteIndQueues(String name, UInt32 id, UInt64 bw_bits_per_us)
+QueueModelWindowedMG1RemoteIndQueuesEnhanced::QueueModelWindowedMG1RemoteIndQueuesEnhanced(String name, UInt32 id, UInt64 bw_bits_per_us)
    : m_window_size(SubsecondTime::NS(Sim()->getCfg()->getInt("queue_model/windowed_mg1_remote_ind_queues/window_size")))
    , m_use_separate_queue_delay_cap(Sim()->getCfg()->getBool("queue_model/windowed_mg1_remote_ind_queues/use_separate_queue_delay_cap"))
    , m_use_utilization_overflow(Sim()->getCfg()->getBool("queue_model/windowed_mg1_remote_ind_queues/use_utilization_overflow"))
@@ -112,14 +112,14 @@ QueueModelWindowedMG1RemoteIndQueues::QueueModelWindowedMG1RemoteIndQueues(Strin
    registerStatsMetric(name, id, "num-page-effective-bandwidth-exceeded-allowable-max", &m_page_effective_bandwidth_exceeded_allowable_max);
    registerStatsMetric(name, id, "num-cacheline-effective-bandwidth-exceeded-allowable-max", &m_cacheline_effective_bandwidth_exceeded_allowable_max);
 
-   std::cout << "Using windowed_mg1_remote_ind_queues queue model with m_use_utilization_overflow=" << m_use_utilization_overflow;
+   std::cout << "Using windowed_mg1_remote_ind_queues_enhanced queue model with m_use_utilization_overflow=" << m_use_utilization_overflow;
    if (m_use_utilization_overflow) {
       std::cout << ", utilization overflow threshold=" << m_utilization_overflow_threshold;
    }
    std::cout << std::endl;
 }
 
-QueueModelWindowedMG1RemoteIndQueues::~QueueModelWindowedMG1RemoteIndQueues()
+QueueModelWindowedMG1RemoteIndQueuesEnhanced::~QueueModelWindowedMG1RemoteIndQueuesEnhanced()
 {
    if (m_total_requests < 1) {
       return;
@@ -192,21 +192,21 @@ QueueModelWindowedMG1RemoteIndQueues::~QueueModelWindowedMG1RemoteIndQueues()
    }
 }
 
-void QueueModelWindowedMG1RemoteIndQueues::finalizeStats() {
+void QueueModelWindowedMG1RemoteIndQueuesEnhanced::finalizeStats() {
    // Try editing the value to trigger the variable to be recorded??
-   m_total_cacheline_queue_utilization_during_page_requests_denominator = 1;
-   m_total_page_queue_utilization_during_cacheline_requests_denominator = 1;
-   m_total_cacheline_queue_utilization_during_page_no_effect_denominator = 1;
-   m_total_page_queue_utilization_during_cacheline_no_effect_denominator = 1;
+   m_total_cacheline_queue_utilization_during_page_requests_denominator = 0;
+   m_total_page_queue_utilization_during_cacheline_requests_denominator = 0;
+   m_total_cacheline_queue_utilization_during_page_no_effect_denominator = 0;
+   m_total_page_queue_utilization_during_cacheline_no_effect_denominator = 0;
 
-   m_total_cacheline_queue_utilization_during_page_requests_denominator = 1000 * 1000;
-   m_total_page_queue_utilization_during_cacheline_requests_denominator = 1000 * 1000;
-   m_total_cacheline_queue_utilization_during_page_no_effect_denominator = 1000 * 1000;
-   m_total_page_queue_utilization_during_cacheline_no_effect_denominator = 1000 * 1000;
-   std::cout << "remote_ind_queues finalizeStats(): denominator=" << m_total_cacheline_queue_utilization_during_page_requests_denominator << std::endl;
+   m_total_cacheline_queue_utilization_during_page_requests_denominator += 1000 * 1000;
+   m_total_page_queue_utilization_during_cacheline_requests_denominator += 1000 * 1000;
+   m_total_cacheline_queue_utilization_during_page_no_effect_denominator += 1000 * 1000;
+   m_total_page_queue_utilization_during_cacheline_no_effect_denominator += 1000 * 1000;
+   std::cout << "remote_ind_queues_enhanced finalizeStats(): denominator=" << m_total_cacheline_queue_utilization_during_page_requests_denominator << std::endl;
 }
 
-double QueueModelWindowedMG1RemoteIndQueues::getPageQueueUtilizationPercentage(SubsecondTime pkt_time) {
+double QueueModelWindowedMG1RemoteIndQueuesEnhanced::getPageQueueUtilizationPercentage(SubsecondTime pkt_time) {
    // Remove packets that now fall outside the window
    // Advance the window based on the global (barrier) time, as this guarantees the earliest time any thread may be at.
    // Use a backup value of 10 window sizes before the current request to avoid excessive memory usage in case something fishy is going on.
@@ -217,11 +217,11 @@ double QueueModelWindowedMG1RemoteIndQueues::getPageQueueUtilizationPercentage(S
    removeItemsUpdateBytes(time_point, pkt_time, false);
 
    // Use queue utilization as measure to determine whether the queue is full
-   double utilization = (double)m_page_service_time_sum / m_window_size.getPS();
+   double utilization = (double)m_page_service_time_sum / ((1. - m_r_cacheline_queue_fraction) * m_window_size.getPS());
    return utilization;
 }
 
-double QueueModelWindowedMG1RemoteIndQueues::getCachelineQueueUtilizationPercentage(SubsecondTime pkt_time) {
+double QueueModelWindowedMG1RemoteIndQueuesEnhanced::getCachelineQueueUtilizationPercentage(SubsecondTime pkt_time) {
    // Remove packets that now fall outside the window
    // Advance the window based on the global (barrier) time, as this guarantees the earliest time any thread may be at.
    // Use a backup value of 10 window sizes before the current request to avoid excessive memory usage in case something fishy is going on.
@@ -232,11 +232,11 @@ double QueueModelWindowedMG1RemoteIndQueues::getCachelineQueueUtilizationPercent
    removeItemsUpdateBytes(time_point, pkt_time, false);
 
    // Use queue utilization as measure to determine whether the queue is full
-   double utilization = (double)m_cacheline_service_time_sum / m_window_size.getPS();
+   double utilization = (double)m_cacheline_service_time_sum / (m_r_cacheline_queue_fraction * m_window_size.getPS());
    return utilization;
 }
 
-double QueueModelWindowedMG1RemoteIndQueues::getTotalQueueUtilizationPercentage(SubsecondTime pkt_time) {
+double QueueModelWindowedMG1RemoteIndQueuesEnhanced::getTotalQueueUtilizationPercentage(SubsecondTime pkt_time) {
    // Remove packets that now fall outside the window
    // Advance the window based on the global (barrier) time, as this guarantees the earliest time any thread may be at.
    // Use a backup value of 10 window sizes before the current request to avoid excessive memory usage in case something fishy is going on.
@@ -247,26 +247,26 @@ double QueueModelWindowedMG1RemoteIndQueues::getTotalQueueUtilizationPercentage(
    removeItemsUpdateBytes(time_point, pkt_time, false);
 
    // Use queue utilization as measure to determine whether the queue is full
-   double utilization = (double)(m_page_service_time_sum + m_cacheline_service_time_sum) / (2 * m_window_size.getPS());
+   double utilization = (double)(m_page_service_time_sum + m_cacheline_service_time_sum) / m_window_size.getPS();
    return utilization;
 }
 
 // Currently, this only affects the stats tracking what effective max bandwidths are reached
-void QueueModelWindowedMG1RemoteIndQueues::updateBandwidth(UInt64 bw_bits_per_us, double r_cacheline_queue_fraction) {
+void QueueModelWindowedMG1RemoteIndQueuesEnhanced::updateBandwidth(UInt64 bw_bits_per_us, double r_cacheline_queue_fraction) {
    m_specified_bw_GB_per_s = ((double)bw_bits_per_us / 8 / 1000);  // convert bits/us to GB/s
    m_r_cacheline_queue_fraction = r_cacheline_queue_fraction;
 }
 
 // With computeQueueDelayTrackBytes(), computeQueueDelay() shouldn't be used anymore
 SubsecondTime
-QueueModelWindowedMG1RemoteIndQueues::computeQueueDelay(SubsecondTime pkt_time, SubsecondTime processing_time, core_id_t requester)
+QueueModelWindowedMG1RemoteIndQueuesEnhanced::computeQueueDelay(SubsecondTime pkt_time, SubsecondTime processing_time, core_id_t requester)
 {
-   throw std::logic_error("QueueModelWindowedMG1RemoteIndQueues::computeQueueDelay shouldn't be called");
+   throw std::logic_error("QueueModelWindowedMG1RemoteIndQueuesEnhanced::computeQueueDelay shouldn't be called");
 }
 
 /* Get estimate of queue delay without adding the packet to the queue */
 SubsecondTime
-QueueModelWindowedMG1RemoteIndQueues::computeQueueDelayNoEffect(SubsecondTime pkt_time, SubsecondTime processing_time, request_t request_type, core_id_t requester)
+QueueModelWindowedMG1RemoteIndQueuesEnhanced::computeQueueDelayNoEffect(SubsecondTime pkt_time, SubsecondTime processing_time, request_t request_type, core_id_t requester)
 {
    SubsecondTime t_queue = SubsecondTime::Zero();
 
@@ -292,12 +292,13 @@ QueueModelWindowedMG1RemoteIndQueues::computeQueueDelayNoEffect(SubsecondTime pk
          service_time_sum = m_page_service_time_sum;
          service_time_sum2 = m_page_service_time_sum2;
          num_arrivals = m_num_page_arrivals;
+         t_queue = applyQueueDelayFormula(request_type, service_time_sum, service_time_sum2, num_arrivals, (1. - m_r_cacheline_queue_fraction) * m_window_size.getPS(), false);
       } else {  // request_type == QueueModel::CACHELINE
          service_time_sum = m_cacheline_service_time_sum;
          service_time_sum2 = m_cacheline_service_time_sum2;
          num_arrivals = m_num_cacheline_arrivals;
+         t_queue = applyQueueDelayFormula(request_type, service_time_sum, service_time_sum2, num_arrivals, m_r_cacheline_queue_fraction * m_window_size.getPS(), false);
       }
-      t_queue = applySingleWindowSizeFormula(request_type, service_time_sum, service_time_sum2, num_arrivals, false);
    }
    // Add additional network latency
    t_queue += m_r_added_latency;  // is it ok for t_queue to potentially be larger than m_window_size?
@@ -319,7 +320,7 @@ QueueModelWindowedMG1RemoteIndQueues::computeQueueDelayNoEffect(SubsecondTime pk
 }
 
 SubsecondTime
-QueueModelWindowedMG1RemoteIndQueues::computeQueueDelayTrackBytes(SubsecondTime pkt_time, SubsecondTime processing_time, UInt64 num_bytes, request_t request_type, core_id_t requester, bool is_inflight_page, UInt64 phys_page)
+QueueModelWindowedMG1RemoteIndQueuesEnhanced::computeQueueDelayTrackBytes(SubsecondTime pkt_time, SubsecondTime processing_time, UInt64 num_bytes, request_t request_type, core_id_t requester, bool is_inflight_page, UInt64 phys_page)
 {
    SubsecondTime t_queue = SubsecondTime::Zero();
 
@@ -345,12 +346,13 @@ QueueModelWindowedMG1RemoteIndQueues::computeQueueDelayTrackBytes(SubsecondTime 
          service_time_sum = m_page_service_time_sum;
          service_time_sum2 = m_page_service_time_sum2;
          num_arrivals = m_num_page_arrivals;
+         t_queue = applyQueueDelayFormula(request_type, service_time_sum, service_time_sum2, num_arrivals, (1. - m_r_cacheline_queue_fraction) * m_window_size.getPS(), true);
       } else {  // request_type == QueueModel::CACHELINE
          service_time_sum = m_cacheline_service_time_sum;
          service_time_sum2 = m_cacheline_service_time_sum2;
          num_arrivals = m_num_cacheline_arrivals;
+         t_queue = applyQueueDelayFormula(request_type, service_time_sum, service_time_sum2, num_arrivals, m_r_cacheline_queue_fraction * m_window_size.getPS(), true);
       }
-      t_queue = applySingleWindowSizeFormula(request_type, service_time_sum, service_time_sum2, num_arrivals, true);
    }
    // Add additional network latency
    t_queue += m_r_added_latency;  // is it ok for t_queue to potentially be larger than m_window_size?
@@ -393,10 +395,10 @@ QueueModelWindowedMG1RemoteIndQueues::computeQueueDelayTrackBytes(SubsecondTime 
 
 // total_service_time is in ps, total_service_time2 is in ps^2, utilization_window_size is in ps
 SubsecondTime
-QueueModelWindowedMG1RemoteIndQueues::applyQueueDelayFormula(request_t request_type, UInt64 total_service_time, UInt64 total_service_time2, UInt64 num_arrivals, UInt64 utilization_window_size, bool update_stats)
+QueueModelWindowedMG1RemoteIndQueuesEnhanced::applyQueueDelayFormula(request_t request_type, UInt64 total_service_time, UInt64 total_service_time2, UInt64 num_arrivals, UInt64 utilization_window_size, bool update_stats)
 {
    double utilization = (double)total_service_time / utilization_window_size;
-   double service_time_Es2 = total_service_time2 / num_arrivals;
+   double service_time_Es2 = total_service_time2 / m_r_cacheline_queue_fraction / num_arrivals;
    double arrival_rate = (double)num_arrivals / utilization_window_size;
 
    // If requesters do not throttle based on returned latency, it's their problem, not ours
@@ -441,20 +443,20 @@ QueueModelWindowedMG1RemoteIndQueues::applyQueueDelayFormula(request_t request_t
 
 // total_service_time is in ps, total_service_time2 is in ps^2
 SubsecondTime
-QueueModelWindowedMG1RemoteIndQueues::applySingleWindowSizeFormula(request_t request_type, UInt64 total_service_time, UInt64 total_service_time2, UInt64 num_arrivals, bool update_stats)
+QueueModelWindowedMG1RemoteIndQueuesEnhanced::applySingleWindowSizeFormula(request_t request_type, UInt64 total_service_time, UInt64 total_service_time2, UInt64 num_arrivals, bool update_stats)
 {
    return applyQueueDelayFormula(request_type, total_service_time, total_service_time2, num_arrivals, m_window_size.getPS(), update_stats);
 }
 
 // total_service_time is in ps, total_service_time2 is in ps^2
 // SubsecondTime
-// QueueModelWindowedMG1RemoteIndQueues::applyDoubleWindowSizeFormula(request_t request_type, UInt64 total_service_time, UInt64 total_service_time2, UInt64 num_arrivals, bool update_stats)
+// QueueModelWindowedMG1RemoteIndQueuesEnhanced::applyDoubleWindowSizeFormula(request_t request_type, UInt64 total_service_time, UInt64 total_service_time2, UInt64 num_arrivals, bool update_stats)
 // {
 //    return applyQueueDelayFormula(request_type, total_service_time, total_service_time2, num_arrivals, 2 * m_window_size.getPS(), update_stats);
 // }
 
 void
-QueueModelWindowedMG1RemoteIndQueues::addItemUpdateBytes(SubsecondTime pkt_time, UInt64 num_bytes, SubsecondTime pkt_queue_delay, request_t request_type)
+QueueModelWindowedMG1RemoteIndQueuesEnhanced::addItemUpdateBytes(SubsecondTime pkt_time, UInt64 num_bytes, SubsecondTime pkt_queue_delay, request_t request_type)
 {
    // Add num_bytes to map tracking the current window & update m_bytes_tracking
    // m_packet_bytes.insert(std::pair<SubsecondTime, UInt64>(pkt_time + pkt_queue_delay, num_bytes));
@@ -470,7 +472,7 @@ QueueModelWindowedMG1RemoteIndQueues::addItemUpdateBytes(SubsecondTime pkt_time,
 
 // Parameter request_type only supplied when track_effective_bandwidth == true
 void
-QueueModelWindowedMG1RemoteIndQueues::removeItemsUpdateBytes(SubsecondTime earliest_time, SubsecondTime pkt_time, bool track_effective_bandwidth, request_t request_type)
+QueueModelWindowedMG1RemoteIndQueuesEnhanced::removeItemsUpdateBytes(SubsecondTime earliest_time, SubsecondTime pkt_time, bool track_effective_bandwidth, request_t request_type)
 {
    // Can remove packets that arrived earlier than the current window
    // while(!m_packet_bytes.empty() && m_packet_bytes.begin()->first < earliest_time)
@@ -551,7 +553,7 @@ QueueModelWindowedMG1RemoteIndQueues::removeItemsUpdateBytes(SubsecondTime earli
 
 
 void
-QueueModelWindowedMG1RemoteIndQueues::addItem(SubsecondTime pkt_time, SubsecondTime service_time, request_t request_type)
+QueueModelWindowedMG1RemoteIndQueuesEnhanced::addItem(SubsecondTime pkt_time, SubsecondTime service_time, request_t request_type)
 {
    if (request_type == QueueModel::PAGE) {
       m_window_page_requests.insert(std::pair<SubsecondTime, SubsecondTime>(pkt_time, service_time));
@@ -567,7 +569,7 @@ QueueModelWindowedMG1RemoteIndQueues::addItem(SubsecondTime pkt_time, SubsecondT
 }
 
 void
-QueueModelWindowedMG1RemoteIndQueues::removeItems(SubsecondTime earliest_time)
+QueueModelWindowedMG1RemoteIndQueuesEnhanced::removeItems(SubsecondTime earliest_time)
 {
    // Page request map
    while(!m_window_page_requests.empty() && m_window_page_requests.begin()->first < earliest_time)

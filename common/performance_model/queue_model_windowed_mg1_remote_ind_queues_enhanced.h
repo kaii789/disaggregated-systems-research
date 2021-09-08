@@ -1,5 +1,5 @@
-#ifndef __QUEUE_MODEL_WINDOWED_MG1_REMOTE_IND_QUEUES_H__
-#define __QUEUE_MODEL_WINDOWED_MG1_REMOTE_IND_QUEUES_H__
+#ifndef __QUEUE_MODEL_WINDOWED_MG1_REMOTE_IND_QUEUES_ENHANCED_H__
+#define __QUEUE_MODEL_WINDOWED_MG1_REMOTE_IND_QUEUES_ENHANCED_H__
 
 #include "queue_model.h"
 #include "fixed_types.h"
@@ -10,11 +10,11 @@
 #include <vector>
 
 /* Putting two independent remote queues together for easier stats keeping */
-class QueueModelWindowedMG1RemoteIndQueues : public QueueModel
+class QueueModelWindowedMG1RemoteIndQueuesEnhanced : public QueueModel
 {
 public:
-   QueueModelWindowedMG1RemoteIndQueues(String name, UInt32 id, UInt64 bw_bits_per_us);
-   ~QueueModelWindowedMG1RemoteIndQueues();
+   QueueModelWindowedMG1RemoteIndQueuesEnhanced(String name, UInt32 id, UInt64 bw_bits_per_us);
+   ~QueueModelWindowedMG1RemoteIndQueuesEnhanced();
 
    SubsecondTime computeQueueDelay(SubsecondTime pkt_time, SubsecondTime processing_time, core_id_t requester = INVALID_CORE_ID);
    SubsecondTime computeQueueDelayNoEffect(SubsecondTime pkt_time, SubsecondTime processing_time, request_t request_type, core_id_t requester = INVALID_CORE_ID);
@@ -130,4 +130,4 @@ private:
    // SubsecondTime applyDoubleWindowSizeFormula(request_t request_type, UInt64 total_service_time, UInt64 total_service_time2, UInt64 num_arrivals, bool update_stats);
 };
 
-#endif /* __QUEUE_MODEL_WINDOWED_MG1_REMOTE_IND_QUEUES_H__ */
+#endif /* __QUEUE_MODEL_WINDOWED_MG1_REMOTE_IND_QUEUES_ENHANCED_H__ */
