@@ -29,8 +29,8 @@ class CompressionModelFVE : public CompressionModel
 
         // Compression latency per cache line
         UInt32 m_compression_latency = 10;
-        // Decompression latency per cache line
-        UInt32 m_decompression_latency = 10;
+        // Decompression latency per compressed word (default 32-bit word)
+        UInt32 m_decompression_latency = 2;
 
         UInt8 m_word_size_bits = 32;
         UInt32 m_word_size_bytes = 4;
@@ -43,6 +43,9 @@ class CompressionModelFVE : public CompressionModel
             UInt32  bit_pos;
             UInt32  num_bytes;
         } bitstream;
+
+        // Stats
+        UInt64 m_num_overflowed_pages;
 
         void initBitstream(bitstream*, void*, UInt32);
         UInt64 readBit(bitstream*);

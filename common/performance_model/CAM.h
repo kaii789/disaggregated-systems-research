@@ -13,6 +13,7 @@ class CAM {
         CAM(UInt32);
         ~CAM();
 
+        void clear();
         UInt64 read_value(UInt8);
         void write_value(UInt8, UInt64);
         UInt8 replace_value(UInt64);

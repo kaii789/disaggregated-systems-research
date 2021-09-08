@@ -1,5 +1,5 @@
-#ifndef __COMPRESSION_MODEL_LZBDI_H__
-#define __COMPRESSION_MODEL_LZBDI_H__
+#ifndef __COMPRESSION_MODEL_FPCBDI_H__
+#define __COMPRESSION_MODEL_FPCBDI_H__
 
 #include "compression_model.h"
 #include "moving_average.h"
@@ -11,11 +11,11 @@
 #include <cstring>
 #include <boost/tuple/tuple.hpp>
 
-class CompressionModelLZBDI : public CompressionModel
+class CompressionModelFPCBDI : public CompressionModel
 {
 public:
-   CompressionModelLZBDI(String name, UInt32 id, UInt32 page_size, UInt32 cache_line_size);
-   ~CompressionModelLZBDI();
+   CompressionModelFPCBDI(String name, UInt32 id, UInt32 page_size, UInt32 cache_line_size);
+   ~CompressionModelFPCBDI();
 
    SubsecondTime compress(IntPtr addr, size_t data_size, core_id_t core_id, UInt32 *compressed_page_size, UInt32 *compressed_cache_lines);
    SubsecondTime decompress(IntPtr addr, UInt32 compressed_cache_lines, core_id_t core_id);
@@ -40,6 +40,9 @@ private:
        UInt32 compressed_size; // In bytes
     } ;
 
+    static const UInt32 mask[6];
+    static const UInt32 neg_check[6];
+
     // Compression latency per cache line 
     UInt32 m_compression_latency = 5; 
     // Decompression latency per cache line
@@ -61,10 +64,10 @@ private:
     // Statistics
     UInt64 m_total_compressed;
     UInt64 m_num_overflowed_pages;
-    UInt64 m_compress_options[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    UInt64 m_bytes_saved_per_option[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    UInt64 m_bits_saved_per_option[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    UInt64 m_compress_options[24] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    UInt64 m_bytes_saved_per_option[24] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    UInt64 m_bits_saved_per_option[24] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 };
 
-#endif /* __COMPRESSION_MODEL_LZBDI_H__ */
+#endif /* __COMPRESSION_MODEL_FPCBDI_H__ */
