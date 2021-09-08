@@ -226,7 +226,7 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     total_compression_latency = results['compression.total-compression-latency'][0]
     total_decompression_latency = results['compression.total-decompression-latency'][0]
 
-    gran_size = 64 if config['perf_model/dram/remote_use_cacheline_granularity'] == "true" else 4096
+    gran_size = 64 if config['perf_model/dram/remote_use_cacheline_granularity'] == "true" else int(config['perf_model/dram/page_size'])
     results['compression.avg-compression-ratio'] = [float((data_moves * gran_size)) / float(((data_moves * gran_size) - bytes_saved))]
     results['compression.avg-compression-latency'] = [total_compression_latency / data_moves]
     results['compression.avg-decompression-latency'] = [total_decompression_latency / data_moves]
@@ -440,6 +440,14 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
       ('  adaptive high avg compression latency(ns)', 'compression.adaptive-high-avg-compression-latency', format_ns(2)),
       ('  adaptive high avg decompression latency(ns)', 'compression.adaptive-high-avg-decompression-latency', format_ns(2)),
     ]
+
+  if "compression.adaptive-bw-utilization-decile-0" in results:
+    total_count = results['dram.page-moves'][0]
+    for i in range(10):
+      decile_count = results["compression.adaptive-bw-utilization-decile-{}".format(i)][0]
+      percentage = ((float)(decile_count) / (float)(total_count)) * 100 if total_count != 0 else 0
+      results["compression.adaptive-bw-utilization-decile-percentage-{}".format(i)] = [percentage]
+      template.append(('  adaptive bw utilization % decile {}'.format(i), "compression.adaptive-bw-utilization-decile-percentage-{}".format(i), str))
 
   # if 'dram.redundant-moves-temp1-time-savings' in results:
   template.extend([

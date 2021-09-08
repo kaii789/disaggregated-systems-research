@@ -20,7 +20,7 @@ config_list = [
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "512"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
             automation.ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
-            automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
+            # automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
         ]
     ),
     # 1) LZBDI
@@ -30,7 +30,7 @@ config_list = [
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
             automation.ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
             automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lzbdi"),
-            automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
+            # automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
         ]
     ),
     # 2) LZ78
@@ -40,7 +40,7 @@ config_list = [
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
             automation.ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
             automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lz78"),
-            automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
+            # automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
         ]
     ),
     # 3) LZW
@@ -50,7 +50,7 @@ config_list = [
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
             automation.ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
             automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lzw"),
-            automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
+            # automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
         ]
     ),
     # 4) Deflate 1 GB/s
@@ -62,7 +62,7 @@ config_list = [
             automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "zlib"),
             automation.ConfigEntry("perf_model/dram/compression_model/zlib", "compression_latency", "1"),
             automation.ConfigEntry("perf_model/dram/compression_model/zlib", "decompression_latency", "1"),
-            automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
+            # automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
         ]
     ),
     # 5) Deflate 2 GB/s
@@ -74,7 +74,7 @@ config_list = [
             automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "zlib"),
             automation.ConfigEntry("perf_model/dram/compression_model/zlib", "compression_latency", "2"),
             automation.ConfigEntry("perf_model/dram/compression_model/zlib", "decompression_latency", "2"),
-            automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
+            # automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
         ]
     ),
     # 6) Deflate 5 GB/s
@@ -86,7 +86,7 @@ config_list = [
             automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "zlib"),
             automation.ConfigEntry("perf_model/dram/compression_model/zlib", "compression_latency", "5"),
             automation.ConfigEntry("perf_model/dram/compression_model/zlib", "decompression_latency", "5"),
-            automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
+            # automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
         ]
     ),
     # 7) Adaptive LZ78
@@ -97,7 +97,7 @@ config_list = [
             automation.ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
             automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "adaptive"),
             automation.ConfigEntry("perf_model/dram/compression_model/adaptive", "high_compression_scheme", "lz78"),
-            automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
+            # automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
             automation.ConfigEntry("perf_model/dram/compression_model/adaptive/dynamic_bw_threshold", "high_compression_rate", "0.5"),
         ]
     ),
@@ -109,7 +109,7 @@ config_list = [
             automation.ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
             automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "adaptive"),
             automation.ConfigEntry("perf_model/dram/compression_model/adaptive", "high_compression_scheme", "lzw"),
-            automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
+            # automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
             automation.ConfigEntry("perf_model/dram/compression_model/adaptive/dynamic_bw_threshold", "high_compression_rate", "0.5"),
         ]
     ),
@@ -122,7 +122,7 @@ config_list = [
             automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "adaptive"),
             automation.ConfigEntry("perf_model/dram/compression_model/zlib", "compression_latency", "1"),
             automation.ConfigEntry("perf_model/dram/compression_model/zlib", "decompression_latency", "1"),
-            automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
+            # automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
             automation.ConfigEntry("perf_model/dram/compression_model/adaptive/dynamic_bw_threshold", "high_compression_rate", "1"),
         ]
     ),
@@ -135,7 +135,7 @@ config_list = [
             automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "adaptive"),
             automation.ConfigEntry("perf_model/dram/compression_model/zlib", "compression_latency", "2"),
             automation.ConfigEntry("perf_model/dram/compression_model/zlib", "decompression_latency", "2"),
-            automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
+            # automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
             automation.ConfigEntry("perf_model/dram/compression_model/adaptive/dynamic_bw_threshold", "high_compression_rate", "2"),
         ]
     ),
@@ -148,7 +148,7 @@ config_list = [
             automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "adaptive"),
             automation.ConfigEntry("perf_model/dram/compression_model/zlib", "compression_latency", "5"),
             automation.ConfigEntry("perf_model/dram/compression_model/zlib", "decompression_latency", "5"),
-            automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
+            # automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
             automation.ConfigEntry("perf_model/dram/compression_model/adaptive/dynamic_bw_threshold", "high_compression_rate", "5"),
         ]
     ),
@@ -295,40 +295,47 @@ command_strs["ligra_bfs_small_input_localdram_1MB"] = ligra_base_str_options.for
 
 
 # Ligra
-def run_ligra(application_name, ligra_input_selection, num_MB):
+def run_ligra(application_name, ligra_input_selection):
     experiments = []
     ligra_input_file = ligra_input_to_file[ligra_input_selection]
     net_lat = 120
-    for remote_init in ["false"]:  # "false"
-        for bw_scalefactor in [4]:
-            localdram_size_str = "{}MB".format(num_MB)
-            command_str = ligra_base_str_options.format(
-                application_name,
-                ligra_input_file,
-                sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={}".format(
-                    int(num_MB * ONE_MB_TO_BYTES),
-                    int(net_lat),
-                    int(bw_scalefactor),
-                    str(remote_init),
-                ),
-            )
-
-            experiments.append(
-                automation.Experiment(
-                    experiment_name="ligra_{}_{}localdram_{}_netlat_{}_bw_scalefactor_{}_combo".format(
-                        application_name.lower(),
-                        ""
-                        if ligra_input_selection == "regular_input"
-                        else ligra_input_selection + "_",
-                        localdram_size_str,
-                        net_lat,
-                        bw_scalefactor,
+    app_to_local_dram_size = {
+        "BFS": [10, 20, 30, 50],
+        "Triangle": [15, 30, 45, 75],
+        "BC": [15, 30, 45, 75],
+        "Components": [12, 25, 40, 65]
+    }
+    for num_MB in app_to_local_dram_size[application_name]:
+        for remote_init in ["false"]:  # "false"
+            for bw_scalefactor in [4, 16]:
+                localdram_size_str = "{}MB".format(num_MB)
+                command_str = ligra_base_str_options.format(
+                    application_name,
+                    ligra_input_file,
+                    sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={}".format(
+                        int(num_MB * ONE_MB_TO_BYTES),
+                        int(net_lat),
+                        int(bw_scalefactor),
+                        str(remote_init),
                     ),
-                    command_str=command_str,
-                    experiment_run_configs=config_list,
-                    output_root_directory=".",
                 )
-            )
+
+                experiments.append(
+                    automation.Experiment(
+                        experiment_name="ligra_{}_{}localdram_{}_netlat_{}_bw_scalefactor_{}_combo".format(
+                            application_name.lower(),
+                            ""
+                            if ligra_input_selection == "regular_input"
+                            else ligra_input_selection + "_",
+                            localdram_size_str,
+                            net_lat,
+                            bw_scalefactor,
+                        ),
+                        command_str=command_str,
+                        experiment_run_configs=config_list,
+                        output_root_directory=".",
+                    )
+                )
 
     return experiments
 
@@ -337,8 +344,14 @@ def run_ligra(application_name, ligra_input_selection, num_MB):
 def run_tinynet(model_type):
     experiments = []
     net_lat = 120
-    for num_MB in [2]:
-        for bw_scalefactor in [4]:
+    model_to_local_dram_size = {
+        "tiny": [2],
+        "darknet19": [6, 12, 18, 30],
+        "resnet50": [4, 8, 12, 20],
+        "vgg-16": [12, 24, 36, 62]
+    }
+    for num_MB in model_to_local_dram_size[model_type]:
+        for bw_scalefactor in [4, 16]:
             localdram_size_str = "{}MB".format(num_MB)
             command_str = darknet_base_str_options.format(
                 model_type,
@@ -370,7 +383,7 @@ def run_stream(type):
     experiments = []
     net_lat = 120
     for num_MB in [2]:
-        for bw_scalefactor in [4]:
+        for bw_scalefactor in [4, 16]:
             localdram_size_str = "{}MB".format(num_MB)
             command_str = stream_base_options.format(
                 type,
@@ -435,8 +448,8 @@ def run_sssp(input):
 def run_hpcg():
     experiments = []
     net_lat = 120
-    for num_MB in [32]:
-        for bw_scalefactor in [4]:
+    for num_MB in [45, 90, 135, 225]:
+        for bw_scalefactor in [4, 16]:
             localdram_size_str = "{}MB".format(num_MB)
             command_str = hpcg_base_options.format(
                 sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
@@ -464,8 +477,8 @@ def run_hpcg():
 def run_nw(type):
     experiments = []
     net_lat = 120
-    for num_MB in [4]:
-        for bw_scalefactor in [4]:
+    for num_MB in [30, 60, 90, 145]:
+        for bw_scalefactor in [4, 16]:
             localdram_size_str = "{}MB".format(num_MB)
             command_str = nw_base_options.format(
                 type, 
@@ -522,12 +535,12 @@ def run_sls():
 
 def graph(res_name, benchmark_list, local_dram_list, bw_scalefactor_list):
     # labels = ["Remote Bandwidth Scalefactor", "C0", "LZBDI", "LZ78", "LZW", "DF1", "DF2", "DF5", "A-LZ78", "A-LZW", "A-DF1", "A-DF2", "A-DF5", "A-DF10"]
-    labels = ["Remote Bandwidth Scalefactor", "C0", "LZBDI", "LZ78", "LZW", "DF1", "DF2", "DF5", "A-LZ78", "A-LZW", "A-DF1", "A-DF2", "A-DF5"]
+    labels = ["Local Dram Size-Remote Bandwidth Scalefactor", "C0", "LZBDI", "LZ78", "LZW", "DF1", "DF2", "DF5", "A-LZ78", "A-LZW", "A-DF1", "A-DF2", "A-DF5"]
     # "stream_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_combo"
 
     process = 0
     num_bars = len(labels) - 1
-    res = [bw_scalefactor_list[:]] + [[] for _ in range(num_bars)]
+    res = [["{}-{}".format(size, factor) for size in local_dram_list for factor in bw_scalefactor_list]] + [[] for _ in range(num_bars)]
     compression_res = {}
     for benchmark in benchmark_list:
         for size in local_dram_list:
@@ -585,11 +598,17 @@ def gen_settings_for_graph(benchmark_name):
         local_dram_list = ["524288B"]
         bw_scalefactor_list = [4, 16]
     elif benchmark_name == "bfs_reg":
-        res_name = "bfs_reg_4MB_comparison"
+        res_name = "bfs_reg_ac_dram_sens"
         benchmark_list = []
         benchmark_list.append("ligra_{}_".format("bfs"))
-        local_dram_list = ["4MB"]
-        bw_scalefactor_list = [4]
+        local_dram_list = ["10MB", "20MB", "30MB", "50MB"]
+        bw_scalefactor_list = [4, 16]
+    elif benchmark_name == "bfs_reg":
+        res_name = "bfs_reg_ac_dram_sens"
+        benchmark_list = []
+        benchmark_list.append("ligra_{}_".format("bfs"))
+        local_dram_list = ["10MB", "20MB", "30MB", "50MB"]
+        bw_scalefactor_list = [4, 16]
     elif benchmark_name == "triangle_reg":
         res_name = "triangle_reg_16MB_ac_dynamic_bw"
         benchmark_list = []
@@ -672,8 +691,8 @@ def gen_settings_for_graph(benchmark_name):
 
 # TODO: Experiment run
 experiments = []
-# experiments.extend(run_ligra("BFS", "regular_input", 4))
-# experiments.extend(run_ligra("Triangle", "regular_input", 16))
+# experiments.extend(run_ligra("BFS", "regular_input"))
+# experiments.extend(run_ligra("Triangle", "regular_input"))
 # experiments.extend(run_tinynet("tiny"))
 # experiments.extend(run_tinynet("darknet19"))
 # experiments.extend(run_stream("0")) # Scale
@@ -681,11 +700,12 @@ experiments = []
 # experiments.extend(run_sssp("bcsstk05.mtx"))
 # experiments.extend(run_bfs("reg_8x", 32))
 # experiments.extend(run_tinynet("resnet50"))
+# experiments.extend(run_tinynet("vgg-16"))
 
 # experiments.extend(run_hpcg())
-# experiments.extend(run_ligra("BC", "regular_input", 4))
-# experiments.extend(run_ligra("Components", "regular_input", 4))
-# experiments.extend(run_nw("2048"))
+# experiments.extend(run_ligra("BC", "regular_input"))
+# experiments.extend(run_ligra("Components", "regular_input"))
+# experiments.extend(run_nw("6144"))
 # experiments.extend(run_sls())
 
 log_filename = "run-sniper-repeat2_1.log"
@@ -710,5 +730,5 @@ with open(log_filename, "w") as log_file:
     print(log_str, file=log_file)
 
 # TODO: Generate graph
-# res_name, benchmark_list, local_dram_list, bw_scalefactor_list = gen_settings_for_graph("nw")
+# res_name, benchmark_list, local_dram_list, bw_scalefactor_list = gen_settings_for_graph("bfs_reg")
 # graph(res_name, benchmark_list, local_dram_list, bw_scalefactor_list)

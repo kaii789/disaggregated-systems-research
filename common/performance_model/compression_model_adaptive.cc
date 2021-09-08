@@ -40,6 +40,12 @@ CompressionModelAdaptive::CompressionModelAdaptive(String name, UInt32 id, UInt3
     registerStatsMetric("compression", id, "adaptive-high-total-decompression-latency", &m_high_total_decompression_latency);
     registerStatsMetric("compression", id, "adaptive-high-bytes-saved", &m_high_bytes_saved);
 
+    // Stats for BW utilization
+    for (int i = 0; i < 10; i++) {
+        m_bw_utilization_decile_to_count[i] = 0;
+        registerStatsMetric("compression", id, ("adaptive-bw-utilization-decile-" + std::to_string(i)).c_str(), &m_bw_utilization_decile_to_count[i]);
+    }
+
     m_cacheline_count = m_page_size / m_cache_line_size;
 }
 
@@ -52,17 +58,32 @@ CompressionModelAdaptive::finalizeStats()
 {
 }
 
+void
+CompressionModelAdaptive::update_bw_utilization_count()
+{
+    int decile = (int)(m_bandwidth_utilization * 10);
+    m_bw_utilization_decile_to_count[decile] += 1;
+}
+
 // TODO:
 SubsecondTime
 CompressionModelAdaptive::compress(IntPtr addr, size_t data_size, core_id_t core_id, UInt32 *compressed_page_size, UInt32 *compressed_cache_lines)
 {
-    UInt32 compressed_cachelines = 0;
-    UInt32 compressed_size = data_size;
-    SubsecondTime total_compression_latency = SubsecondTime::Zero();
+    update_bw_utilization_count();
+
+    UInt32 high_compressed_cachelines = 0;
+    UInt32 high_compressed_size = data_size;
+    SubsecondTime high_compression_latency = SubsecondTime::Zero();
+
+    UInt32 low_compressed_cachelines = 0;
+    UInt32 low_compressed_size = data_size;
+    SubsecondTime low_compression_latency = SubsecondTime::Zero();
+
+    SubsecondTime compression_latency = SubsecondTime::Zero();
 
     int type = m_type;
     if ((type == 1 || type == 3) && (m_low_compression_count < m_type_switch_threshold || m_high_compression_count < m_type_switch_threshold))
-        type = 0;
+        type = 2;
 
     bool use_low_compression;
     bool use_high_compression;
@@ -98,27 +119,48 @@ CompressionModelAdaptive::compress(IntPtr addr, size_t data_size, core_id_t core
         use_low_compression = m_bandwidth_utilization >= m_lower_bandwidth_threshold && m_bandwidth_utilization < m_upper_bandwidth_threshold;
         use_high_compression = m_bandwidth_utilization >= m_upper_bandwidth_threshold;
     } else if (type == 3) {
-        double estimate_low_compression_ratio = (double)(m_low_compression_count * m_page_size) / (double)(m_low_compression_count * m_page_size - m_low_bytes_saved);
-        double estimate_low_compression_latency = m_low_total_compression_latency.getNS() / (double)m_low_compression_count;
-        double estimate_low_compression_rate = ((double)4000) / estimate_low_compression_latency; // GB/s
-        double bandwidth = (double)(m_r_bandwidth->getBandwidthBitsPerUs()) / 8000; // GB/s
-        double effective_low_data_rate = std::min(estimate_low_compression_rate, estimate_low_compression_ratio * (1 - m_bandwidth_utilization) * bandwidth);
-
-        double weight = 1;
-        if (m_bandwidth_utilization >= 0.8) {
-            weight = 10;
-        } else if (m_bandwidth_utilization >= 0.7) {
-            weight = 5;
-        } else if (m_bandwidth_utilization >= 0.6) {
-            weight = 2.5;
-        } else if (m_bandwidth_utilization >= 0.5) {
-            weight = 1.25;
+        // Encourage low compression at lower bandwidth saturation
+        double weight_low = 1;
+        if (m_bandwidth_utilization < 0.2) {
+            weight_low = 4;
+        } else if (m_bandwidth_utilization < 0.4) {
+            weight_low = 2;
+        } else if (m_bandwidth_utilization < 0.6) {
+            weight_low = 1.5;
         }
 
-        double estimate_high_compression_ratio = (double)(m_high_compression_count * m_page_size) / (double)(m_high_compression_count * m_page_size - m_high_bytes_saved);
+        int window_capacity = m_type_switch_threshold;
+
+        // double estimate_low_compression_ratio = (double)(m_low_compression_count * m_page_size) / (double)(m_low_compression_count * m_page_size - m_low_bytes_saved);
+        double estimate_low_compression_ratio = low_compression_ratio_sum / window_capacity;
+        double estimate_low_compression_latency = m_low_total_compression_latency.getNS() / (double)m_low_compression_count;
+        double estimate_low_compression_rate = ((double)(m_page_size)) / estimate_low_compression_latency; // GB/s
+        double bandwidth = (double)(m_r_bandwidth->getBandwidthBitsPerUs()) / 8000; // GB/s
+        double effective_low_data_rate = std::min(estimate_low_compression_rate, weight_low * estimate_low_compression_ratio * (1 - m_bandwidth_utilization) * bandwidth);
+
+        // Encourage high compression at higher bandwidth saturation
+        double weight_high = 1;
+        if (m_bandwidth_utilization >= 0.8) {
+            weight_high = 2;
+        } else if (m_bandwidth_utilization >= 0.7) {
+            weight_high = 1.5;
+        }
+        // else if (m_bandwidth_utilization >= 0.6) {
+        //     weight_high = 1.5;
+        // }
+
+        // It is possible that the compression ratio of high compression improves later on, but
+        // we don't catch this if the compression ratio of high compression isn't so good early on
+        // double compression_weight_high = 1;
+        // if (m_bandwidth_utilization >= 0.6) {
+        //     compression_weight_high = 1.5;
+        // }
+
+        // double estimate_high_compression_ratio = (double)(m_high_compression_count * m_page_size) / (double)(m_high_compression_count * m_page_size - m_high_bytes_saved);
+        double estimate_high_compression_ratio = high_compression_ratio_sum / window_capacity;
         double estimate_high_compression_latency = m_high_total_compression_latency.getNS() / (double)m_high_compression_count;
-        double estimate_high_compression_rate = ((double)4000) / estimate_high_compression_latency;
-        double effective_high_data_rate = std::min(weight * estimate_high_compression_rate, estimate_high_compression_ratio * (1 - m_bandwidth_utilization) * bandwidth);
+        double estimate_high_compression_rate = ((double)(m_page_size)) / estimate_high_compression_latency;
+        double effective_high_data_rate = std::min(weight_high * estimate_high_compression_rate, estimate_high_compression_ratio * (1 - m_bandwidth_utilization) * bandwidth);
 
         use_low_compression = effective_low_data_rate > effective_high_data_rate;
         use_high_compression = !use_low_compression;
@@ -127,33 +169,58 @@ CompressionModelAdaptive::compress(IntPtr addr, size_t data_size, core_id_t core
         // printf("[Adaptive] high compression ratio: %f, high compression rate: %f, bandwidth: %f\n", estimate_high_compression_ratio, estimate_high_compression_rate, bandwidth);
     }
 
-    // Compress depending on bandwidth
-    if (use_low_compression) {
-        total_compression_latency = m_low_compression_model->compress(addr, data_size, core_id, &compressed_size, &compressed_cachelines);
-        m_addr_to_scheme[addr] = m_low_compression_scheme;
-        m_low_compression_count += 1;
-        if (m_compression_latency != 0)
-            m_low_total_compression_latency += total_compression_latency;
-        m_low_bytes_saved += data_size - compressed_size;
-    }
-    else if (use_high_compression) {
-        total_compression_latency = m_high_compression_model->compress(addr, data_size, core_id, &compressed_size, &compressed_cachelines);
-        m_addr_to_scheme[addr] = m_high_compression_scheme;
-        m_high_compression_count += 1;
-        if (m_compression_latency != 0)
-            m_high_total_compression_latency += total_compression_latency;
-        m_high_bytes_saved += data_size - compressed_size;
-    }
+    // Compress
+    low_compression_latency = m_low_compression_model->compress(addr, data_size, core_id, &low_compressed_size, &low_compressed_cachelines);
+    if (m_compression_latency != 0)
+        m_low_total_compression_latency += low_compression_latency;
+
+    high_compression_latency = m_high_compression_model->compress(addr, data_size, core_id, &high_compressed_size, &high_compressed_cachelines);
+    if (m_compression_latency != 0)
+        m_high_total_compression_latency += high_compression_latency;
 
     // assert(compressed_size <= m_page_size && "[Adaptive] Wrong compression!");
 
-    *compressed_page_size = compressed_size;
-    *compressed_cache_lines = compressed_cachelines;
+    if (use_low_compression) {
+        m_addr_to_scheme[addr] = m_low_compression_scheme;
+        m_low_compression_count += 1;
+        m_low_bytes_saved += data_size - low_compressed_size;
+        *compressed_page_size = low_compressed_size;
+        *compressed_cache_lines = low_compressed_cachelines;
+        compression_latency = low_compression_latency;
+    } else if (use_high_compression) {
+        m_addr_to_scheme[addr] = m_high_compression_scheme;
+        m_high_compression_count += 1;
+        m_high_bytes_saved += data_size - high_compressed_size;
+        *compressed_page_size = high_compressed_size;
+        *compressed_cache_lines = high_compressed_cachelines;
+        compression_latency = high_compression_latency;
+    }
+
+    // Update compression ratio window for type 3
+    if (type == 3) {
+        int window_capacity = m_type_switch_threshold;
+
+        double high_compression_ratio = (double)m_page_size / (double)high_compressed_size;
+        high_compression_ratio_window.push(high_compression_ratio);
+        high_compression_ratio_sum += high_compression_ratio;
+        if (high_compression_ratio_window.size() > window_capacity) {
+            high_compression_ratio_sum -= high_compression_ratio_window.front();
+            high_compression_ratio_window.pop();
+        }
+
+        double low_compression_ratio = (double)m_page_size / (double)low_compressed_size;
+        low_compression_ratio_window.push(low_compression_ratio);
+        low_compression_ratio_sum += low_compression_ratio;
+        if (low_compression_ratio_window.size() > window_capacity) {
+            low_compression_ratio_sum -= low_compression_ratio_window.front();
+            low_compression_ratio_window.pop();
+        }
+    }
 
     // Return compression latency
     if (m_compression_latency == 0)
         return SubsecondTime::Zero();
-    return total_compression_latency;
+    return compression_latency;
 }
 
 // TODO:
