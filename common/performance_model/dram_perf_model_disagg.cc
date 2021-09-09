@@ -670,7 +670,7 @@ SubsecondTime
 DramPerfModelDisagg::getDramAccessCost(SubsecondTime start_time, UInt64 size, core_id_t requester, IntPtr address, ShmemPerf *perf)
 {
     UInt64 phys_page = address & ~((UInt64(1) << floorLog2(m_page_size)) - 1);
-    IntPtr cacheline_address = phys_page; // address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1);
+    IntPtr cacheline_address = (size > m_cache_line_size) ? phys_page : address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1);
     SubsecondTime t_now = start_time;
     for (UInt32 i = 0; i < size / m_cache_line_size; i++) {
         // Calculate address mapping inside the DIMM
