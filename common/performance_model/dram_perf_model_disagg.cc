@@ -979,6 +979,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             //try again
 
             page_hw_access_latency = getDramAccessCost(t_remote_queue_request, m_page_size, requester, address, perf);
+            m_total_remote_dram_hardware_latency_pages += page_hw_access_latency;
 
             // Compress
             UInt32 page_size = m_page_size;
