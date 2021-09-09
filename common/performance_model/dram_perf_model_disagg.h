@@ -219,7 +219,10 @@ class DramPerfModelDisagg : public DramPerfModel
         SubsecondTime m_total_local_access_latency;
         SubsecondTime m_total_remote_access_latency;
         SubsecondTime m_total_remote_datamovement_latency;
-        UInt64 m_global_time_much_larger_than_tnow;
+        SubsecondTime m_total_local_dram_hardware_latency;
+        SubsecondTime m_total_remote_dram_hardware_latency_cachelines;
+        SubsecondTime m_total_remote_dram_hardware_latency_pages;
+        UInt64 m_global_time_much_larger_than_page_arrival;
         SubsecondTime m_sum_global_time_much_larger;
 
         UInt64 m_bw_utilization_decile_to_count[11];
@@ -227,7 +230,7 @@ class DramPerfModelDisagg : public DramPerfModel
         // Dynamic BW
         long long int m_update_bandwidth_count = 0;
 
-        SubsecondTime getDramAccessCost(SubsecondTime pkt_time, UInt64 pkt_size, core_id_t requester, IntPtr address, ShmemPerf *perf);
+        SubsecondTime getDramAccessCost(SubsecondTime start_time, UInt64 size, core_id_t requester, IntPtr address, ShmemPerf *perf);
         void parseDeviceAddress(IntPtr address, UInt32 &channel, UInt32 &rank, UInt32 &bank_group, UInt32 &bank, UInt32 &column, UInt64 &dram_page);
         UInt64 parseAddressBits(UInt64 address, UInt32 &data, UInt32 offset, UInt32 size, UInt64 base_address);
         SubsecondTime possiblyEvict(UInt64 phys_page, SubsecondTime pkt_time, core_id_t requester);
