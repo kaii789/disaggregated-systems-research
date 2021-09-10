@@ -758,10 +758,10 @@ DramPerfModelDisagg::getDramAccessCost(SubsecondTime start_time, UInt64 size, co
         // Add the wait time for the larger of bank group and rank availability delay
         t_now += (rank_avail_delay > group_avail_delay) ? rank_avail_delay : group_avail_delay;
         perf->updateTime(t_now, ShmemPerf::DRAM_DEVICE);
-        //std::cout << "DDR Processing time: " << m_bus_bandwidth.getRoundedLatency(8*pkt_size) << std::endl; 
+        //std::cout << "DDR Processing time: " << m_bus_bandwidth.getRoundedLatency(8*pkt_size) << std::endl;
 
         // Add DDR bus latency and queuing delay
-        SubsecondTime ddr_processing_time = m_bus_bandwidth.getRoundedLatency(8 * size); // bytes to bits
+        SubsecondTime ddr_processing_time = m_bus_bandwidth.getRoundedLatency(8 * m_cache_line_size); // bytes to bits
         SubsecondTime ddr_queue_delay = m_r_queue_model.size() ? m_r_queue_model[channel]->computeQueueDelay(t_now, ddr_processing_time, requester) : SubsecondTime::Zero();
         t_now += ddr_queue_delay;
         perf->updateTime(t_now, ShmemPerf::DRAM_QUEUE);
