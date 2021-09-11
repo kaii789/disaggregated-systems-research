@@ -667,107 +667,207 @@ DramPerfModelDisagg::parseDeviceAddress(IntPtr address, UInt32 &channel, UInt32 
 
 // DRAM hardware access cost
 SubsecondTime
-DramPerfModelDisagg::getDramAccessCost(SubsecondTime start_time, UInt64 size, core_id_t requester, IntPtr address, ShmemPerf *perf)
+DramPerfModelDisagg::getDramAccessCost(SubsecondTime start_time, UInt64 size, core_id_t requester, IntPtr address, ShmemPerf *perf, bool is_remote)
 {
     UInt64 phys_page = address & ~((UInt64(1) << floorLog2(m_page_size)) - 1);
     IntPtr cacheline_address = (size > m_cache_line_size) ? phys_page : address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1);
     SubsecondTime t_now = start_time;
-    for (UInt32 i = 0; i < size / m_cache_line_size; i++) {
-        // Calculate address mapping inside the DIMM
-        UInt32 channel, rank, bank_group, bank, column;
-        UInt64 dram_page;
-        parseDeviceAddress(cacheline_address, channel, rank, bank_group, bank, column, dram_page);
 
-        perf->updateTime(t_now);
+    if (is_remote) {
+        for (UInt32 i = 0; i < size / m_cache_line_size; i++) {
+            // Calculate address mapping inside the DIMM
+            UInt32 channel, rank, bank_group, bank, column;
+            UInt64 dram_page;
+            parseDeviceAddress(cacheline_address, channel, rank, bank_group, bank, column, dram_page);
 
-        // Add DDR controller pipeline delay
-        t_now += m_controller_delay;
-        perf->updateTime(t_now, ShmemPerf::DRAM_CNTLR);
+            perf->updateTime(t_now);
 
-        // Add DDR refresh delay if needed
-        if (m_refresh_interval != SubsecondTime::Zero()) {
+            // Add DDR controller pipeline delay
+            t_now += m_controller_delay;
+            perf->updateTime(t_now, ShmemPerf::DRAM_CNTLR);
 
-            SubsecondTime refresh_base = (t_now.getPS() / m_refresh_interval.getPS()) * m_refresh_interval;
-            if (t_now - refresh_base < m_refresh_length) {
-                t_now = refresh_base + m_refresh_length;
-                perf->updateTime(t_now, ShmemPerf::DRAM_REFRESH);
+            // Add DDR refresh delay if needed
+            if (m_refresh_interval != SubsecondTime::Zero()) {
+
+                SubsecondTime refresh_base = (t_now.getPS() / m_refresh_interval.getPS()) * m_refresh_interval;
+                if (t_now - refresh_base < m_refresh_length) {
+                    t_now = refresh_base + m_refresh_length;
+                    perf->updateTime(t_now, ShmemPerf::DRAM_REFRESH);
+                }
             }
-        }
 
+            UInt64 crb = (channel * m_num_ranks * m_num_banks) + (rank * m_num_banks) + bank; // Combine channel, rank, bank to index m_banks
+            LOG_ASSERT_ERROR(crb < m_total_banks, "Bank index out of bounds");
+            BankInfo &bank_info = m_r_banks[crb];
 
-        UInt64 crb = (channel * m_num_ranks * m_num_banks) + (rank * m_num_banks) + bank; // Combine channel, rank, bank to index m_banks
-        LOG_ASSERT_ERROR(crb < m_total_banks, "Bank index out of bounds");
-        BankInfo &bank_info = m_r_banks[crb];
+            //printf("[%2d] %s (%12lx, %4lu, %4lu), t_open = %lu, t_now = %lu, bank_info.t_avail = %lu\n", m_core_id, bank_info.open_page == dram_page && bank_info.t_avail + m_bank_keep_open >= t_now ? "Page Hit: " : "Page Miss:", address, crb, dram_page % 10000, t_now.getNS() - bank_info.t_avail.getNS(), t_now.getNS(), bank_info.t_avail.getNS());
+            // DRAM page hit/miss
+            if (bank_info.open_page == dram_page                            // Last access was to this row
+                    && bank_info.t_avail + m_bank_keep_open >= t_now   // Bank hasn't been closed in the meantime
+            ) {
 
-        //printf("[%2d] %s (%12lx, %4lu, %4lu), t_open = %lu, t_now = %lu, bank_info.t_avail = %lu\n", m_core_id, bank_info.open_page == dram_page && bank_info.t_avail + m_bank_keep_open >= t_now ? "Page Hit: " : "Page Miss:", address, crb, dram_page % 10000, t_now.getNS() - bank_info.t_avail.getNS(), t_now.getNS(), bank_info.t_avail.getNS());
-        // DRAM page hit/miss
-        if (bank_info.open_page == dram_page                            // Last access was to this row
-                && bank_info.t_avail + m_bank_keep_open >= t_now   // Bank hasn't been closed in the meantime
-        ) {
+                if (bank_info.t_avail > t_now) {
+                    t_now = bank_info.t_avail;
+                    perf->updateTime(t_now, ShmemPerf::DRAM_BANK_PENDING);
+                }
+                ++m_dram_page_hits;
 
-            if (bank_info.t_avail > t_now) {
-                t_now = bank_info.t_avail;
-                perf->updateTime(t_now, ShmemPerf::DRAM_BANK_PENDING);
-            }
-            ++m_dram_page_hits;
-
-        } else {
-            // Wait for bank to become available
-            if (bank_info.t_avail > t_now)
-                t_now = bank_info.t_avail;
-            // Close dram_page
-            if (bank_info.t_avail + m_bank_keep_open >= t_now) {
-                // We found the dram_page open and have to close it ourselves
-                t_now += m_bank_close_delay;
-                ++m_dram_page_misses;
-            } else if (bank_info.t_avail + m_bank_keep_open + m_bank_close_delay > t_now) {
-                // Bank was being closed, we have to wait for that to complete
-                t_now = bank_info.t_avail + m_bank_keep_open + m_bank_close_delay;
-                ++m_dram_page_closing;
             } else {
-                // Bank was already closed, no delay.
-                ++m_dram_page_empty;
+                // Wait for bank to become available
+                if (bank_info.t_avail > t_now)
+                    t_now = bank_info.t_avail;
+                // Close dram_page
+                if (bank_info.t_avail + m_bank_keep_open >= t_now) {
+                    // We found the dram_page open and have to close it ourselves
+                    t_now += m_bank_close_delay;
+                    ++m_dram_page_misses;
+                } else if (bank_info.t_avail + m_bank_keep_open + m_bank_close_delay > t_now) {
+                    // Bank was being closed, we have to wait for that to complete
+                    t_now = bank_info.t_avail + m_bank_keep_open + m_bank_close_delay;
+                    ++m_dram_page_closing;
+                } else {
+                    // Bank was already closed, no delay.
+                    ++m_dram_page_empty;
+                }
+
+                // Open dram_page
+                t_now += m_bank_open_delay;
+                perf->updateTime(t_now, ShmemPerf::DRAM_BANK_CONFLICT);
+
+                bank_info.open_page = dram_page;
             }
 
-            // Open dram_page
-            t_now += m_bank_open_delay;
-            perf->updateTime(t_now, ShmemPerf::DRAM_BANK_CONFLICT);
+            // Add rank access time and availability
+            UInt64 cr = (channel * m_num_ranks) + rank;
+            LOG_ASSERT_ERROR(cr < m_total_ranks, "Rank index out of bounds");
+            SubsecondTime rank_avail_request = (m_num_bank_groups > 1) ? m_intercommand_delay_short : m_intercommand_delay;
+            SubsecondTime rank_avail_delay = m_r_rank_avail.size() ? m_r_rank_avail[cr]->computeQueueDelay(t_now, rank_avail_request, requester) : SubsecondTime::Zero();
 
-            bank_info.open_page = dram_page;
+            // Add bank group access time and availability
+            UInt64 crbg = (channel * m_num_ranks * m_num_bank_groups) + (rank * m_num_bank_groups) + bank_group;
+            LOG_ASSERT_ERROR(crbg < m_total_bank_groups, "Bank-group index out of bounds");
+            SubsecondTime group_avail_delay = m_r_bank_group_avail.size() ? m_r_bank_group_avail[crbg]->computeQueueDelay(t_now, m_intercommand_delay_long, requester) : SubsecondTime::Zero();
+
+            // Add device access time (tCAS)
+            t_now += m_dram_access_cost;
+            perf->updateTime(t_now, ShmemPerf::DRAM_DEVICE);
+
+            // Mark bank as busy until it can receive its next command
+            // Done before waiting for the bus to be free: sort of assumes best-case bus scheduling
+            bank_info.t_avail = t_now;
+
+            // Add the wait time for the larger of bank group and rank availability delay
+            t_now += (rank_avail_delay > group_avail_delay) ? rank_avail_delay : group_avail_delay;
+            perf->updateTime(t_now, ShmemPerf::DRAM_DEVICE);
+            //std::cout << "DDR Processing time: " << m_bus_bandwidth.getRoundedLatency(8*pkt_size) << std::endl;
+
+            // Add DDR bus latency and queuing delay
+            SubsecondTime ddr_processing_time = m_bus_bandwidth.getRoundedLatency(8 * m_cache_line_size); // bytes to bits
+            SubsecondTime ddr_queue_delay = m_r_queue_model.size() ? m_r_queue_model[channel]->computeQueueDelay(t_now, ddr_processing_time, requester) : SubsecondTime::Zero();
+            t_now += ddr_queue_delay;
+            perf->updateTime(t_now, ShmemPerf::DRAM_QUEUE);
+
+            // Get next cacheline address
+            cacheline_address += (UInt64(1) << floorLog2(m_cache_line_size));
         }
+    } else {
+        for (UInt32 i = 0; i < size / m_cache_line_size; i++) {
+            // Calculate address mapping inside the DIMM
+            UInt32 channel, rank, bank_group, bank, column;
+            UInt64 dram_page;
+            parseDeviceAddress(address, channel, rank, bank_group, bank, column, dram_page);
 
-        // Add rank access time and availability
-        UInt64 cr = (channel * m_num_ranks) + rank;
-        LOG_ASSERT_ERROR(cr < m_total_ranks, "Rank index out of bounds");
-        SubsecondTime rank_avail_request = (m_num_bank_groups > 1) ? m_intercommand_delay_short : m_intercommand_delay;
-        SubsecondTime rank_avail_delay = m_r_rank_avail.size() ? m_r_rank_avail[cr]->computeQueueDelay(t_now, rank_avail_request, requester) : SubsecondTime::Zero();
+            perf->updateTime(t_now);
 
-        // Add bank group access time and availability
-        UInt64 crbg = (channel * m_num_ranks * m_num_bank_groups) + (rank * m_num_bank_groups) + bank_group;
-        LOG_ASSERT_ERROR(crbg < m_total_bank_groups, "Bank-group index out of bounds");
-        SubsecondTime group_avail_delay = m_r_bank_group_avail.size() ? m_r_bank_group_avail[crbg]->computeQueueDelay(t_now, m_intercommand_delay_long, requester) : SubsecondTime::Zero();
+            // Add DDR controller pipeline delay
+            t_now += m_controller_delay;
+            perf->updateTime(t_now, ShmemPerf::DRAM_CNTLR);
 
-        // Add device access time (tCAS)
-        t_now += m_dram_access_cost;
-        perf->updateTime(t_now, ShmemPerf::DRAM_DEVICE);
+            // Add DDR refresh delay if needed
+            if (m_refresh_interval != SubsecondTime::Zero()) {
+                SubsecondTime refresh_base = (t_now.getPS() / m_refresh_interval.getPS()) * m_refresh_interval;
+                if (t_now - refresh_base < m_refresh_length) {
+                    t_now = refresh_base + m_refresh_length;
+                    perf->updateTime(t_now, ShmemPerf::DRAM_REFRESH);
+                }
+            }
 
-        // Mark bank as busy until it can receive its next command
-        // Done before waiting for the bus to be free: sort of assumes best-case bus scheduling
-        bank_info.t_avail = t_now;
+            UInt64 crb = (channel * m_num_ranks * m_num_banks) + (rank * m_num_banks) + bank; // Combine channel, rank, bank to index m_banks
+            LOG_ASSERT_ERROR(crb < m_total_banks, "Bank index out of bounds");
+            BankInfo &bank_info = m_banks[crb];
 
-        // Add the wait time for the larger of bank group and rank availability delay
-        t_now += (rank_avail_delay > group_avail_delay) ? rank_avail_delay : group_avail_delay;
-        perf->updateTime(t_now, ShmemPerf::DRAM_DEVICE);
-        //std::cout << "DDR Processing time: " << m_bus_bandwidth.getRoundedLatency(8*pkt_size) << std::endl;
+            //printf("[%2d] %s (%12lx, %4lu, %4lu), t_open = %lu, t_now = %lu, bank_info.t_avail = %lu\n", m_core_id, bank_info.open_page == dram_page && bank_info.t_avail + m_bank_keep_open >= t_now ? "Page Hit: " : "Page Miss:", address, crb, dram_page % 10000, t_now.getNS() - bank_info.t_avail.getNS(), t_now.getNS(), bank_info.t_avail.getNS());
 
-        // Add DDR bus latency and queuing delay
-        SubsecondTime ddr_processing_time = m_bus_bandwidth.getRoundedLatency(8 * m_cache_line_size); // bytes to bits
-        SubsecondTime ddr_queue_delay = m_r_queue_model.size() ? m_r_queue_model[channel]->computeQueueDelay(t_now, ddr_processing_time, requester) : SubsecondTime::Zero();
-        t_now += ddr_queue_delay;
-        perf->updateTime(t_now, ShmemPerf::DRAM_QUEUE);
+            // DRAM page hit/miss
+            if (bank_info.open_page == dram_page                       // Last access was to this row
+                    && bank_info.t_avail + m_bank_keep_open >= t_now   // Bank hasn't been closed in the meantime
+            ) {
+                if (bank_info.t_avail > t_now) {
+                    t_now = bank_info.t_avail;
+                    perf->updateTime(t_now, ShmemPerf::DRAM_BANK_PENDING);
+                }
+                ++m_dram_page_hits;
 
-        // Get next cacheline address
-        cacheline_address += (UInt64(1) << floorLog2(m_cache_line_size));
+            } else {
+                // Wait for bank to become available
+                if (bank_info.t_avail > t_now)
+                    t_now = bank_info.t_avail;
+                // Close dram_page
+                if (bank_info.t_avail + m_bank_keep_open >= t_now) {
+                    // We found the dram_page open and have to close it ourselves
+                    t_now += m_bank_close_delay;
+                    ++m_dram_page_misses;
+                } else if (bank_info.t_avail + m_bank_keep_open + m_bank_close_delay > t_now) {
+                    // Bank was being closed, we have to wait for that to complete
+                    t_now = bank_info.t_avail + m_bank_keep_open + m_bank_close_delay;
+                    ++m_dram_page_closing;
+                } else {
+                    // Bank was already closed, no delay.
+                    ++m_dram_page_empty;
+                }
+
+                // Open dram_page
+                t_now += m_bank_open_delay;
+                perf->updateTime(t_now, ShmemPerf::DRAM_BANK_CONFLICT);
+
+                bank_info.open_page = dram_page;
+            }
+
+            // Add rank access time and availability
+            UInt64 cr = (channel * m_num_ranks) + rank;
+            LOG_ASSERT_ERROR(cr < m_total_ranks, "Rank index out of bounds");
+            SubsecondTime rank_avail_request = (m_num_bank_groups > 1) ? m_intercommand_delay_short : m_intercommand_delay;
+            SubsecondTime rank_avail_delay = m_rank_avail.size() ? m_rank_avail[cr]->computeQueueDelay(t_now, rank_avail_request, requester) : SubsecondTime::Zero();
+
+            // Add bank group access time and availability
+            UInt64 crbg = (channel * m_num_ranks * m_num_bank_groups) + (rank * m_num_bank_groups) + bank_group;
+            LOG_ASSERT_ERROR(crbg < m_total_bank_groups, "Bank-group index out of bounds");
+            SubsecondTime group_avail_delay = m_bank_group_avail.size() ? m_bank_group_avail[crbg]->computeQueueDelay(t_now, m_intercommand_delay_long, requester) : SubsecondTime::Zero();
+
+            // Add device access time (tCAS)
+            t_now += m_dram_access_cost;
+            perf->updateTime(t_now, ShmemPerf::DRAM_DEVICE);
+
+            // Mark bank as busy until it can receive its next command
+            // Done before waiting for the bus to be free: sort of assumes best-case bus scheduling
+            bank_info.t_avail = t_now;
+
+            // Add the wait time for the larger of bank group and rank availability delay
+            t_now += (rank_avail_delay > group_avail_delay) ? rank_avail_delay : group_avail_delay;
+            perf->updateTime(t_now, ShmemPerf::DRAM_DEVICE);
+
+            // DDR bus latency and queuing delay
+            SubsecondTime ddr_processing_time = m_bus_bandwidth.getRoundedLatency(8 * m_cache_line_size); // bytes to bits
+            //std::cout << m_bus_bandwidth.getRoundedLatency(8*pkt_size) << std::endl;
+            SubsecondTime ddr_queue_delay = m_queue_model.size() ? m_queue_model[channel]->computeQueueDelay(t_now, ddr_processing_time, requester) : SubsecondTime::Zero();
+            t_now += ddr_queue_delay;
+            perf->updateTime(t_now, ShmemPerf::DRAM_QUEUE);
+            t_now += ddr_processing_time;
+            perf->updateTime(t_now, ShmemPerf::DRAM_BUS);
+
+            // Get next cacheline address
+            cacheline_address += (UInt64(1) << floorLog2(m_cache_line_size));
+        }
     }
 
     return t_now - start_time;  // Net increase of time, ie the pure hardware access cost
@@ -779,7 +879,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     // pkt_size is in 'Bytes'
     // m_dram_bandwidth is in 'Bits per clock cycle'
 
-    SubsecondTime cacheline_hw_access_latency = getDramAccessCost(pkt_time, pkt_size, requester, address, perf);
+    SubsecondTime cacheline_hw_access_latency = getDramAccessCost(pkt_time, pkt_size, requester, address, perf, true);
     m_total_remote_dram_hardware_latency_cachelines += cacheline_hw_access_latency;
     SubsecondTime t_now = pkt_time + cacheline_hw_access_latency;
 
@@ -978,7 +1078,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             //to wait: t_remote_queue_request + some amount of time
             //try again
 
-            page_hw_access_latency = getDramAccessCost(t_remote_queue_request, m_page_size, requester, address, perf);
+            page_hw_access_latency = getDramAccessCost(t_remote_queue_request, m_page_size, requester, address, perf, true);
             m_total_remote_dram_hardware_latency_pages += page_hw_access_latency;
 
             // Compress
@@ -1074,7 +1174,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             }
         } else if (!m_r_simulate_datamov_overhead) {
             // Include the hardware access cost of the page
-            page_datamovement_queue_delay = getDramAccessCost(t_remote_queue_request, m_page_size, requester, address, perf);
+            page_datamovement_queue_delay = getDramAccessCost(t_remote_queue_request, m_page_size, requester, address, perf, true);
         } else {
             page_datamovement_queue_delay = SubsecondTime::Zero();
         }
@@ -1436,7 +1536,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
     // t_now += ddr_processing_time;
     // perf->updateTime(t_now, ShmemPerf::DRAM_BUS);
    
-    SubsecondTime cacheline_hw_access_latency = getDramAccessCost(pkt_time, pkt_size, requester, address, perf);
+    SubsecondTime cacheline_hw_access_latency = getDramAccessCost(pkt_time, pkt_size, requester, address, perf, false);
     m_total_local_dram_hardware_latency += cacheline_hw_access_latency;
     SubsecondTime t_now = pkt_time + cacheline_hw_access_latency;
 
@@ -1472,7 +1572,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                     // Can't make additional cacheline request
                     ++m_redundant_moves_type2_cancelled_datamovement_queue_full;
                 } else if (m_inflight_redundant[phys_page] < m_r_limit_redundant_moves) {
-                    SubsecondTime add_cacheline_hw_access_latency = getDramAccessCost(t_now, pkt_size, requester, address, perf);
+                    SubsecondTime add_cacheline_hw_access_latency = getDramAccessCost(t_now, pkt_size, requester, address, perf, false);
     
                     UInt32 size = pkt_size;
                     SubsecondTime cacheline_compression_latency = SubsecondTime::Zero();  // when cacheline compression is not enabled, this is always 0
