@@ -1174,7 +1174,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             }
         } else if (!m_r_simulate_datamov_overhead) {
             // Include the hardware access cost of the page
-            page_datamovement_queue_delay = getDramAccessCost(pkt_time, pkt_size, requester, address, perf, true);
+            page_datamovement_queue_delay = getDramAccessCost(t_remote_queue_request, m_page_size, requester, address, perf, true);
         } else {
             page_datamovement_queue_delay = SubsecondTime::Zero();
         }
