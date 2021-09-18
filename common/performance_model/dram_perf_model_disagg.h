@@ -13,7 +13,8 @@
 #include <bitset>
 #include <map>
 #include <list>
-#include <set>
+// #include <set>
+#include <unordered_set>
 #include <algorithm>
 
 class DramPerfModelDisagg : public DramPerfModel
@@ -117,9 +118,11 @@ class DramPerfModelDisagg : public DramPerfModel
         std::vector<BankInfo> m_r_banks;
 
         std::list<UInt64> m_local_pages; // Pages of local memory
-        std::map<UInt64, char> m_local_pages_remote_origin;  // Pages of local memory that were originally in remote
-        std::list<UInt64> m_remote_pages; // Pages of remote memory
-        std::list<UInt64> m_dirty_pages; // Dirty pages of local memory
+        // std::map<UInt64, char> m_local_pages_remote_origin;  // Pages of local memory that were originally in remote
+        // std::list<UInt64> m_remote_pages; // Pages of remote memory
+        std::unordered_set<UInt64> m_remote_pages; // Pages of remote memory
+        // std::list<UInt64> m_dirty_pages; // Dirty pages of local memory
+        std::unordered_set<UInt64> m_dirty_pages; // Dirty pages of local memory
         std::map<UInt64, SubsecondTime> m_inflight_pages; // Inflight pages that are being transferred from remote memory to local memory
         std::map<UInt64, UInt32> m_inflight_redundant;    // Count the number of redundant moves that occur for each inflight page while it is being transferred
         std::map<UInt64, SubsecondTime> m_inflightevicted_pages; // Inflight pages that are being transferred from local memory to remote memory
@@ -162,7 +165,7 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_num_recent_remote_additional_accesses;   // For cacheline queue requests made on inflight pages. Track this separately since they could be counted as either "remote" or "local" cacheline accesses
         UInt64 m_num_recent_local_accesses;
         // SubsecondTime m_recent_access_count_begin_time;
-        std::set<UInt64> m_recent_accessed_pages;
+        std::unordered_set<UInt64> m_recent_accessed_pages;
         std::vector<double> m_page_locality_measures;
         std::vector<double> m_modified_page_locality_measures;
         std::vector<double> m_modified2_page_locality_measures;
