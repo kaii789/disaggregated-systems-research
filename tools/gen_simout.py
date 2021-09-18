@@ -149,9 +149,9 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     results['dram.localavghardwarelatency'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.total-local-dram-hardware-latency'], results['dram.local-accesses']))
     results['dram.remoteavglatency'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.total-remote-access-latency'], results['dram.remote-accesses']))
     results['dram.remoteavghardwarelatency_pages'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.total-remote-dram-hardware-latency-pages'], results['dram.page-moves']))  # Prefetched pages not currently accounted for in sniper stats
-    if ('dram-datamovement-queue.num-cacheline-requests' in results and sum(results['dram-datamovement-queue.num-requests']) > 0) or ('dram-datamovement-queue-2.num-requests' in results and sum(results['dram-datamovement-queue-2.num-requests']) > 0):
+    if ('dram-datamovement-queue.num-cacheline-requests' in results and sum(results['dram-datamovement-queue.num-cacheline-requests']) > 0) or ('dram-datamovement-queue-2.num-requests' in results and sum(results['dram-datamovement-queue-2.num-requests']) > 0):
       # Partition queues was on
-      results['dram.remoteavghardwarelatency_cachelines'] = map(lambda (a,b): a/(b+c) if (b+c) else float('inf'), zip(results['dram.total-remote-dram-hardware-latency-cachelines'], results['dram.remote-accesses'], results['dram.redundant-moves-type2']))
+      results['dram.remoteavghardwarelatency_cachelines'] = map(lambda (a,b,c): a/(b+c) if (b+c) else float('inf'), zip(results['dram.total-remote-dram-hardware-latency-cachelines'], results['dram.remote-accesses'], results['dram.redundant-moves-type2']))
     else:
       results['dram.remoteavghardwarelatency_cachelines'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.total-remote-dram-hardware-latency-cachelines'], results['dram.remote-accesses']))
     results['dram.remote_datamovement_avglatency'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.total-remote-datamovement-latency'], results['dram.remote-accesses']))

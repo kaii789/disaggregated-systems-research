@@ -1131,6 +1131,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
                     // (and the cacheline request is not sent)
                     t_now += page_datamovement_queue_delay;  // if nonzero, compression latency was earlier added to t_now already
                     m_total_remote_datamovement_latency += page_datamovement_queue_delay;
+                    m_total_remote_dram_hardware_latency_cachelines -= cacheline_hw_access_latency;  // remove previously added latency
                     t_now -= cacheline_hw_access_latency;  // remove previously added latency
                     t_now += page_hw_access_latency;
                     if (m_r_mode != 4 && !m_r_enable_selective_moves) {
@@ -1163,6 +1164,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
                 // Default is requesting the whole page at once (instead of also requesting cacheline), so replace time of cacheline request with the time of the page request
                 t_now += page_datamovement_queue_delay;
                 m_total_remote_datamovement_latency += page_datamovement_queue_delay;
+                m_total_remote_dram_hardware_latency_cachelines -= cacheline_hw_access_latency;  // remove previously added latency
                 t_now -= cacheline_hw_access_latency;  // remove previously added latency
                 t_now += page_hw_access_latency;
                 if (m_r_mode != 4 && !m_r_enable_selective_moves) {
@@ -1175,6 +1177,13 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         } else if (!m_r_simulate_datamov_overhead) {
             // Include the hardware access cost of the page
             page_datamovement_queue_delay = getDramAccessCost(t_remote_queue_request, m_page_size, requester, address, perf, true);
+            t_now += page_datamovement_queue_delay;
+            m_total_remote_datamovement_latency += page_datamovement_queue_delay;
+            m_total_remote_dram_hardware_latency_cachelines -= cacheline_hw_access_latency;  // remove previously added latency
+            if (m_r_mode != 4 && !m_r_enable_selective_moves) {
+                t_now -= datamovement_queue_delay;  // only subtract if it was added earlier
+                m_total_remote_datamovement_latency -= datamovement_queue_delay;
+            }
         } else {
             page_datamovement_queue_delay = SubsecondTime::Zero();
         }
@@ -1572,7 +1581,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                     // Can't make additional cacheline request
                     ++m_redundant_moves_type2_cancelled_datamovement_queue_full;
                 } else if (m_inflight_redundant[phys_page] < m_r_limit_redundant_moves) {
-                    SubsecondTime add_cacheline_hw_access_latency = getDramAccessCost(t_now, pkt_size, requester, address, perf, false);
+                    SubsecondTime add_cacheline_hw_access_latency = getDramAccessCost(t_now, pkt_size, requester, address, perf, true);
     
                     UInt32 size = pkt_size;
                     SubsecondTime cacheline_compression_latency = SubsecondTime::Zero();  // when cacheline compression is not enabled, this is always 0
