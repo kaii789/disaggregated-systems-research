@@ -1182,7 +1182,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         }
 
 
-        assert(std::find(m_local_pages.begin(), m_local_pages.end(), phys_page) == m_local_pages.end()); 
+        // assert(std::find(m_local_pages.begin(), m_local_pages.end(), phys_page) == m_local_pages.end()); 
         // assert(std::find(m_remote_pages.begin(), m_remote_pages.end(), phys_page) != m_remote_pages.end());
         assert(m_remote_pages.count(phys_page));
         m_local_pages.push_back(phys_page);
@@ -1738,7 +1738,8 @@ DramPerfModelDisagg::isRemoteAccess(IntPtr address, core_id_t requester, DramCnt
         phys_page =  address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1);
 
     if (m_r_mode == 0 || m_r_mode == 4) { // Static partitioning: no data movement and m_r_partitioning_ratio decides how many go where
-        if (std::find(m_local_pages.begin(), m_local_pages.end(), phys_page) != m_local_pages.end())
+        // if (std::find(m_local_pages.begin(), m_local_pages.end(), phys_page) != m_local_pages.end())
+        if (m_local_pages.find(phys_page))
             return false;
         // else if (std::find(m_remote_pages.begin(), m_remote_pages.end(), phys_page) != m_remote_pages.end())
         else if (m_remote_pages.count(phys_page))
@@ -1753,7 +1754,8 @@ DramPerfModelDisagg::isRemoteAccess(IntPtr address, core_id_t requester, DramCnt
         }
     }
     else if (m_r_mode == 1 || m_r_mode == 2 || m_r_mode == 3 || m_r_mode == 5) {  // local DRAM as a cache 
-        if (std::find(m_local_pages.begin(), m_local_pages.end(), phys_page) != m_local_pages.end()) { // Is it in local DRAM?
+        // if (std::find(m_local_pages.begin(), m_local_pages.end(), phys_page) != m_local_pages.end()) { // Is it in local DRAM?
+        if (m_local_pages.find(phys_page)) { // Is it in local DRAM?
             m_local_pages.remove(phys_page); // LRU
             m_local_pages.push_back(phys_page);
             // if (access_type == DramCntlrInterface::WRITE) {
@@ -2021,7 +2023,8 @@ DramPerfModelDisagg::possiblyPrefetch(UInt64 phys_page, SubsecondTime t_now, cor
             continue;  // could return here, but continue the loop to update stats for when prefetching was not done
         }
         UInt64 pref_page = *it;
-        if (std::find(m_local_pages.begin(), m_local_pages.end(), pref_page) != m_local_pages.end()) {
+        // if (std::find(m_local_pages.begin(), m_local_pages.end(), pref_page) != m_local_pages.end()) {
+        if (m_local_pages.find(pref_page)) {
             ++m_prefetch_page_not_done_page_local_already;  // page already in m_local_pages
             continue;
         }
@@ -2088,7 +2091,7 @@ DramPerfModelDisagg::possiblyPrefetch(UInt64 phys_page, SubsecondTime t_now, cor
             m_total_decompression_latency += decompression_latency;
         }
 
-        assert(std::find(m_local_pages.begin(), m_local_pages.end(), pref_page) == m_local_pages.end()); 
+        // assert(std::find(m_local_pages.begin(), m_local_pages.end(), pref_page) == m_local_pages.end()); 
         // assert(std::find(m_remote_pages.begin(), m_remote_pages.end(), pref_page) != m_remote_pages.end()); 
         assert(m_remote_pages.count(pref_page)); 
         m_local_pages.push_back(pref_page);

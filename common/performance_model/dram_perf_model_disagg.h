@@ -8,6 +8,7 @@
 #include "fixed_types.h"
 #include "subsecond_time.h"
 #include "dram_cntlr_interface.h"
+#include "hashed_linked_list.h"
 
 #include <vector>
 #include <bitset>
@@ -117,7 +118,7 @@ class DramPerfModelDisagg : public DramPerfModel
 
         std::vector<BankInfo> m_r_banks;
 
-        std::list<UInt64> m_local_pages; // Pages of local memory
+        HashedLinkedList m_local_pages; // Pages of local memory
         // std::map<UInt64, char> m_local_pages_remote_origin;  // Pages of local memory that were originally in remote
         // std::list<UInt64> m_remote_pages; // Pages of remote memory
         std::unordered_set<UInt64> m_remote_pages; // Pages of remote memory
