@@ -1758,10 +1758,9 @@ DramPerfModelDisagg::isRemoteAccess(IntPtr address, core_id_t requester, DramCnt
         if (m_local_pages.find(phys_page)) { // Is it in local DRAM?
             m_local_pages.remove(phys_page); // LRU
             m_local_pages.push_back(phys_page);
-            // if (access_type == DramCntlrInterface::WRITE) {
-            //     m_dirty_pages.remove(phys_page);
-            //     m_dirty_pages.push_back(phys_page);
-            // }
+            if (access_type == DramCntlrInterface::WRITE) {
+                m_dirty_pages.insert(phys_page); // for unordered_set, the element is only inserted if it's not already in the container
+            }
             return false;
         }
         // else if (std::find(m_remote_pages.begin(), m_remote_pages.end(), phys_page) != m_remote_pages.end()) {
