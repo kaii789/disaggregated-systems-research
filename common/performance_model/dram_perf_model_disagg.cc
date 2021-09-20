@@ -1184,8 +1184,9 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
 
         // assert(std::find(m_local_pages.begin(), m_local_pages.end(), phys_page) == m_local_pages.end()); 
         // assert(std::find(m_remote_pages.begin(), m_remote_pages.end(), phys_page) != m_remote_pages.end());
-        assert(!m_local_pages.find(phys_page));
-        assert(m_remote_pages.count(phys_page));
+        // Commenting these out since for this function to be called by isRemoteAccess() returning true, these statements are already true
+        // assert(!m_local_pages.find(phys_page));
+        // assert(m_remote_pages.count(phys_page));
         m_local_pages.push_back(phys_page);
         // m_local_pages_remote_origin[phys_page] = 1;
         if (m_r_exclusive_cache)
@@ -2093,8 +2094,9 @@ DramPerfModelDisagg::possiblyPrefetch(UInt64 phys_page, SubsecondTime t_now, cor
 
         // assert(std::find(m_local_pages.begin(), m_local_pages.end(), pref_page) == m_local_pages.end()); 
         // assert(std::find(m_remote_pages.begin(), m_remote_pages.end(), pref_page) != m_remote_pages.end()); 
-        assert(!m_local_pages.find(pref_page)); 
-        assert(m_remote_pages.count(pref_page)); 
+        // Commenting out since earlier in this loop, these checks were already made
+        // assert(!m_local_pages.find(pref_page)); 
+        // assert(m_remote_pages.count(pref_page)); 
         m_local_pages.push_back(pref_page);
         // m_local_pages_remote_origin[pref_page] = 1;
         if (m_r_exclusive_cache)
