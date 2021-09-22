@@ -13,6 +13,7 @@
 #include <vector>
 #include <bitset>
 #include <map>
+#include <unordered_map>
 #include <list>
 // #include <set>
 #include <unordered_set>
@@ -95,6 +96,7 @@ class DramPerfModelDisagg : public DramPerfModel
         bool m_use_ideal_page_throttling;  // Whether to use ideal page throttling
         SubsecondTime m_r_ideal_pagethrottle_remote_access_history_window_size;  // Track remote page accesses using the most recent window size number of ns
         bool m_track_page_bw_utilization_stats;
+        bool m_speed_up_simulation;  // When this is true, some optional stats aren't calculated
 
         // Local Memory
         std::vector<QueueModel*> m_queue_model;
@@ -119,7 +121,7 @@ class DramPerfModelDisagg : public DramPerfModel
         std::vector<BankInfo> m_r_banks;
 
         HashedLinkedList m_local_pages; // Pages of local memory
-        // std::map<UInt64, char> m_local_pages_remote_origin;  // Pages of local memory that were originally in remote
+        std::unordered_map<UInt64, char> m_local_pages_remote_origin;  // Pages of local memory that were originally in remote; char type can be changed to int for tracking number of accesses
         // std::list<UInt64> m_remote_pages; // Pages of remote memory
         std::unordered_set<UInt64> m_remote_pages; // Pages of remote memory
         // std::list<UInt64> m_dirty_pages; // Dirty pages of local memory
@@ -139,7 +141,7 @@ class DramPerfModelDisagg : public DramPerfModel
 
         std::map<UInt64, std::pair<SubsecondTime, UInt32>> m_throttled_pages_tracker;  // keep track of pages that were throttled. The value is a (time, count) pair of the last time the page was throttled and the number of times the page was requested within the same 10^6 ns
         std::vector<std::pair<UInt64, UInt32>> m_throttled_pages_tracker_values;       // values to keep track of for stats
-        std::list<UInt64> m_moved_pages_no_access_yet;                                 // Pages moved from remote to local, but haven't been accessed yet
+        HashedLinkedList m_moved_pages_no_access_yet;                                  // Pages moved from remote to local, but haven't been accessed yet
 
         // TODO: Compression
         bool m_use_compression;
