@@ -64,3 +64,18 @@ def get_compression_stats(res_dir):
             cdl = total_cacheline_decompression_latency / data_moves
 
     return cr, cl, dl, ccr, ccl, cdl
+
+def get_average_bw(res_dir):
+    res = sniper_lib.get_results(resultsdir=res_dir)
+    results = res['results']
+
+    weighted_average = 0
+    results['dram.accesses'] = list(map(sum, zip(results['dram.reads'], results['dram.writes'])))
+    total_count = results['dram.accesses'][0]
+    for i in range(10):
+        decile_count = results["dram.bw-utilization-decile-{}".format(i)][0]
+        decile_ratio = ((float)(decile_count) / (float)(total_count))
+        weighted_average += decile_ratio * (float(i)/10)
+
+    print(weighted_average)
+    return weighted_average
