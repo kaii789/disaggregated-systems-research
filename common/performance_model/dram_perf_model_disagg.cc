@@ -672,14 +672,19 @@ DramPerfModelDisagg::parseDeviceAddress(IntPtr address, UInt32 &channel, UInt32 
 
 // DRAM hardware access cost
 SubsecondTime
-DramPerfModelDisagg::getDramAccessCost(SubsecondTime start_time, UInt64 size, core_id_t requester, IntPtr address, ShmemPerf *perf, bool is_remote)
+DramPerfModelDisagg::getDramAccessCost(SubsecondTime start_time, UInt64 size, core_id_t requester, IntPtr address, ShmemPerf *perf, bool is_remote, bool is_exclude_cacheline)
 {
     UInt64 phys_page = address & ~((UInt64(1) << floorLog2(m_page_size)) - 1);
     IntPtr cacheline_address = (size > m_cache_line_size) ? phys_page : address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1);
+    IntPtr actual_data_cacheline_address = address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1);
     SubsecondTime t_now = start_time;
+
 
     if (is_remote) {
         for (UInt32 i = 0; i < size / m_cache_line_size; i++) {
+            if (is_exclude_cacheline && cacheline_address == actual_data_cacheline_address)
+                continue;
+
             // Calculate address mapping inside the DIMM
             UInt32 channel, rank, bank_group, bank, column;
             UInt64 dram_page;
@@ -777,6 +782,9 @@ DramPerfModelDisagg::getDramAccessCost(SubsecondTime start_time, UInt64 size, co
         }
     } else {
         for (UInt32 i = 0; i < size / m_cache_line_size; i++) {
+            if (is_exclude_cacheline && cacheline_address == actual_data_cacheline_address)
+                continue;
+
             // Calculate address mapping inside the DIMM
             UInt32 channel, rank, bank_group, bank, column;
             UInt64 dram_page;
@@ -1085,7 +1093,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             //to wait: t_remote_queue_request + some amount of time
             //try again
 
-            page_hw_access_latency = getDramAccessCost(t_remote_queue_request, m_page_size, requester, address, perf, true);
+            page_hw_access_latency = getDramAccessCost(t_remote_queue_request, m_page_size, requester, address, perf, true, false);
             m_total_remote_dram_hardware_latency_pages += page_hw_access_latency;
 
             // Compress
@@ -1183,7 +1191,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             }
         } else if (!m_r_simulate_datamov_overhead) {
             // Include the hardware access cost of the page
-            page_datamovement_queue_delay = getDramAccessCost(t_remote_queue_request, m_page_size, requester, address, perf, true);
+            page_datamovement_queue_delay = getDramAccessCost(t_remote_queue_request, m_page_size, requester, address, perf, true, false);
             t_now += page_datamovement_queue_delay;
             m_total_remote_datamovement_latency += page_datamovement_queue_delay;
             m_total_remote_dram_hardware_latency_cachelines -= cacheline_hw_access_latency;  // remove previously added latency
@@ -1232,7 +1240,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     if (!move_page || !m_r_simulate_datamov_overhead || m_r_cacheline_gran) {  // move_page == false, or earlier condition (m_r_simulate_datamov_overhead && !m_r_cacheline_gran) is false
         // Actually put the cacheline request on the queue, since after now we're sure we actually use the cacheline request
         // This actual cacheline request probably has a similar delay value as the earlier computeQueueDelayNoEffect value, no need to update t_now
-        cacheline_hw_access_latency = getDramAccessCost(pkt_time, pkt_size, requester, address, perf, true);  // A change for 64 byte page granularity
+        cacheline_hw_access_latency = getDramAccessCost(pkt_time, pkt_size, requester, address, perf, true, false);  // A change for 64 byte page granularity
         t_remote_queue_request = pkt_time + cacheline_hw_access_latency;
         m_total_remote_dram_hardware_latency_cachelines += cacheline_hw_access_latency;
         t_now += cacheline_hw_access_latency;
@@ -1571,7 +1579,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
     // t_now += ddr_processing_time;
     // perf->updateTime(t_now, ShmemPerf::DRAM_BUS);
    
-    SubsecondTime cacheline_hw_access_latency = getDramAccessCost(pkt_time, pkt_size, requester, address, perf, false);
+    SubsecondTime cacheline_hw_access_latency = getDramAccessCost(pkt_time, pkt_size, requester, address, perf, false, false);
     m_total_local_dram_hardware_latency += cacheline_hw_access_latency;
     SubsecondTime t_now = pkt_time + cacheline_hw_access_latency;
 
@@ -1607,7 +1615,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                     // Can't make additional cacheline request
                     ++m_redundant_moves_type2_cancelled_datamovement_queue_full;
                 } else if (m_inflight_redundant[phys_page] < m_r_limit_redundant_moves) {
-                    SubsecondTime add_cacheline_hw_access_latency = getDramAccessCost(t_now, pkt_size, requester, address, perf, true);
+                    SubsecondTime add_cacheline_hw_access_latency = getDramAccessCost(t_now, pkt_size, requester, address, perf, true, false);
     
                     UInt32 size = pkt_size;
                     SubsecondTime cacheline_compression_latency = SubsecondTime::Zero();  // when cacheline compression is not enabled, this is always 0
