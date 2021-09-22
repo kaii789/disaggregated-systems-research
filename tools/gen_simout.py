@@ -151,9 +151,9 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     results['dram.remoteavghardwarelatency_pages'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.total-remote-dram-hardware-latency-pages'], results['dram.page-moves']))  # Prefetched pages not currently accounted for in sniper stats
     if ('dram-datamovement-queue.num-cacheline-requests' in results and sum(results['dram-datamovement-queue.num-cacheline-requests']) > 0) or ('dram-datamovement-queue-2.num-requests' in results and sum(results['dram-datamovement-queue-2.num-requests']) > 0):
       # Partition queues was on
-      results['dram.remoteavghardwarelatency_cachelines'] = map(lambda (a,b,c): a/(b+c) if (b+c) else float('inf'), zip(results['dram.total-remote-dram-hardware-latency-cachelines'], results['dram.remote-accesses'], results['dram.redundant-moves-type2']))
+      results['dram.remoteavghardwarelatency_cachelines'] = map(lambda (a,b,c,d): (a-d)/(b+c) if (b+c) else float('inf'), zip(results['dram.total-remote-dram-hardware-latency-cachelines'], results['dram.remote-accesses'], results['dram.redundant-moves-type2'], results['dram.page-moves']))
     else:
-      results['dram.remoteavghardwarelatency_cachelines'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.total-remote-dram-hardware-latency-cachelines'], results['dram.remote-accesses']))
+      results['dram.remoteavghardwarelatency_cachelines'] = map(lambda (a,b,d): (a-d)/b if b else float('inf'), zip(results['dram.total-remote-dram-hardware-latency-cachelines'], results['dram.remote-accesses'], results['dram.page-moves']))
     results['dram.remote_datamovement_avglatency'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.total-remote-datamovement-latency'], results['dram.remote-accesses']))
   if 'dram.page-movement-num-global-time-much-larger' in results and sum(results['dram.page-movement-num-global-time-much-larger']) > 0:
     results['dram.pagemovement_avg_globaltime_much_larger'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.page-movement-global-time-much-larger-total-time'], results['dram.page-movement-num-global-time-much-larger']))
