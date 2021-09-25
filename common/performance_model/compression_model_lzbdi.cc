@@ -30,7 +30,7 @@ CompressionModelLZBDI::CompressionModelLZBDI(String name, UInt32 id, UInt32 page
     m_compressed_cache_line_sizes = new UInt32[m_cacheline_count];
 
     // Register stats for compression_options
-    registerStatsMetric("compression", id, "num_overflowed_pages", &m_num_overflowed_pages);
+    // registerStatsMetric("compression", id, "num_overflowed_pages", &m_num_overflowed_pages);
     m_num_overflowed_pages = 0;
     registerStatsMetric("compression", id, "bdi_total_compressed", &(m_total_compressed));
     for (UInt32 i = 0; i < 16; i++) {
