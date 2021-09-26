@@ -75,7 +75,7 @@ def get_average_bw(res_dir):
     for i in range(10):
         decile_count = results["dram.bw-utilization-decile-{}".format(i)][0]
         decile_ratio = ((float)(decile_count) / (float)(total_count))
-        weighted_average += decile_ratio * (float(i)/10)
+        weighted_average += decile_ratio * (float(i + (i + 1))/2/10)  # use the midpoint of the decile "bucket"
 
     print(weighted_average)
     return weighted_average
