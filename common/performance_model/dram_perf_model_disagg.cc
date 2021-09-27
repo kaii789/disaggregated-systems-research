@@ -270,8 +270,8 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     registerStatsMetric("dram", core_id, "total-remote-dram-hardware-latency-cachelines", &m_total_remote_dram_hardware_latency_cachelines);
     registerStatsMetric("dram", core_id, "total-remote-dram-hardware-latency-pages", &m_total_remote_dram_hardware_latency_pages);
     registerStatsMetric("dram", core_id, "total-remote-datamovement-latency", &m_total_remote_datamovement_latency);
-    registerStatsMetric("dram", core_id, "local-reads-remote-origin", &m_local_reads_remote_origin);
-    registerStatsMetric("dram", core_id, "local-writes-remote-origin", &m_local_writes_remote_origin);
+    // registerStatsMetric("dram", core_id, "local-reads-remote-origin", &m_local_reads_remote_origin);
+    // registerStatsMetric("dram", core_id, "local-writes-remote-origin", &m_local_writes_remote_origin);
     registerStatsMetric("dram", core_id, "remote-reads", &m_remote_reads);
     registerStatsMetric("dram", core_id, "remote-writes", &m_remote_writes);
     registerStatsMetric("dram", core_id, "page-moves", &m_page_moves);
@@ -1216,8 +1216,8 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         m_local_pages.push_back(phys_page);
         if (m_r_exclusive_cache)
             m_remote_pages.erase(phys_page);
-        if (!m_speed_up_simulation)
-            m_local_pages_remote_origin[phys_page] = 1;
+        // if (!m_speed_up_simulation)
+        //     m_local_pages_remote_origin[phys_page] = 1;
         if (m_use_ideal_page_throttling || !m_speed_up_simulation)
             m_moved_pages_no_access_yet.push_back(phys_page);
 
@@ -1473,17 +1473,17 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
         //	printf("Remote access: %d\n",m_remote_reads); 
         return (getAccessLatencyRemote(pkt_time, pkt_size, requester, address, access_type, perf)); 
     }
-    if (!m_speed_up_simulation) {
-        // m_local_reads_remote_origin
-        if (m_local_pages_remote_origin.count(phys_page)) {
-            m_local_pages_remote_origin[phys_page] += 1;
-            if (access_type == DramCntlrInterface::READ) {
-                ++m_local_reads_remote_origin;
-            } else {  // access_type == DramCntlrInterface::WRITE
-                ++m_local_writes_remote_origin;
-            }
-        }
-    }
+    // if (!m_speed_up_simulation) {
+    //     // m_local_reads_remote_origin
+    //     if (m_local_pages_remote_origin.count(phys_page)) {
+    //         m_local_pages_remote_origin[phys_page] += 1;
+    //         if (access_type == DramCntlrInterface::READ) {
+    //             ++m_local_reads_remote_origin;
+    //         } else {  // access_type == DramCntlrInterface::WRITE
+    //             ++m_local_writes_remote_origin;
+    //         }
+    //     }
+    // }
     if (m_use_ideal_page_throttling || !m_speed_up_simulation)
         m_moved_pages_no_access_yet.remove(phys_page);  // there has been a local access to phys_page
 
@@ -1818,15 +1818,15 @@ DramPerfModelDisagg::isRemoteAccess(IntPtr address, core_id_t requester, DramCnt
                     // Do swap: mimic procedure for evicting other_page and replacing it with phys_page
                     // other_page hasn't been accessed yet so no need to check if it's dirty
                     m_local_pages.remove(other_page);
-                    if (!m_speed_up_simulation)
-                        m_local_pages_remote_origin.erase(other_page);
+                    // if (!m_speed_up_simulation)
+                    //     m_local_pages_remote_origin.erase(other_page);
                     if (std::find(m_remote_pages.begin(), m_remote_pages.end(), other_page) == m_remote_pages.end()) {
                         m_remote_pages.insert(other_page);  // other_page is not in remote_pages, add it back
                     }
 
                     m_local_pages.push_back(phys_page);
-                    if (!m_speed_up_simulation)
-                        m_local_pages_remote_origin[phys_page] = 1;
+                    // if (!m_speed_up_simulation)
+                    //     m_local_pages_remote_origin[phys_page] = 1;
                     if (m_r_exclusive_cache) {
                         m_remote_pages.erase(phys_page);
                     }
@@ -1908,8 +1908,8 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
             // If a non-dirty page is found, just remove this page to make space
             if (found) {
                 m_local_pages.remove(evicted_page);
-                if (!m_speed_up_simulation)
-                    m_local_pages_remote_origin.erase(evicted_page);
+                // if (!m_speed_up_simulation)
+                //     m_local_pages_remote_origin.erase(evicted_page);
             }
         }
 
@@ -1917,8 +1917,8 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
         if (!found) {
             evicted_page = m_local_pages.front(); // Evict the least recently used page
             m_local_pages.pop_front();
-            if (!m_speed_up_simulation)
-                m_local_pages_remote_origin.erase(evicted_page);
+            // if (!m_speed_up_simulation)
+            //     m_local_pages_remote_origin.erase(evicted_page);
         }
         ++m_local_evictions; 
 
@@ -2146,8 +2146,8 @@ DramPerfModelDisagg::possiblyPrefetch(UInt64 phys_page, SubsecondTime t_now, cor
         m_local_pages.push_back(pref_page);
         if (m_r_exclusive_cache)
             m_remote_pages.erase(pref_page);
-        if (!m_speed_up_simulation)
-            m_local_pages_remote_origin[pref_page] = 1;
+        // if (!m_speed_up_simulation)
+        //     m_local_pages_remote_origin[pref_page] = 1;
         // m_inflight_pages.erase(pref_page);
         m_inflight_pages[pref_page] = t_remote_queue_request + page_compression_latency + page_datamovement_queue_delay;  // use max of this time with Sim()->getClockSkewMinimizationServer()->getGlobalTime() here as well?
         possiblyEvict(phys_page, t_remote_queue_request, requester);
