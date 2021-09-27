@@ -17,7 +17,7 @@ HashedLinkedList::push_back(UInt64 val)
 void
 HashedLinkedList::remove(UInt64 val)
 {
-    if (m_size > 0) {
+    if (m_size > 0 && map.find(val) != map.end()) {
         list.erase(map.at(val));
         map.erase(val);
         m_size -= 1;
