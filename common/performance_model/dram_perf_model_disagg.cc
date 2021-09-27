@@ -892,10 +892,14 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     // pkt_size is in 'Bytes'
     // m_dram_bandwidth is in 'Bits per clock cycle'
 
-    // Change for 64 byte page granularity: Don't get cacheline when moving 64 byte "page"
-    // SubsecondTime cacheline_hw_access_latency = getDramAccessCost(pkt_time, pkt_size, requester, address, perf, true);
+    // When partition queues is off: don't get cacheline when moving the page
     SubsecondTime cacheline_hw_access_latency = SubsecondTime::Zero();
-    // m_total_remote_dram_hardware_latency_cachelines += cacheline_hw_access_latency;
+    if (m_r_partition_queues) {
+        // When partition queues is off, access the requested cacheline first
+        cacheline_hw_access_latency = getDramAccessCost(pkt_time, pkt_size, requester, address, perf, true, false);
+        m_total_remote_dram_hardware_latency_cachelines += cacheline_hw_access_latency;
+    }
+
     SubsecondTime t_now = pkt_time + cacheline_hw_access_latency;
 
     SubsecondTime t_remote_queue_request = t_now;  // time of making queue request (after DRAM hardware access cost added)
@@ -1240,10 +1244,13 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     if (!move_page || !m_r_simulate_datamov_overhead || m_r_cacheline_gran) {  // move_page == false, or earlier condition (m_r_simulate_datamov_overhead && !m_r_cacheline_gran) is false
         // Actually put the cacheline request on the queue, since after now we're sure we actually use the cacheline request
         // This actual cacheline request probably has a similar delay value as the earlier computeQueueDelayNoEffect value, no need to update t_now
-        cacheline_hw_access_latency = getDramAccessCost(pkt_time, pkt_size, requester, address, perf, true, false);  // A change for 64 byte page granularity
-        t_remote_queue_request = pkt_time + cacheline_hw_access_latency;
-        m_total_remote_dram_hardware_latency_cachelines += cacheline_hw_access_latency;
-        t_now += cacheline_hw_access_latency;
+        if (!m_r_partition_queues) {
+            // When partition queues is off, only calculate cacheline access cost when moving the cacheline instead of the page
+            cacheline_hw_access_latency = getDramAccessCost(pkt_time, pkt_size, requester, address, perf, true, false);  // A change for 64 byte page granularity
+            t_remote_queue_request = pkt_time + cacheline_hw_access_latency;
+            m_total_remote_dram_hardware_latency_cachelines += cacheline_hw_access_latency;
+            t_now += cacheline_hw_access_latency;
+        }
 
         if (m_r_partition_queues == 1) {
             cacheline_delay = m_data_movement_2->computeQueueDelayTrackBytes(t_remote_queue_request + cacheline_compression_latency, m_r_part2_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, requester);
