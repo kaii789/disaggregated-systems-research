@@ -1097,11 +1097,18 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             //to wait: t_remote_queue_request + some amount of time
             //try again
 
-            page_hw_access_latency = getDramAccessCost(t_remote_queue_request, m_page_size, requester, address, perf, true, false);
+            UInt32 page_size = m_page_size;
+
+            if (m_r_partition_queues) {
+                // Set exclude_cacheline to true (in this case, should still pass in the original page size for the size parameter)
+                page_hw_access_latency = getDramAccessCost(t_remote_queue_request, m_page_size, requester, address, perf, true, true);
+                page_size = m_page_size - m_cache_line_size;
+            } else {
+                page_hw_access_latency = getDramAccessCost(t_remote_queue_request, m_page_size, requester, address, perf, true, false);
+            }
             m_total_remote_dram_hardware_latency_pages += page_hw_access_latency;
 
             // Compress
-            UInt32 page_size = m_page_size;
             if (m_use_compression)
             {
                 m_compression_model->update_bandwidth_utilization(m_data_movement->getPageQueueUtilizationPercentage(t_now));
