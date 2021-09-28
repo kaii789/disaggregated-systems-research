@@ -244,9 +244,9 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
       total_cacheline_decompression_latency = results['compression.total-cacheline-decompression-latency'][0]
 
       gran_size = 64
-      results['compression.avg-cacheline-compression-ratio'] = [float((data_moves * gran_size)) / float(((data_moves * gran_size) - cacheline_bytes_saved))]
-      results['compression.avg-cacheline-compression-latency'] = [total_cacheline_compression_latency / data_moves]
-      results['compression.avg-cacheline-decompression-latency'] = [total_cacheline_decompression_latency / data_moves]
+      results['compression.avg-cacheline-compression-ratio'] = [float((data_moves * gran_size)) / float(((data_moves * gran_size) - cacheline_bytes_saved))] + [0]*(ncores - 1)
+      results['compression.avg-cacheline-compression-latency'] = [total_cacheline_compression_latency / data_moves] + [0]*(ncores - 1)
+      results['compression.avg-cacheline-decompression-latency'] = [total_cacheline_decompression_latency / data_moves] + [0]*(ncores - 1)
 
     if 'compression.adaptive-low-compression-count' in results:
       low_bytes_saved = results['compression.adaptive-low-bytes-saved'][0]
@@ -347,7 +347,7 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     for i in range(end_decile + 1):  # the last number is end_decile
       decile_count = results["dram.bw-utilization-decile-{}".format(i)][0]
       percentage = ((float)(decile_count) / (float)(total_count)) * 100
-      results["dram.bw-utilization-decile-percentage-{}".format(i)] = [percentage]
+      results["dram.bw-utilization-decile-percentage-{}".format(i)] = [percentage] + [0]*(ncores - 1)
       template.append(('  bw utilization % decile {}'.format(i), "dram.bw-utilization-decile-percentage-{}".format(i), str))
 
   # Compression
@@ -456,7 +456,7 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     for i in range(10):
       decile_count = results["compression.adaptive-bw-utilization-decile-{}".format(i)][0]
       percentage = ((float)(decile_count) / (float)(total_count)) * 100 if total_count != 0 else 0
-      results["compression.adaptive-bw-utilization-decile-percentage-{}".format(i)] = [percentage]
+      results["compression.adaptive-bw-utilization-decile-percentage-{}".format(i)] = [percentage] + [0]*(ncores - 1)
       template.append(('  adaptive bw utilization % decile {}'.format(i), "compression.adaptive-bw-utilization-decile-percentage-{}".format(i), str))
 
   # if 'dram.redundant-moves-temp1-time-savings' in results:
