@@ -27,6 +27,7 @@ no_remote_memory_list = [
             # automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
         ]
     ),
+    
 ]
 
 config_list = [
@@ -48,10 +49,12 @@ config_list = [
         [
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
-            automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "1"),
+            automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "4"),
             automation.ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
             automation.ConfigEntry("perf_model/dram", "remote_memory_mode", "1"),
             automation.ConfigEntry("perf_model/dram", "remote_init", "true"),
+            automation.ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.2"),
+            automation.ConfigEntry("perf_model/dram", "use_dynamic_cacheline_queue_fraction_adjustment", "false"),
         ]
     ),
     # 2 Compression On
@@ -78,10 +81,12 @@ config_list = [
             automation.ConfigEntry("perf_model/dram/compression_model/zlib", "compression_latency", "5"),
             automation.ConfigEntry("perf_model/dram/compression_model/zlib", "decompression_latency", "5"),
             automation.ConfigEntry("perf_model/dram/compression_model/adaptive/dynamic_bw_threshold", "high_compression_rate", "5"),
-            automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "1"),
+            automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "4"),
             automation.ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
             automation.ConfigEntry("perf_model/dram", "remote_memory_mode", "1"),
             automation.ConfigEntry("perf_model/dram", "remote_init", "true"),
+            automation.ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.2"),
+            automation.ConfigEntry("perf_model/dram", "use_dynamic_cacheline_queue_fraction_adjustment", "false"),
         ]
     ),
     # # 1) LZBDI
@@ -283,7 +288,7 @@ command_strs = {}
 
 ###  Darknet command strings  ###
 # Note: using os.system(), the 'cd' of working directory doesn't persist to the next call to os.system()
-darknet_base_str_options = "cd {1} && ../../run-sniper -d {{{{sniper_output_dir}}}} -c ../../disaggr_config/local_memory_cache.cfg -c {{{{sniper_output_dir}}}}/repeat_testing.cfg {{sniper_options}} -- {0}/darknet classifier predict {0}/cfg/imagenet1k.data {0}/cfg/{{0}}.cfg {0}/{{0}}.weights {0}/data/dog.jpg".format(
+darknet_base_str_options = "cd {1} && ../../run-sniper -d {{{{sniper_output_dir}}}} -c ../../disaggr_config/local_memory_cache.cfg -c {{{{sniper_output_dir}}}}/repeat_testing.cfg {{sniper_options}} -- {0}/darknet classifier predict {0}/cfg/imagenet1k.data {0}/cfg/{{0}}.cfg {0}/{{0}}.weights {0}/data/dog.jpg && cd {{{{sniper_output_dir}}}}".format(
     ".", darknet_home
 )
 command_strs["darknet_tiny"] = darknet_base_str_options.format(
@@ -323,9 +328,9 @@ ligra_input_to_file = {
 }
 
 # TODO:
-page_size_list = [4096]
+page_size_list = [4096] # 512, 1024, 2048, 64
 bw_scalefactor_list = [1.536, 4, 16]
-netlat_list = [120, 400, 1600]
+netlat_list = [120, 400, 1600] # 880, 1000
 
 def input_file_checker(experiments):
     # Temporary function
@@ -628,6 +633,11 @@ def run_stream(type):
 
 def run_nw(dimension):
     experiments = []
+    dimension_to_local_dram_size = {
+        "2048": [6],
+        "4096": [26],
+        "6144": [58],
+    }
 
     # Remote memory off case
     num_MB = 8
@@ -656,7 +666,9 @@ def run_nw(dimension):
         )
     )
 
-    for num_MB in [4]: # TODO: change me
+    # Everything else
+    roi_num_pages = 32888  # for 4096
+    for num_MB in dimension_to_local_dram_size[dimension]:
         for page_size in page_size_list:
             for bw_scalefactor in bw_scalefactor_list:
                 for net_lat in netlat_list:
@@ -776,10 +788,10 @@ experiments = []
 # experiments.extend(run_ligra_nonsym("Components", "regular_input"))
 
 timezone = pytz.timezone("Canada/Eastern")
-log_filename = "run-sniper-repeat2_1.log"
+log_filename = "run-sniper-repeat_1.log"
 num = 2
 while os.path.isfile(log_filename):
-    log_filename = "run-sniper-repeat2_{}.log".format(num)
+    log_filename = "run-sniper-repeat_{}.log".format(num)
     num += 1
 
 with open(log_filename, "w") as log_file:
@@ -794,7 +806,7 @@ with open(log_filename, "w") as log_file:
     # compiled_application_checker(experiments)
     input_file_checker(experiments)
     experiment_manager.start(
-        manager_sleep_interval_seconds=30,
+        manager_sleep_interval_seconds=60,
         timezone=timezone,
     )
 
