@@ -54,7 +54,7 @@ config_list = [
             automation.ConfigEntry("general", "total_cores", "4"),
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
-            automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "1"),
+            automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "4"),
             automation.ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
             automation.ConfigEntry("perf_model/dram", "remote_memory_mode", "1"),
             automation.ConfigEntry("perf_model/dram", "remote_init", "true"),
@@ -772,7 +772,7 @@ def run_spmv(matrix):
 # TODO: Experiment run
 experiments = []
 # Kailong
-# experiments.extend(run_ligra_nonsym("BFS"))
+experiments.extend(run_ligra_nonsym("BFS"))
 experiments.extend(run_ligra_nonsym("BC"))
 experiments.extend(run_ligra_nonsym("Components"))
 experiments.extend(run_ligra_sym("Triangle"))
