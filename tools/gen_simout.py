@@ -234,9 +234,9 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     total_decompression_latency = results['compression.total-decompression-latency'][0]
 
     gran_size = 64 if config['perf_model/dram/remote_use_cacheline_granularity'] == "true" else int(config['perf_model/dram/page_size'])
-    results['compression.avg-compression-ratio'] = [float((data_moves * gran_size)) / float(((data_moves * gran_size) - bytes_saved))]
-    results['compression.avg-compression-latency'] = [total_compression_latency / data_moves]
-    results['compression.avg-decompression-latency'] = [total_decompression_latency / data_moves]
+    results['compression.avg-compression-ratio'] = [float((data_moves * gran_size)) / float(((data_moves * gran_size) - bytes_saved))] + [0]*(ncores - 1)
+    results['compression.avg-compression-latency'] = [total_compression_latency / data_moves] + [0]*(ncores - 1)
+    results['compression.avg-decompression-latency'] = [total_decompression_latency / data_moves] + [0]*(ncores - 1)
 
     if cacheline_bytes_saved != 0:
       data_moves = results['dram.remote-reads'][0] + results['dram.remote-writes'][0]
@@ -254,21 +254,21 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
       low_total_decompression_latency = results['compression.adaptive-low-total-decompression-latency'][0]
       low_data_moves = results['compression.adaptive-low-compression-count'][0]
 
-      results['compression.adaptive-low-avg-compression-ratio'] = [float((low_data_moves * gran_size)) / float(((low_data_moves * gran_size) - low_bytes_saved))] if low_data_moves != 0 else [0]
-      results['compression.adaptive-low-avg-compression-latency'] = [low_total_compression_latency / low_data_moves] if low_data_moves > 0 else [0]
-      results['compression.adaptive-low-avg-decompression-latency'] = [low_total_decompression_latency / low_data_moves] if low_data_moves > 0 else [0]
+      results['compression.adaptive-low-avg-compression-ratio'] = [float((low_data_moves * gran_size)) / float(((low_data_moves * gran_size) - low_bytes_saved))] + [0]*(ncores - 1) if low_data_moves != 0 else [0] + [0]*(ncores - 1)
+      results['compression.adaptive-low-avg-compression-latency'] = [low_total_compression_latency / low_data_moves] + [0]*(ncores - 1) if low_data_moves > 0 else [0] + [0]*(ncores - 1)
+      results['compression.adaptive-low-avg-decompression-latency'] = [low_total_decompression_latency / low_data_moves] + [0]*(ncores - 1) if low_data_moves > 0 else [0] + [0]*(ncores - 1)
 
       high_bytes_saved = results['compression.adaptive-high-bytes-saved'][0]
       high_total_compression_latency = results['compression.adaptive-high-total-compression-latency'][0]
       high_total_decompression_latency = results['compression.adaptive-high-total-decompression-latency'][0]
       high_data_moves = results['compression.adaptive-high-compression-count'][0]
 
-      results['compression.adaptive-high-avg-compression-ratio'] = [float((high_data_moves * gran_size)) / float(((high_data_moves * gran_size) - high_bytes_saved))] if high_data_moves != 0 else [0]
-      results['compression.adaptive-high-avg-compression-latency'] = [high_total_compression_latency / high_data_moves] if high_data_moves > 0 else [0]
-      results['compression.adaptive-high-avg-decompression-latency'] = [high_total_decompression_latency / high_data_moves] if high_data_moves > 0 else [0]
+      results['compression.adaptive-high-avg-compression-ratio'] = [float((high_data_moves * gran_size)) / float(((high_data_moves * gran_size) - high_bytes_saved))] + [0]*(ncores - 1) if high_data_moves != 0 else [0] + [0]*(ncores - 1)
+      results['compression.adaptive-high-avg-compression-latency'] = [high_total_compression_latency / high_data_moves] + [0]*(ncores - 1) if high_data_moves > 0 else [0] + [0]*(ncores - 1)
+      results['compression.adaptive-high-avg-decompression-latency'] = [high_total_decompression_latency / high_data_moves] + [0]*(ncores - 1) if high_data_moves > 0 else [0] + [0]*(ncores - 1)
 
-      results['compression.adaptive-low-compression-percentage'] = [(float(low_data_moves) / float(low_data_moves + high_data_moves)) * 100]
-      results['compression.adaptive-high-compression-percentage'] = [(float(high_data_moves) / float(low_data_moves + high_data_moves)) * 100]
+      results['compression.adaptive-low-compression-percentage'] = [(float(low_data_moves) / float(low_data_moves + high_data_moves)) * 100] + [0]*(ncores - 1)
+      results['compression.adaptive-high-compression-percentage'] = [(float(high_data_moves) / float(low_data_moves + high_data_moves)) * 100] + [0]*(ncores - 1)
 
     # print("bytes_saved", bytes_saved)
     # print("data moves", data_moves)
@@ -391,7 +391,7 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     for i in range(0, 16): 
       bdi_option = float(results['compression.bdi_usage_option-{}'.format(i)][0]) / float(bdi_total_compressed) * 100
       bdi_option_format = "{:.2f}".format(bdi_option)
-      results['compression.bdi_usage_option-{}'.format(i)] = [bdi_option_format]
+      results['compression.bdi_usage_option-{}'.format(i)] = [bdi_option_format] + [0]*(ncores - 1)
       template.append(('  bdi_usage(%)_option-{}'.format(i), 'compression.bdi_usage_option-{}'.format(i), str))
     for i in range(0, 16): 
       template.append(('  bdi_bytes_saved_option-{}'.format(i), 'compression.bdi_bytes_saved_option-{}'.format(i), str))
@@ -404,7 +404,7 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     for i in range(0, 24): 
       fpcbdi_option = float(results['compression.fpcbdi_usage_option-{}'.format(i)][0]) / float(fpcbdi_total_compressed) * 100
       fpcbdi_option_format = "{:.2f}".format(fpcbdi_option)
-      results['compression.fpcbdi_usage_option-{}'.format(i)] = [fpcbdi_option_format]
+      results['compression.fpcbdi_usage_option-{}'.format(i)] = [fpcbdi_option_format] + [0]*(ncores - 1)
       template.append(('  fpcbdi_usage(%)_option-{}'.format(i), 'compression.fpcbdi_usage_option-{}'.format(i), str))
     for i in range(0, 24): 
       template.append(('  fpcbdi_bytes_saved_option-{}'.format(i), 'compression.fpcbdi_bytes_saved_option-{}'.format(i), str))
@@ -418,7 +418,7 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     for i in range(7): 
       fpc_pattern = float(results['compression.fpc_usage_pattern-{}'.format(i)][0]) / float(fpc_total_compressed) * 100
       fpc_pattern_format = "{:.2f}".format(fpc_pattern)
-      results['compression.fpc_usage_pattern-{}'.format(i)] = [fpc_pattern_format]
+      results['compression.fpc_usage_pattern-{}'.format(i)] = [fpc_pattern_format] + [0]*(ncores - 1)
       template.append(('  fpc_usage(%)_pattern-{}'.format(i), 'compression.fpc_usage_pattern-{}'.format(i), str))
     for i in range(7): 
       template.append(('  fpc_bytes_saved_pattern-{}'.format(i), 'compression.fpc_bytes_saved_pattern-{}'.format(i), str))
