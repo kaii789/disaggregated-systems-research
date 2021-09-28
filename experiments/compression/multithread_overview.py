@@ -58,6 +58,8 @@ config_list = [
             automation.ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
             automation.ConfigEntry("perf_model/dram", "remote_memory_mode", "1"),
             automation.ConfigEntry("perf_model/dram", "remote_init", "true"),
+            automation.ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.2"),
+            automation.ConfigEntry("perf_model/dram", "use_dynamic_cacheline_queue_fraction_adjustment", "false"),
         ]
     ),
     # # 2 Compression On
@@ -770,9 +772,10 @@ def run_spmv(matrix):
 # TODO: Experiment run
 experiments = []
 # Kailong
-experiments.extend(run_ligra_nonsym("BFS"))
-# experiments.extend(run_ligra_nonsym("BC"))
-# experiments.extend(run_ligra_sym("Triangle"))
+# experiments.extend(run_ligra_nonsym("BFS"))
+experiments.extend(run_ligra_nonsym("BC"))
+experiments.extend(run_ligra_nonsym("Components"))
+experiments.extend(run_ligra_sym("Triangle"))
 # experiments.extend(run_darknet("darknet19"))
 
 # Jonathan
