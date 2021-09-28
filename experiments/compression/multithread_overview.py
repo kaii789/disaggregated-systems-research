@@ -16,6 +16,7 @@ import run_sniper_repeat_base as automation
 no_remote_memory_list = [
     automation.ExperimentRunConfig(
         [
+            automation.ConfigEntry("general", "total_cores", "4"),
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
             automation.ConfigEntry("perf_model/dram", "enable_remote_mem", "false"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
@@ -33,6 +34,7 @@ config_list = [
     # 0) No Compression
     automation.ExperimentRunConfig(
         [
+            automation.ConfigEntry("general", "total_cores", "4"),
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
             automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
@@ -46,6 +48,7 @@ config_list = [
     # 1 PQ On
     automation.ExperimentRunConfig(
         [
+            automation.ConfigEntry("general", "total_cores", "4"),
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
             automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "1"),
@@ -57,6 +60,7 @@ config_list = [
     # 2 Compression On
     automation.ExperimentRunConfig(
         [
+            automation.ConfigEntry("general", "total_cores", "4"),
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
             automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "adaptive"),
@@ -72,6 +76,7 @@ config_list = [
     # 3 PQ On, Compression On
     automation.ExperimentRunConfig(
         [
+            automation.ConfigEntry("general", "total_cores", "4"),
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
             automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "adaptive"),
