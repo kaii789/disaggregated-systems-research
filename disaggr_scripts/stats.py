@@ -33,6 +33,25 @@ def get_ipc(res_directory):
     ]
     return results['performance_model.ipc'][0]
 
+def get_time(res_dir):
+    # Return execution time in milliseconds
+    res = sniper_lib.get_results(resultsdir=res_dir)
+    results = res['results']
+    config = res['config']
+
+    ncores = int(config['general/total_cores'])
+    if 'barrier.global_time_begin' in results:
+        time0_begin = results['barrier.global_time_begin']
+        time0_end = results['barrier.global_time_end']
+
+    if 'barrier.global_time' in results:
+        time0 = results['barrier.global_time'][0]
+    else:
+        time0 = time0_begin - time0_end
+
+    results['performance_model.elapsed_time_fixed'] = [time0 for c in range(ncores)]
+    return float(results['performance_model.elapsed_time_fixed'][0]) / (10 ** 12)
+
 def get_compression_stats(res_dir):
     res = sniper_lib.get_results(resultsdir=res_dir)
     results = res['results']
