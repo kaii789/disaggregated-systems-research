@@ -158,6 +158,8 @@ class DramPerfModelDisagg : public DramPerfModel
         SubsecondTime m_total_cacheline_compression_latency = SubsecondTime::Zero();
         SubsecondTime m_total_cacheline_decompression_latency = SubsecondTime::Zero();
 
+        bool m_use_r_compressed_pages;
+
         // Prefetcher
         bool m_r_enable_nl_prefetcher;            // Enable prefetcher to prefetch pages from remote DRAM to local DRAM
         PrefetcherModel *m_prefetcher_model;
