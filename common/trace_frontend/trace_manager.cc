@@ -343,7 +343,8 @@ void TraceManager::getApplicationData(int core_id, Core::lock_signal_t lock_sign
          return;
       }
    }
-   LOG_PRINT_ERROR("Unable to find core %d", core_id);
+   // LOG_PRINT_ERROR("Unable to find core %d", core_id);
+   LOG_PRINT("Unable to find core %d", core_id);
 }
 
 // This should only be called when already holding the thread lock to prevent migrations while we scan for a core id match
