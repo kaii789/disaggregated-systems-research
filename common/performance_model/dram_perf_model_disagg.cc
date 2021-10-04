@@ -1099,15 +1099,9 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             //try again
 
             UInt32 page_size = m_page_size;
-
             if (m_r_partition_queues) {
-                // Set exclude_cacheline to true (in this case, should still pass in the original page size for the size parameter)
-                page_hw_access_latency = getDramAccessCost(t_remote_queue_request, m_page_size, requester, address, perf, true, true);
                 page_size = m_page_size - m_cache_line_size;
-            } else {
-                page_hw_access_latency = getDramAccessCost(t_remote_queue_request, m_page_size, requester, address, perf, true, false);
             }
-            m_total_remote_dram_hardware_latency_pages += page_hw_access_latency;
 
             // Compress
             if (m_use_compression)
@@ -1135,6 +1129,19 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
                     t_now += page_compression_latency;
                 }
             }
+
+            // Round page size for dram up to the nearest multiple of m_cache_line_size
+            UInt32 page_size_for_dram = page_size;
+            UInt32 cacheline_remainder = page_size % m_cache_line_size;
+            if (cacheline_remainder > 0)
+                page_size_for_dram = page_size_for_dram + m_cache_line_size - cacheline_remainder;
+            if (m_r_partition_queues) {
+                // Set exclude_cacheline to true (in this case, should still pass in the original page size for the size parameter)
+                page_hw_access_latency = getDramAccessCost(t_remote_queue_request, page_size_for_dram, requester, address, perf, true, true);
+            } else {
+                page_hw_access_latency = getDramAccessCost(t_remote_queue_request, page_size_for_dram, requester, address, perf, true, false);
+            }
+            m_total_remote_dram_hardware_latency_pages += page_hw_access_latency;
 
             if (m_r_partition_queues == 1) {
                 page_datamovement_queue_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + page_hw_access_latency + page_compression_latency, m_r_part_bandwidth.getRoundedLatency(8*page_size), page_size, QueueModel::PAGE, requester);
@@ -1988,11 +1995,9 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
             // TODO: Currently model decompression by adding decompression latency to inflight page time
             if (m_use_compression)
             {
-                if (!m_use_r_compressed_pages) {
-                    SubsecondTime decompression_latency = m_compression_model->decompress(evicted_page, address_to_num_cache_lines[evicted_page], m_core_id);
-                    page_datamovement_queue_delay += decompression_latency;
-                    m_total_decompression_latency += decompression_latency;
-                }
+                SubsecondTime decompression_latency = m_compression_model->decompress(evicted_page, address_to_num_cache_lines[evicted_page], m_core_id);
+                page_datamovement_queue_delay += decompression_latency;
+                m_total_decompression_latency += decompression_latency;
             }
 
             // if (std::find(m_remote_pages.begin(), m_remote_pages.end(), evicted_page) == m_remote_pages.end()) {
@@ -2052,11 +2057,9 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
             // TODO: Currently model decompression by adding decompression latency to inflight page time
             if (m_use_compression)
             {
-                if (!m_use_r_compressed_pages) {
-                    SubsecondTime decompression_latency = m_compression_model->decompress(evicted_page, address_to_num_cache_lines[evicted_page], m_core_id);
-                    page_datamovement_queue_delay += decompression_latency;
-                    m_total_decompression_latency += decompression_latency;
-                }
+                SubsecondTime decompression_latency = m_compression_model->decompress(evicted_page, address_to_num_cache_lines[evicted_page], m_core_id);
+                page_datamovement_queue_delay += decompression_latency;
+                m_total_decompression_latency += decompression_latency;
             }
 
             m_inflightevicted_pages[evicted_page] = t_remote_queue_request + evict_compression_latency + page_datamovement_queue_delay;
