@@ -390,8 +390,8 @@ def run_ligra_nonsym(application_name):
         "KCore": [25],
         "MIS": [25],
         "Radii": [25],
-        "BellmanFord": [26],
-        "CF": [26],
+        "BellmanFord": [36],
+        "CF": [50],
     }
     # Remote memory off case
     num_MB = 8
