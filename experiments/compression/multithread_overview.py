@@ -277,10 +277,10 @@ sssp_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {s
 stream_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/stream/stream_sniper {{0}}".format(
     sniper_root=subfolder_sniper_root_relpath
 )
-spmv_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/spmv/bench_spdmv {sniper_root}/benchmarks/crono/inputs/{{0}} 1 1".format(
+spmv_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/spmv/bench_spdmv {sniper_root}/benchmarks/crono/inputs/{{0}} 1 4".format(
     sniper_root=subfolder_sniper_root_relpath
 )
-nw_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/rodinia/bin/needle {{0}} 1 1".format(
+nw_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/rodinia/bin/needle {{0}} 1 4".format(
     sniper_root=subfolder_sniper_root_relpath
 )
 hpcg_base_options = "cp {sniper_root}/benchmarks/hpcg/linux_serial/bin/hpcg.dat .;{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/hpcg/linux_serial/bin/xhpcg".format(
@@ -674,33 +674,38 @@ def run_nw(dimension):
         )
     )
 
-    for num_MB in [4]: # TODO: change me
-        for page_size in page_size_list:
-            for bw_scalefactor in bw_scalefactor_list:
-                for net_lat in netlat_list:
-                    localdram_size_str = "{}MB".format(num_MB)
-                    command_str = nw_base_options.format(
-                        dimension,
-                        sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
-                            page_size,
-                            int(num_MB * ONE_MB_TO_BYTES),
-                            int(net_lat),
-                            int(bw_scalefactor),
-                            int(1 * ONE_BILLION),
-                        ),
-                    )
-                    # 1 billion instructions cap
+    dimension_to_local_dram_size = {
+        "2048": [6],
+        "4096": [26],
+        "6144": [58],
+    }
+    num_MB = dimension_to_local_dram_size[dimension][0]
+    for page_size in page_size_list:
+        for bw_scalefactor in bw_scalefactor_list:
+            for net_lat in netlat_list:
+                localdram_size_str = "{}MB".format(num_MB)
+                command_str = nw_base_options.format(
+                    dimension,
+                    sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+                        page_size,
+                        int(num_MB * ONE_MB_TO_BYTES),
+                        int(net_lat),
+                        int(bw_scalefactor),
+                        int(1 * ONE_BILLION),
+                    ),
+                )
+                # 1 billion instructions cap
 
-                    experiments.append(
-                        automation.Experiment(
-                            experiment_name="nw_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_combo".format(
-                                localdram_size_str, net_lat, bw_scalefactor, page_size
-                            ),
-                            command_str=command_str,
-                            experiment_run_configs=config_list,
-                            output_root_directory=".",
-                        )
+                experiments.append(
+                    automation.Experiment(
+                        experiment_name="nw_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_combo".format(
+                            localdram_size_str, net_lat, bw_scalefactor, page_size
+                        ),
+                        command_str=command_str,
+                        experiment_run_configs=config_list,
+                        output_root_directory=".",
                     )
+                )
 
     return experiments
 
@@ -778,7 +783,7 @@ def run_spmv(matrix):
 
 # TODO: Experiment run
 experiments = []
-# Kailong
+
 # experiments.extend(run_ligra_nonsym("BFS"))
 # experiments.extend(run_ligra_nonsym("BC"))
 # experiments.extend(run_ligra_nonsym("Components"))
@@ -791,17 +796,13 @@ experiments = []
 
 # experiments.extend(run_ligra_nonsym("BellmanFord"))
 # experiments.extend(run_ligra_nonsym("CF"))
-
-# experiments.extend(run_darknet("darknet19"))
-
-# Jonathan
-# experiments.extend(run_darknet("vgg-16"))
-# experiments.extend(run_spmv("pkustk14.mtx"))
 # experiments.extend(run_nw("4096"))
+# experiments.extend(run_spmv("pkustk14.mtx"))
 
 # For later
+# experiments.extend(run_darknet("vgg-16"))
 # experiments.extend(run_darknet("resnet50"))
-# experiments.extend(run_ligra_nonsym("Components", "regular_input"))
+# experiments.extend(run_darknet("darknet19"))
 
 timezone = pytz.timezone("Canada/Eastern")
 log_filename = "run-sniper-repeat2_1.log"
