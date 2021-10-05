@@ -331,6 +331,7 @@ ligra_input_to_file = {
     # "reg_10x": "rMat_10000000",
     # "reg_8x": "rMat_8000000",
     "regular_input_sym": "rMat_1000000sym",
+    "regular_input_w": "rMat_1000000_w",
 }
 
 # TODO:
@@ -378,13 +379,19 @@ def input_file_checker(experiments):
 
 # Ligra
 def run_ligra_nonsym(application_name):
-    ligra_input_selection = "regular_input"
+    ligra_input_selection = "regular_input" if application_name not in ["BellmanFord", "CF"] else "regular_input_w"
     experiments = []
     ligra_input_file = ligra_input_to_file[ligra_input_selection]
     app_to_local_dram_size = {
         "BFS": [20],
         "BC": [29],
-        "Components": [26]
+        "Components": [26],
+        "PageRank": [25],
+        "KCore": [25],
+        "MIS": [25],
+        "Radii": [25],
+        "BellmanFord": [26],
+        "CF": [26],
     }
     # Remote memory off case
     num_MB = 8
@@ -776,6 +783,15 @@ experiments = []
 # experiments.extend(run_ligra_nonsym("BC"))
 # experiments.extend(run_ligra_nonsym("Components"))
 # experiments.extend(run_ligra_sym("Triangle"))
+
+# experiments.extend(run_ligra_nonsym("PageRank"))
+# experiments.extend(run_ligra_nonsym("KCore"))
+# experiments.extend(run_ligra_nonsym("MIS"))
+# experiments.extend(run_ligra_nonsym("Radii"))
+
+# experiments.extend(run_ligra_nonsym("BellmanFord"))
+# experiments.extend(run_ligra_nonsym("CF"))
+
 # experiments.extend(run_darknet("darknet19"))
 
 # Jonathan
