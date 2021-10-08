@@ -286,7 +286,7 @@ nw_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sni
 hpcg_base_options = "cp {sniper_root}/benchmarks/hpcg/linux_serial/bin/hpcg.dat .;{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/hpcg/linux_serial/bin/xhpcg".format(
     sniper_root=subfolder_sniper_root_relpath
 )
-sls_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/sls/bin/sls -f {sniper_root}/benchmarks/sls/sls_inputs/sls.in".format(
+sls_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/sls/bin/sls -f /home/shared/sls.in".format(
     sniper_root=subfolder_sniper_root_relpath
 )
 
@@ -779,6 +779,122 @@ def run_spmv(matrix):
                     )
     return experiments
 
+def run_sls():
+    experiments = []
+
+    # Remote memory off case
+    num_MB = 8
+    page_size = 4096
+    net_lat= 120
+    bw_scalefactor = 4
+    localdram_size_str = "{}MB".format(num_MB)
+    command_str = sls_base_options.format(
+        sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+            page_size,
+            int(num_MB * ONE_MB_TO_BYTES),
+            int(net_lat),
+            int(bw_scalefactor),
+            int(1 * ONE_BILLION),
+        ),
+    )
+    experiments.append(
+    automation.Experiment(
+        experiment_name="sls_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_noremotemem".format(
+            localdram_size_str, net_lat, bw_scalefactor, page_size
+        ),
+        command_str=command_str,
+        experiment_run_configs=no_remote_memory_list,
+        output_root_directory=".",
+        )
+    )
+
+    num_MB = 2000
+    for page_size in page_size_list:
+        for bw_scalefactor in bw_scalefactor_list:
+            for net_lat in netlat_list:
+                localdram_size_str = "{}MB".format(num_MB)
+                command_str = sls_base_options.format(
+                    sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+                        page_size,
+                        int(num_MB * ONE_MB_TO_BYTES),
+                        int(net_lat),
+                        int(bw_scalefactor),
+                        int(1 * ONE_BILLION),
+                    ),
+                )
+                # 1 billion instructions cap
+
+                experiments.append(
+                    automation.Experiment(
+                        experiment_name="sls_localdram_{}_netlat_{}_bw_scalefactor_{}_combo".format(
+                            localdram_size_str, net_lat, bw_scalefactor
+                        ),
+                        command_str=command_str,
+                        experiment_run_configs=config_list,
+                        output_root_directory=".",
+                    )
+                )
+
+    return experiments
+
+
+def run_hpcg():
+    experiments = []
+
+    # Remote memory off case
+    num_MB = 8
+    page_size = 4096
+    net_lat= 120
+    bw_scalefactor = 4
+    localdram_size_str = "{}MB".format(num_MB)
+    command_str = hpcg_base_options.format(
+        sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+            page_size,
+            int(num_MB * ONE_MB_TO_BYTES),
+            int(net_lat),
+            int(bw_scalefactor),
+            int(1 * ONE_BILLION),
+        ),
+    )
+    experiments.append(
+    automation.Experiment(
+        experiment_name="hpcg_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_noremotemem".format(
+            localdram_size_str, net_lat, bw_scalefactor, page_size
+        ),
+        command_str=command_str,
+        experiment_run_configs=no_remote_memory_list,
+        output_root_directory=".",
+        )
+    )
+
+    num_MB = 200
+    for page_size in page_size_list:
+        for bw_scalefactor in bw_scalefactor_list:
+            for net_lat in netlat_list:
+                localdram_size_str = "{}MB".format(num_MB)
+                command_str = hpcg_base_options.format(
+                    sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+                        page_size,
+                        int(num_MB * ONE_MB_TO_BYTES),
+                        int(net_lat),
+                        int(bw_scalefactor),
+                        int(1 * ONE_BILLION),
+                    ),
+                )
+                # 1 billion instructions cap
+
+                experiments.append(
+                    automation.Experiment(
+                        experiment_name="hpcg_localdram_{}_netlat_{}_bw_scalefactor_{}_combo".format(
+                            localdram_size_str, net_lat, bw_scalefactor
+                        ),
+                        command_str=command_str,
+                        experiment_run_configs=config_list,
+                        output_root_directory=".",
+                    )
+                )
+
+    return experiments
 
 
 # TODO: Experiment run
@@ -799,6 +915,9 @@ experiments = []
 # experiments.extend(run_nw("4096"))
 # experiments.extend(run_spmv("pkustk14.mtx"))
 
+# experiments.extend(run_sls())
+# experiments.extend(run_hpcg())
+
 # For later
 # experiments.extend(run_darknet("vgg-16"))
 # experiments.extend(run_darknet("resnet50"))
@@ -817,7 +936,7 @@ with open(log_filename, "w") as log_file:
     print(log_str, file=log_file)
 
     experiment_manager = automation.ExperimentManager(
-        output_root_directory=".", max_concurrent_processes=8, log_file=log_file
+        output_root_directory=".", max_concurrent_processes=2, log_file=log_file
     )
     experiment_manager.add_experiments(experiments)
     # compiled_application_checker(experiments)
@@ -865,64 +984,6 @@ with open(log_filename, "w") as log_file:
 #                         output_root_directory=".",
 #                     )
 #                 )
-
-#     return experiments
-
-# def run_hpcg():
-#     experiments = []
-#     net_lat = 120
-#     for num_MB in [32]:
-#         for bw_scalefactor in [4]:
-#             localdram_size_str = "{}MB".format(num_MB)
-#             command_str = hpcg_base_options.format(
-#                 sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
-#                     int(num_MB * ONE_MB_TO_BYTES),
-#                     int(net_lat),
-#                     int(bw_scalefactor),
-#                     int(1 * ONE_BILLION),
-#                 ),
-#             )
-#             # 1 billion instructions cap
-
-#             experiments.append(
-#                 automation.Experiment(
-#                     experiment_name="hpcg_localdram_{}_netlat_{}_bw_scalefactor_{}_combo".format(
-#                         localdram_size_str, net_lat, bw_scalefactor
-#                     ),
-#                     command_str=command_str,
-#                     experiment_run_configs=config_list,
-#                     output_root_directory=".",
-#                 )
-#             )
-
-#     return experiments
-
-# def run_sls():
-#     experiments = []
-#     net_lat = 120
-#     for num_MB in [16]:
-#         for bw_scalefactor in [4, 16]:
-#             localdram_size_str = "{}MB".format(num_MB)
-#             command_str = sls_base_options.format(
-#                 sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
-#                     int(num_MB * ONE_MB_TO_BYTES),
-#                     int(net_lat),
-#                     int(bw_scalefactor),
-#                     int(1 * ONE_BILLION),
-#                 ),
-#             )
-#             # 1 billion instructions cap
-
-#             experiments.append(
-#                 automation.Experiment(
-#                     experiment_name="sls_localdram_{}_netlat_{}_bw_scalefactor_{}_combo".format(
-#                         localdram_size_str, net_lat, bw_scalefactor
-#                     ),
-#                     command_str=command_str,
-#                     experiment_run_configs=config_list,
-#                     output_root_directory=".",
-#                 )
-#             )
 
 #     return experiments
 
