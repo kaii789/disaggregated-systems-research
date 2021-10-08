@@ -17,7 +17,7 @@ HOST_FLAGS := ${COMMON_FLAGS} -std=c11 -O3
 all: ${HOST_TARGET} 
 
 ${HOST_TARGET}: ${HOST_SOURCES} ${COMMON_INCLUDES} 
-	$(CC) -o $@ ${HOST_SOURCES} ${HOST_FLAGS}
+	$(CC) -fopenmp -o $@ ${HOST_SOURCES} ${HOST_FLAGS}
 
 clean:
 	$(RM) -r $(BUILDDIR)

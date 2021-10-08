@@ -259,8 +259,9 @@ static void print_SLSdata() {
  * @brief Compute the output to host CPU
  */
 static void SLS_host() {
-
+    // omp_set_num_threads(4);
     unsigned int b, t, r, p, f;
+    #pragma omp parallel for
     for (b = 0; b < nbatches; b++) {
         long long int table_offset = 0;
         for (t = 0; t < ntables; t++) {
