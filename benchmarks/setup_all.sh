@@ -74,3 +74,9 @@ echo "Compiling HPCG..."
 cd ../../hpcg/linux_serial
 ../configure Linux_Serial
 make
+cd ..
+mkdir linux_multi
+cd linux_multi
+../configure GCC_OMP
+export OMP_NUM_THREADS=4;
+make
