@@ -827,7 +827,7 @@ def run_sls():
                 experiments.append(
                     automation.Experiment(
                         experiment_name="sls_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_combo".format(
-                            localdram_size_str, net_lat, bw_scalefactor
+                            localdram_size_str, net_lat, bw_scalefactor, page_size
                         ),
                         command_str=command_str,
                         experiment_run_configs=config_list,
@@ -886,7 +886,7 @@ def run_hpcg():
                 experiments.append(
                     automation.Experiment(
                         experiment_name="hpcg_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_combo".format(
-                            localdram_size_str, net_lat, bw_scalefactor
+                            localdram_size_str, net_lat, bw_scalefactor, page_size
                         ),
                         command_str=command_str,
                         experiment_run_configs=config_list,
