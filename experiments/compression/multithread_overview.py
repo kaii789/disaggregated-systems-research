@@ -283,10 +283,10 @@ spmv_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {s
 nw_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/rodinia/bin/needle {{0}} 1 4".format(
     sniper_root=subfolder_sniper_root_relpath
 )
-hpcg_base_options = "cp {sniper_root}/benchmarks/hpcg/linux_serial/bin/hpcg.dat .;{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/hpcg/linux_serial/bin/xhpcg".format(
+hpcg_base_options = "export OMP_NUM_THREADS=4; cp {sniper_root}/benchmarks/hpcg/linux_multi/bin/hpcg.dat .;{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/hpcg/linux_multi/bin/xhpcg".format(
     sniper_root=subfolder_sniper_root_relpath
 )
-sls_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/sls/bin/sls -f /home/shared/sls.in".format(
+sls_base_options = "export OMP_NUM_THREADS=4; {sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/sls/bin/sls -f /home/shared/sls.in".format(
     sniper_root=subfolder_sniper_root_relpath
 )
 
@@ -319,10 +319,10 @@ command_strs["darknet_resnet50"] = darknet_base_str_options.format(
 # ligra_base_str_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c {{{{sniper_output_dir}}}}/repeat_testing.cfg {{sniper_options}} -- {0}/apps/{{0}} -s -rounds 1 {0}/inputs/{{1}}".format(
 #     ligra_home, sniper_root=subfolder_sniper_root_relpath
 # )
-ligra_base_str_options_sym = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c {{{{sniper_output_dir}}}}/repeat_testing.cfg {{sniper_options}} -- {0}/apps/{{0}} -s -rounds 1 {0}/inputs/{{1}}".format(
+ligra_base_str_options_sym = "export OMP_NUM_THREADS=4; {sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c {{{{sniper_output_dir}}}}/repeat_testing.cfg {{sniper_options}} -- {0}/apps/{{0}} -s -rounds 1 {0}/inputs/{{1}}".format(
         ligra_home, sniper_root=subfolder_sniper_root_relpath
     )
-ligra_base_str_options_nonsym = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c {{{{sniper_output_dir}}}}/repeat_testing.cfg {{sniper_options}} -- {0}/apps/{{0}} -rounds 1 {0}/inputs/{{1}}".format(
+ligra_base_str_options_nonsym = "export OMP_NUM_THREADS=4; {sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c {{{{sniper_output_dir}}}}/repeat_testing.cfg {{sniper_options}} -- {0}/apps/{{0}} -rounds 1 {0}/inputs/{{1}}".format(
     ligra_home, sniper_root=subfolder_sniper_root_relpath
 )
 ligra_input_to_file = {
@@ -936,7 +936,7 @@ with open(log_filename, "w") as log_file:
     print(log_str, file=log_file)
 
     experiment_manager = automation.ExperimentManager(
-        output_root_directory=".", max_concurrent_processes=2, log_file=log_file
+        output_root_directory=".", max_concurrent_processes=8, log_file=log_file
     )
     experiment_manager.add_experiments(experiments)
     # compiled_application_checker(experiments)
