@@ -187,9 +187,12 @@ ligra_input_to_file = {
 }
 
 # TODO:
-page_size_list = [4096, 512, 1024, 2048, 64]
+# page_size_list = [4096, 512, 1024, 2048, 64]
+# bw_scalefactor_list = [1.536, 4, 16]
+# netlat_list = [120, 400, 880, 1000, 1600]
+page_size_list = [4096, 64]
 bw_scalefactor_list = [1.536, 4, 16]
-netlat_list = [120, 400, 880, 1000, 1600]
+netlat_list = [400] # 120, 1600
 
 def input_file_checker(experiments):
     # Temporary function
@@ -461,31 +464,61 @@ def run_darknet(model_type):
 # Stream, 2 MB
 def run_stream(type):
     experiments = []
-    net_lat = 120
-    for num_MB in [2]:
-        for bw_scalefactor in [4]:
-            localdram_size_str = "{}MB".format(num_MB)
-            command_str = stream_base_options.format(
-                type,
-                sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
-                    int(num_MB * ONE_MB_TO_BYTES),
-                    int(net_lat),
-                    int(bw_scalefactor),
-                    int(1 * ONE_BILLION),
-                ),
-            )
-            # 1 billion instructions cap
 
-            experiments.append(
-                automation.Experiment(
-                    experiment_name="stream_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_combo".format(
-                        type, localdram_size_str, net_lat, bw_scalefactor
+    # Remote memory off case
+    num_MB = 8
+    page_size = 4096
+    net_lat= 120
+    bw_scalefactor = 4
+    localdram_size_str = "{}MB".format(num_MB)
+    command_str = stream_base_options.format(
+        type,
+        sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+            page_size,
+            int(num_MB * ONE_MB_TO_BYTES),
+            int(net_lat),
+            int(bw_scalefactor),
+            int(1 * ONE_BILLION),
+        ),
+    )
+    experiments.append(
+        automation.Experiment(
+            experiment_name="stream_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_noremotemem".format(
+                type, localdram_size_str, net_lat, bw_scalefactor, page_size
+            ),
+            command_str=command_str,
+            experiment_run_configs=no_remote_memory_list,
+            output_root_directory=".",
+        )
+    )
+
+    num_MB = 460
+    for page_size in page_size_list:
+        for bw_scalefactor in bw_scalefactor_list:
+            for net_lat in netlat_list:
+                localdram_size_str = "{}MB".format(num_MB)
+                command_str = stream_base_options.format(
+                    type,
+                    sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+                        page_size,
+                        int(num_MB * ONE_MB_TO_BYTES),
+                        int(net_lat),
+                        int(bw_scalefactor),
+                        int(1 * ONE_BILLION),
                     ),
-                    command_str=command_str,
-                    experiment_run_configs=config_list,
-                    output_root_directory=".",
                 )
-            )
+                # 1 billion instructions cap
+
+                experiments.append(
+                    automation.Experiment(
+                        experiment_name="stream_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_combo".format(
+                            type, localdram_size_str, net_lat, bw_scalefactor, page_size
+                        ),
+                        command_str=command_str,
+                        experiment_run_configs=config_list,
+                        output_root_directory=".",
+                    )
+                )
 
     return experiments
 
@@ -520,35 +553,41 @@ def run_nw(dimension):
         )
     )
 
-    for num_MB in [4]: # TODO: change me
-        for page_size in page_size_list:
-            for bw_scalefactor in bw_scalefactor_list:
-                for net_lat in netlat_list:
-                    localdram_size_str = "{}MB".format(num_MB)
-                    command_str = nw_base_options.format(
-                        dimension,
-                        sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
-                            page_size,
-                            int(num_MB * ONE_MB_TO_BYTES),
-                            int(net_lat),
-                            int(bw_scalefactor),
-                            int(1 * ONE_BILLION),
-                        ),
-                    )
-                    # 1 billion instructions cap
+    dimension_to_local_dram_size = {
+        "2048": [6],
+        "4096": [26],
+        "6144": [58],
+    }
+    num_MB = dimension_to_local_dram_size[dimension][0]
+    for page_size in page_size_list:
+        for bw_scalefactor in bw_scalefactor_list:
+            for net_lat in netlat_list:
+                localdram_size_str = "{}MB".format(num_MB)
+                command_str = nw_base_options.format(
+                    dimension,
+                    sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+                        page_size,
+                        int(num_MB * ONE_MB_TO_BYTES),
+                        int(net_lat),
+                        int(bw_scalefactor),
+                        int(1 * ONE_BILLION),
+                    ),
+                )
+                # 1 billion instructions cap
 
-                    experiments.append(
-                        automation.Experiment(
-                            experiment_name="nw_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_combo".format(
-                                localdram_size_str, net_lat, bw_scalefactor, page_size
-                            ),
-                            command_str=command_str,
-                            experiment_run_configs=config_list,
-                            output_root_directory=".",
-                        )
+                experiments.append(
+                    automation.Experiment(
+                        experiment_name="nw_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_combo".format(
+                            localdram_size_str, net_lat, bw_scalefactor, page_size
+                        ),
+                        command_str=command_str,
+                        experiment_run_configs=config_list,
+                        output_root_directory=".",
                     )
+                )
 
     return experiments
+
 
 def run_spmv(matrix):
     experiments = []
@@ -741,21 +780,20 @@ def run_hpcg():
 
 # TODO: Experiment run
 experiments = []
-# Kailong
+
+# experiments.extend(run_hpcg())
 # experiments.extend(run_ligra_nonsym("BFS"))
 # experiments.extend(run_ligra_nonsym("BC"))
+# experiments.extend(run_ligra_nonsym("Components"))
 # experiments.extend(run_ligra_sym("Triangle"))
-# experiments.extend(run_darknet("darknet19"))
-# experiments.extend(run_hpcg())
 
-# Jonathan
+# experiments.extend(run_darknet("darknet19"))
+# experiments.extend(run_darknet("resnet50"))
 # experiments.extend(run_darknet("vgg-16"))
 # experiments.extend(run_spmv("pkustk14.mtx"))
 # experiments.extend(run_nw("4096"))
 
-# For later
-# experiments.extend(run_darknet("resnet50"))
-# experiments.extend(run_ligra_nonsym("Components", "regular_input"))
+# experiments.extend(run_stream("1"))
 
 timezone = pytz.timezone("Canada/Eastern")
 log_filename = "run-sniper-repeat2_1.log"
@@ -770,7 +808,7 @@ with open(log_filename, "w") as log_file:
     print(log_str, file=log_file)
 
     experiment_manager = automation.ExperimentManager(
-        output_root_directory=".", max_concurrent_processes=16, log_file=log_file
+        output_root_directory=".", max_concurrent_processes=8, log_file=log_file
     )
     experiment_manager.add_experiments(experiments)
     # compiled_application_checker(experiments)
