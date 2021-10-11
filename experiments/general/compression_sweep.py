@@ -7,6 +7,7 @@ plt.use('Agg')
 import os
 import subprocess
 import threading
+import pytz
 
 import sys
 sys.path.insert(1, '../../disaggr_scripts')
@@ -794,7 +795,7 @@ with open(log_filename, "w") as log_file:
     print(log_str, file=log_file)
 
     experiment_manager = automation.ExperimentManager(
-        output_root_directory=".", max_concurrent_processes=8, log_file=log_file
+        output_root_directory=".", max_concurrent_processes=24, log_file=log_file
     )
     experiment_manager.add_experiments(experiments)
     # compiled_application_checker(experiments)
