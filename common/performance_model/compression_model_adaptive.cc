@@ -171,16 +171,14 @@ CompressionModelAdaptive::compress(IntPtr addr, size_t data_size, core_id_t core
 
     // Compress
     low_compression_latency = m_low_compression_model->compress(addr, data_size, core_id, &low_compressed_size, &low_compressed_cachelines);
-    if (m_compression_latency != 0)
-        m_low_total_compression_latency += low_compression_latency;
-
     high_compression_latency = m_high_compression_model->compress(addr, data_size, core_id, &high_compressed_size, &high_compressed_cachelines);
-    if (m_compression_latency != 0)
-        m_high_total_compression_latency += high_compression_latency;
 
     // assert(compressed_size <= m_page_size && "[Adaptive] Wrong compression!");
 
     if (use_low_compression) {
+        if (m_compression_latency != 0)
+            m_low_total_compression_latency += low_compression_latency;
+
         m_addr_to_scheme[addr] = m_low_compression_scheme;
         m_low_compression_count += 1;
         m_low_bytes_saved += data_size - low_compressed_size;
@@ -188,6 +186,9 @@ CompressionModelAdaptive::compress(IntPtr addr, size_t data_size, core_id_t core
         *compressed_cache_lines = low_compressed_cachelines;
         compression_latency = low_compression_latency;
     } else if (use_high_compression) {
+        if (m_compression_latency != 0)
+            m_high_total_compression_latency += high_compression_latency;
+
         m_addr_to_scheme[addr] = m_high_compression_scheme;
         m_high_compression_count += 1;
         m_high_bytes_saved += data_size - high_compressed_size;
