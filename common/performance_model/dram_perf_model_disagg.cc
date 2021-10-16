@@ -43,6 +43,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_r_part2_bandwidth   (m_dram_speed * m_data_bus_width / (1000 * Sim()->getCfg()->getFloat("perf_model/dram/remote_mem_bw_scalefactor") / Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_fraction"))) // Remote memory - Partitioned Queues => Cacheline Queue
     , m_r_bw_scalefactor    (Sim()->getCfg()->getFloat("perf_model/dram/remote_mem_bw_scalefactor"))
     , m_use_dynamic_bandwidth (Sim()->getCfg()->getBool("perf_model/dram/use_dynamic_bandwidth"))
+    , m_use_dynamic_latency (Sim()->getCfg()->getBool("perf_model/dram/use_dynamic_latency"))
     , m_bank_keep_open      (SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/ddr/bank_keep_open")))
     , m_bank_open_delay     (SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/ddr/bank_open_delay")))
     , m_bank_close_delay    (SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/ddr/bank_close_delay")))
@@ -54,6 +55,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_refresh_interval    (SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/ddr/refresh_interval"))) // tREFI
     , m_refresh_length      (SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/ddr/refresh_length"))) // tRFC
     , m_r_added_latency       (SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/remote_mem_add_lat"))) // Network latency for remote DRAM access 
+    , m_r_added_latency_int       (static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/remote_mem_add_lat"))) // Network latency for remote DRAM access 
     , m_r_datamov_threshold       (Sim()->getCfg()->getInt("perf_model/dram/remote_datamov_threshold"))// Move data if greater than
     , m_cache_line_size     (cache_block_size)
     , m_page_size        (Sim()->getCfg()->getInt("perf_model/dram/page_size"))  // Memory page size (bytes) in disagg.cc used for page movement (different from ddr page size)
@@ -1334,6 +1336,18 @@ DramPerfModelDisagg::updateBandwidth()
 }
 
 void
+DramPerfModelDisagg::updateLatency()
+{
+    m_update_latency_count += 1;
+    if (m_use_dynamic_latency && m_update_latency_count % 20 == 0) {
+        m_r_added_latency_int = (m_r_added_latency_int + 100) % 1700;
+        if (m_r_added_latency_int == 0)
+            m_r_added_latency_int = 400;
+        m_r_added_latency.setInternalDataForced(1000000UL * m_r_added_latency_int);
+    }
+}
+
+void
 DramPerfModelDisagg::update_bw_utilization_count(SubsecondTime pkt_time)
 {
     double bw_utilization = m_data_movement->getPageQueueUtilizationPercentage(pkt_time);
@@ -1350,9 +1364,9 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
 {
     // Update bandwidth factor every 1K remote accesses
     /*
-    if (m_use_dynamic_bandwidth && m_num_accesses + 1 % 1000 == 0)
-        updateBandwidth();
-    */
+    // if (m_use_dynamic_bandwidth && m_num_accesses + 1 % 1000 == 0)
+    //     updateBandwidth();
+    // */
 
     if (m_track_page_bw_utilization_stats) {
         // Update BW utilization count

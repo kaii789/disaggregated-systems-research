@@ -39,6 +39,7 @@ class DramPerfModel
 
       virtual void finalizeStats() = 0;
       virtual void updateBandwidth() = 0;
+      virtual void updateLatency();
 
       UInt64 getTotalAccesses() { return m_num_accesses; }
 };

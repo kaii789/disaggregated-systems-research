@@ -54,6 +54,7 @@ class DramPerfModelDisagg : public DramPerfModel
         ComponentBandwidth m_r_part2_bandwidth; // Remote - Partitioned Queues => Cacheline Queue
         double m_r_bw_scalefactor;              // Remote memory bandwidth is ddr bandwidth scaled down by m_r_bw_scalefactor
         bool m_use_dynamic_bandwidth;
+        bool m_use_dynamic_latency;
         const SubsecondTime m_bank_keep_open;
         const SubsecondTime m_bank_open_delay;
         const SubsecondTime m_bank_close_delay;
@@ -64,7 +65,8 @@ class DramPerfModelDisagg : public DramPerfModel
         const SubsecondTime m_controller_delay;         // Average pipeline delay for various DDR controller stages
         const SubsecondTime m_refresh_interval;         // tRFCI
         const SubsecondTime m_refresh_length;           // tRFC
-        const SubsecondTime m_r_added_latency; // Additional remote latency
+        SubsecondTime m_r_added_latency; // Additional remote latency
+        UInt64 m_r_added_latency_int;
         const UInt32 m_r_datamov_threshold; // Move data if greater than yy
         const UInt32 m_cache_line_size;
         const UInt32 m_page_size; // Memory page size (in bytes) in disagg.cc (different from ddr page size)
@@ -235,8 +237,9 @@ class DramPerfModelDisagg : public DramPerfModel
 
         UInt64 m_bw_utilization_decile_to_count[11];
 
-        // Dynamic BW
+        // Dynamic BW and Latency
         long long int m_update_bandwidth_count = 0;
+        long long int m_update_latency_count = 0;
 
         SubsecondTime getDramAccessCost(SubsecondTime start_time, UInt64 size, core_id_t requester, IntPtr address, ShmemPerf *perf, bool is_remote, bool is_exclude_cacheline);
         void parseDeviceAddress(IntPtr address, UInt32 &channel, UInt32 &rank, UInt32 &bank_group, UInt32 &bank, UInt32 &column, UInt64 &dram_page);
@@ -256,6 +259,7 @@ class DramPerfModelDisagg : public DramPerfModel
         ~DramPerfModelDisagg();
         void finalizeStats();
         void updateBandwidth();
+        void updateLatency();
 
         bool isRemoteAccess(IntPtr address, core_id_t requester, DramCntlrInterface::access_t access_type); 
         SubsecondTime getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_size, core_id_t requester, IntPtr address, DramCntlrInterface::access_t access_type, ShmemPerf *perf);

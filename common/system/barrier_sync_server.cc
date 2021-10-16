@@ -106,6 +106,7 @@ BarrierSyncServer::synchronize(core_id_t core_id, SubsecondTime time)
          ParametricDramDirectoryMSI::MemoryManager* m_manager = static_cast<ParametricDramDirectoryMSI::MemoryManager *> (Sim()->getCoreManager()->getCoreFromID(0)->getMemoryManager());
          DramPerfModel* m_dram_perf_model = m_manager->getDramCntlr()->getDramPerfModel();
          m_dram_perf_model->updateBandwidth();
+         m_dram_perf_model->updateLatency();
       }
     }
 
