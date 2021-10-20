@@ -242,7 +242,7 @@ def run_ligra_nonsym(application_name):
             page_size,
             int(num_MB * ONE_MB_TO_BYTES),
             int(net_lat),
-            int(bw_scalefactor),
+            float(bw_scalefactor),
             int(1 * ONE_BILLION),
         ),
     )
@@ -276,7 +276,7 @@ def run_ligra_nonsym(application_name):
                             page_size,
                             int(num_MB * ONE_MB_TO_BYTES),
                             int(net_lat),
-                            int(bw_scalefactor),
+                            float(bw_scalefactor),
                             int(1 * ONE_BILLION),
                         ),
                     )
@@ -321,7 +321,7 @@ def run_ligra_sym(application_name):
             page_size,
             int(num_MB * ONE_MB_TO_BYTES),
             int(net_lat),
-            int(bw_scalefactor),
+            float(bw_scalefactor),
             int(1 * ONE_BILLION),
         ),
     )
@@ -355,7 +355,7 @@ def run_ligra_sym(application_name):
                             page_size,
                             int(num_MB * ONE_MB_TO_BYTES),
                             int(net_lat),
-                            int(bw_scalefactor),
+                            float(bw_scalefactor),
                             int(1 * ONE_BILLION),
                         ),
                     )
@@ -396,7 +396,7 @@ def run_darknet(model_type):
             page_size,
             int(num_MB * ONE_MB_TO_BYTES),
             int(net_lat),
-            int(bw_scalefactor),
+            float(bw_scalefactor),
             int(1 * ONE_BILLION),
         ),
     )
@@ -428,7 +428,7 @@ def run_darknet(model_type):
                             page_size,
                             int(num_MB * ONE_MB_TO_BYTES),
                             int(net_lat),
-                            int(bw_scalefactor),
+                            float(bw_scalefactor),
                             int(1 * ONE_BILLION),
                         ),
                     )
@@ -464,7 +464,7 @@ def run_stream(type):
             page_size,
             int(num_MB * ONE_MB_TO_BYTES),
             int(net_lat),
-            int(bw_scalefactor),
+            float(bw_scalefactor),
             int(1 * ONE_BILLION),
         ),
     )
@@ -490,7 +490,7 @@ def run_stream(type):
                         page_size,
                         int(num_MB * ONE_MB_TO_BYTES),
                         int(net_lat),
-                        int(bw_scalefactor),
+                        float(bw_scalefactor),
                         int(1 * ONE_BILLION),
                     ),
                 )
@@ -525,7 +525,7 @@ def run_nw(dimension):
             page_size,
             int(num_MB * ONE_MB_TO_BYTES),
             int(net_lat),
-            int(bw_scalefactor),
+            float(bw_scalefactor),
             int(1 * ONE_BILLION),
         ),
     )
@@ -556,7 +556,7 @@ def run_nw(dimension):
                         page_size,
                         int(num_MB * ONE_MB_TO_BYTES),
                         int(net_lat),
-                        int(bw_scalefactor),
+                        float(bw_scalefactor),
                         int(1 * ONE_BILLION),
                     ),
                 )
@@ -594,7 +594,7 @@ def run_spmv(matrix):
             page_size,
             int(num_MB * ONE_MB_TO_BYTES),
             int(net_lat),
-            int(bw_scalefactor),
+            float(bw_scalefactor),
             int(1 * ONE_BILLION),
         ),
     )
@@ -625,7 +625,7 @@ def run_spmv(matrix):
                             page_size,
                             int(num_MB * ONE_MB_TO_BYTES),
                             int(net_lat),
-                            int(bw_scalefactor),
+                            float(bw_scalefactor),
                             int(1 * ONE_BILLION),
                         ),
                     )
@@ -661,7 +661,7 @@ def run_sls():
             page_size,
             int(num_MB * ONE_MB_TO_BYTES),
             int(net_lat),
-            int(bw_scalefactor),
+            float(bw_scalefactor),
             int(1 * ONE_BILLION),
         ),
     )
@@ -686,7 +686,7 @@ def run_sls():
                         page_size,
                         int(num_MB * ONE_MB_TO_BYTES),
                         int(net_lat),
-                        int(bw_scalefactor),
+                        float(bw_scalefactor),
                         int(1 * ONE_BILLION),
                     ),
                 )
@@ -720,7 +720,7 @@ def run_hpcg():
             page_size,
             int(num_MB * ONE_MB_TO_BYTES),
             int(net_lat),
-            int(bw_scalefactor),
+            float(bw_scalefactor),
             int(1 * ONE_BILLION),
         ),
     )
@@ -745,7 +745,7 @@ def run_hpcg():
                         page_size,
                         int(num_MB * ONE_MB_TO_BYTES),
                         int(net_lat),
-                        int(bw_scalefactor),
+                        float(bw_scalefactor),
                         int(1 * ONE_BILLION),
                     ),
                 )
@@ -824,7 +824,7 @@ with open(log_filename, "w") as log_file:
 #                     sniper_options="-g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -g perf_model/dram/remote_init={}".format(
 #                         int(num_B),
 #                         int(net_lat),
-#                         int(bw_scalefactor),
+#                         float(bw_scalefactor),
 #                         str(remote_init),
 #                     ),
 #                 )
