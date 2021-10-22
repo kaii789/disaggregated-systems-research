@@ -239,6 +239,11 @@ class DramPerfModelDisagg : public DramPerfModel
 
         UInt64 m_bw_utilization_decile_to_count[11];
 
+        SubsecondTime m_local_total_remote_access_latency;
+        UInt64 m_local_total_remote_access_latency_window_capacity = 100;
+        UInt64 m_local_total_remote_access_latency_window_cur_size = 0;
+        std::vector<SubsecondTime> m_local_total_remote_access_latency_avgs;
+
         // Dynamic BW and Latency
         long long int m_update_bandwidth_count = 0;
         long long int m_update_latency_count = 0;
@@ -254,6 +259,8 @@ class DramPerfModelDisagg : public DramPerfModel
         void sortAndPrintVectorPercentiles(std::vector<T>& vec, std::ostringstream& percentages_buffer, std::ostringstream& counts_buffer, UInt32 num_bins = 40);
 
         void update_bw_utilization_count(SubsecondTime pkt_time);
+
+        void update_local_remote_latency_stat(SubsecondTime access_latency);
 
     public:
         DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_size, AddressHomeLookup* address_home_lookup);

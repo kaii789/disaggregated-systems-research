@@ -143,6 +143,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_total_remote_dram_hardware_latency_pages(SubsecondTime::Zero())
     , m_global_time_much_larger_than_page_arrival(0)
     , m_sum_global_time_much_larger(SubsecondTime::Zero())
+    , m_local_total_remote_access_latency(SubsecondTime::Zero())
 {
     String name("dram"); 
     if (Sim()->getCfg()->getBool("perf_model/dram/queue_model/enabled"))
@@ -546,6 +547,13 @@ DramPerfModelDisagg::finalizeStats()
         // }
         // least_accessed_phys_pages_buffer << " }";
         // std::cout << "Least accessed phys_pages:\n" << least_accessed_phys_pages_buffer.str() << std::endl;
+
+        // Local Remote Avg Latency Stats
+        for (std::vector<SubsecondTime>::iterator it = m_local_total_remote_access_latency_avgs.begin(); it != m_local_total_remote_access_latency_avgs.end(); ++it) {
+            UInt64 local_remote_access_latency_avg = it->getNS();
+            std::cout << local_remote_access_latency_avg << ' ';
+        }
+
     }
     if (process_and_print_throttled_pages_stats && m_use_throttled_pages_tracker) {
         // Add values in the map at the end of program execution to m_throttled_pages_tracker_values
@@ -1344,7 +1352,20 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     SubsecondTime access_latency = t_now - pkt_time;
     m_total_remote_access_latency += access_latency;
     m_total_access_latency += access_latency;
+    update_local_remote_latency_stat(access_latency);
     return access_latency;
+}
+
+void
+DramPerfModelDisagg::update_local_remote_latency_stat(SubsecondTime access_latency)
+{
+    m_local_total_remote_access_latency += access_latency;
+    m_local_total_remote_access_latency_window_cur_size += 1;
+    if (m_local_total_remote_access_latency_window_cur_size == m_local_total_remote_access_latency_window_capacity) {
+        m_local_total_remote_access_latency_avgs.push_back(m_local_total_remote_access_latency / (float) m_local_total_remote_access_latency_window_capacity);
+        m_local_total_remote_access_latency = SubsecondTime::Zero();
+        m_local_total_remote_access_latency_window_cur_size = 0;
+    }
 }
 
 void
