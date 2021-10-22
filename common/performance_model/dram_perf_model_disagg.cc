@@ -361,12 +361,12 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
 DramPerfModelDisagg::~DramPerfModelDisagg()
 {
     // Remote Avg Latency Stats
-    std::cout << "Avg Remote DRAM Access Latencies\n";
+    std::cout << "\nAvg Remote DRAM Access Latencies:\n";
     for (std::vector<SubsecondTime>::iterator it = m_local_total_remote_access_latency_avgs.begin(); it != m_local_total_remote_access_latency_avgs.end(); ++it) {
         UInt64 local_remote_access_latency_avg = it->getNS();
         std::cout << local_remote_access_latency_avg << ' ';
     }
-    std::cout << "\n";
+    std::cout << "\n\n";
 
     if (m_queue_model.size())
     {
