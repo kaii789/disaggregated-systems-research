@@ -552,12 +552,6 @@ DramPerfModelDisagg::finalizeStats()
         // least_accessed_phys_pages_buffer << " }";
         // std::cout << "Least accessed phys_pages:\n" << least_accessed_phys_pages_buffer.str() << std::endl;
 
-        // Local Remote Avg Latency Stats
-        for (std::vector<SubsecondTime>::iterator it = m_local_total_remote_access_latency_avgs.begin(); it != m_local_total_remote_access_latency_avgs.end(); ++it) {
-            UInt64 local_remote_access_latency_avg = it->getNS();
-            std::cout << local_remote_access_latency_avg << ' ';
-        }
-
     }
     if (process_and_print_throttled_pages_stats && m_use_throttled_pages_tracker) {
         // Add values in the map at the end of program execution to m_throttled_pages_tracker_values
@@ -604,6 +598,12 @@ DramPerfModelDisagg::finalizeStats()
         sortAndPrintVectorPercentiles(throttled_pages_tracker_page_aggregated_counts, percentages_buf_2, aggregated_counts_buf);
         std::cout << "CDF X values (throttled page accesses aggregated by phys_page):\n" << aggregated_counts_buf.str() << std::endl;
         std::cout << "CDF Y values (probability):\n" << percentages_buf_2.str() << std::endl;
+    }
+
+    // Local Remote Avg Latency Stats
+    for (std::vector<SubsecondTime>::iterator it = m_local_total_remote_access_latency_avgs.begin(); it != m_local_total_remote_access_latency_avgs.end(); ++it) {
+        UInt64 local_remote_access_latency_avg = it->getNS();
+        std::cout << local_remote_access_latency_avg << ' ';
     }
 }
 
