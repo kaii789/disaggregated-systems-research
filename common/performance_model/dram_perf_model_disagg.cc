@@ -1963,6 +1963,8 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
     if (m_r_cacheline_gran)
         num_local_pages = m_localdram_size/m_cache_line_size;
         
+    SubsecondTime network_processing_time;
+
     QueueModel::request_t queue_request_type = m_r_cacheline_gran ? QueueModel::CACHELINE : QueueModel::PAGE;
     SubsecondTime t_remote_queue_request = t_now;  // Use this instead of incrementing t_now throughout, if need to send page requests in parallel
     if (m_local_pages.size() > num_local_pages) {
@@ -2059,7 +2061,14 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
                 // The page to evict is not in remote_pages
                 m_remote_pages.insert(evicted_page);
             }
-            m_inflightevicted_pages[evicted_page] = t_remote_queue_request + evict_compression_latency + page_datamovement_queue_delay;
+
+            // Compute network transmission delay
+            if (m_r_partition_queues > 0)
+                network_processing_time = m_r_part_bandwidth.getRoundedLatency(8*size);
+            else
+                network_processing_time = m_r_bus_bandwidth.getRoundedLatency(8*size);
+
+            m_inflightevicted_pages[evicted_page] = t_remote_queue_request + evict_compression_latency + page_datamovement_queue_delay + network_processing_time;
 
         // } else if (std::find(m_remote_pages.begin(), m_remote_pages.end(), evicted_page) == m_remote_pages.end()) {
         } else if (!m_remote_pages.count(evicted_page)) {
@@ -2116,7 +2125,13 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
                 m_total_decompression_latency += decompression_latency;
             }
 
-            m_inflightevicted_pages[evicted_page] = t_remote_queue_request + evict_compression_latency + page_datamovement_queue_delay;
+            // Compute network transmission delay
+            if (m_r_partition_queues > 0)
+                network_processing_time = m_r_part_bandwidth.getRoundedLatency(8*size);
+            else
+                network_processing_time = m_r_bus_bandwidth.getRoundedLatency(8*size);
+
+            m_inflightevicted_pages[evicted_page] = t_remote_queue_request + evict_compression_latency + page_datamovement_queue_delay + network_processing_time;
         }
 
         m_dirty_pages.erase(evicted_page);
