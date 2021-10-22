@@ -459,9 +459,16 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
       results["compression.adaptive-bw-utilization-decile-percentage-{}".format(i)] = [percentage] + [0]*(ncores - 1)
       template.append(('  adaptive bw utilization % decile {}'.format(i), "compression.adaptive-bw-utilization-decile-percentage-{}".format(i), str))
 
+  if 'dram-single-queue.num-requests' in results and sum(results['dram-single-queue.num-requests']) > 0:
+    results['dram.single_local_queue_avgdelay'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram-single-queue.total-queue-delay'], results['dram-single-queue.num-requests']))
+  if 'dram-single-remote-queue.num-requests' in results and sum(results['dram-single-remote-queue.num-requests']) > 0:
+    results['dram.single_remote_queue_avgdelay'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram-single-remote-queue.total-queue-delay'], results['dram-single-remote-queue.num-requests']))
+
   # if 'dram.redundant-moves-temp1-time-savings' in results:
   template.extend([
       ('Experiment stats', '', ''),
+      ('  DRAM access cost single local queue avg delay (ns)', 'dram.single_local_queue_avgdelay', format_ns(2)),
+      ('  DRAM access cost remote queue avg delay (ns)', 'dram.single_remote_queue_avgdelay', format_ns(2)),
       ('  PQ=1 type1 time savings (ns)', 'dram.redundant-moves-type1-time-savings', format_ns(2)),
       ('  PQ=1 type2 time savings (ns)', 'dram.redundant-moves-type2-time-savings', format_ns(2)),
       # ('  PQ=1 page queue avg injected time (ns)', 'dram.page_queue_avg_injected_time', format_ns(2)),
