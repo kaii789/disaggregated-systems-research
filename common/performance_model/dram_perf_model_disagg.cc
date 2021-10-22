@@ -360,6 +360,14 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
 
 DramPerfModelDisagg::~DramPerfModelDisagg()
 {
+    // Remote Avg Latency Stats
+    std::cout << "Avg Remote DRAM Access Latencies\n";
+    for (std::vector<SubsecondTime>::iterator it = m_local_total_remote_access_latency_avgs.begin(); it != m_local_total_remote_access_latency_avgs.end(); ++it) {
+        UInt64 local_remote_access_latency_avg = it->getNS();
+        std::cout << local_remote_access_latency_avg << ' ';
+    }
+    std::cout << "\n";
+
     if (m_queue_model.size())
     {
         for(UInt32 channel = 0; channel < m_num_channels; ++channel)
@@ -598,12 +606,6 @@ DramPerfModelDisagg::finalizeStats()
         sortAndPrintVectorPercentiles(throttled_pages_tracker_page_aggregated_counts, percentages_buf_2, aggregated_counts_buf);
         std::cout << "CDF X values (throttled page accesses aggregated by phys_page):\n" << aggregated_counts_buf.str() << std::endl;
         std::cout << "CDF Y values (probability):\n" << percentages_buf_2.str() << std::endl;
-    }
-
-    // Local Remote Avg Latency Stats
-    for (std::vector<SubsecondTime>::iterator it = m_local_total_remote_access_latency_avgs.begin(); it != m_local_total_remote_access_latency_avgs.end(); ++it) {
-        UInt64 local_remote_access_latency_avg = it->getNS();
-        std::cout << local_remote_access_latency_avg << ' ';
     }
 }
 
