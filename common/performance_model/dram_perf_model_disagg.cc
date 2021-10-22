@@ -156,6 +156,8 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
                         m_bus_bandwidth.getRoundedLatency(8))); // bytes to bits
         } 
     }
+    m_queue_model_single = QueueModel::create(name + "-queue", core_id, Sim()->getCfg()->getString("perf_model/dram/queue_model/type"), m_bus_bandwidth.getRoundedLatency(8));
+    m_r_queue_model_single = QueueModel::create(name + "-remote-queue", core_id, Sim()->getCfg()->getString("perf_model/dram/queue_model/type"), m_bus_bandwidth.getRoundedLatency(8));
 
     String data_movement_queue_model_type;
     if (m_r_use_separate_queue_model) {
@@ -680,18 +682,13 @@ DramPerfModelDisagg::getDramAccessCost(SubsecondTime start_time, UInt64 size, co
     SubsecondTime t_now = start_time;
     SubsecondTime dram_access_cost = SubsecondTime::NS() * 40;
 
-    // Calculate address mapping inside the DIMM
-    UInt32 channel, rank, bank_group, bank, column;
-    UInt64 dram_page;
-    parseDeviceAddress(address, channel, rank, bank_group, bank, column, dram_page);
-
     SubsecondTime ddr_processing_time = m_bus_bandwidth.getRoundedLatency(8 * size); // bytes to bits;
     SubsecondTime ddr_queue_delay;
 
     if (is_remote) {
-        ddr_queue_delay = m_r_queue_model.size() ? m_r_queue_model[channel]->computeQueueDelay(t_now, ddr_processing_time, requester) : SubsecondTime::Zero();
+        ddr_queue_delay = m_r_queue_model.size() ? m_r_queue_model_single->computeQueueDelay(t_now, ddr_processing_time, requester) : SubsecondTime::Zero();
     } else {
-        ddr_queue_delay = m_queue_model.size() ? m_queue_model[channel]->computeQueueDelay(t_now, ddr_processing_time, requester) : SubsecondTime::Zero();
+        ddr_queue_delay = m_queue_model.size() ? m_queue_model_single->computeQueueDelay(t_now, ddr_processing_time, requester) : SubsecondTime::Zero();
     }
 
     perf->updateTime(t_now);
