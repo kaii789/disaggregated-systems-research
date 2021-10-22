@@ -1115,6 +1115,8 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
 
     perf->updateTime(t_now, ShmemPerf::DRAM_BUS);
 
+    SubsecondTime network_processing_time = SubsecondTime::Zero();
+
     // Adding data movement cost of the entire page for now (this just adds contention in the queue)
     SubsecondTime page_datamovement_queue_delay = SubsecondTime::Zero();
     if (move_page) {
@@ -1193,6 +1195,12 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
                 m_total_decompression_latency += decompression_latency;
             }
 
+            // Compute network transmission delay
+            if (m_r_partition_queues > 0)
+                network_processing_time = m_r_part_bandwidth.getRoundedLatency(8*page_size);
+            else
+                network_processing_time = m_r_bus_bandwidth.getRoundedLatency(8*page_size);
+
             // Update t_now after page_datamovement_queue_delay includes the decompression latency
             if (m_r_partition_queues != 0) {
                 if (page_hw_access_latency + page_compression_latency + page_datamovement_queue_delay <= cacheline_hw_access_latency + cacheline_compression_latency + datamovement_queue_delay) {
@@ -1200,6 +1208,8 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
                     // (and the cacheline request is not sent)
                     t_now += page_datamovement_queue_delay;  // if nonzero, compression latency was earlier added to t_now already
                     m_total_remote_datamovement_latency += page_datamovement_queue_delay;
+                    t_now += network_processing_time;
+                    m_total_remote_datamovement_latency += network_processing_time;
                     m_total_remote_dram_hardware_latency_cachelines -= cacheline_hw_access_latency;  // remove previously added latency
                     t_now -= cacheline_hw_access_latency;  // remove previously added latency
                     t_now += page_hw_access_latency;
@@ -1233,6 +1243,8 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
                 // Default is requesting the whole page at once (instead of also requesting cacheline), so replace time of cacheline request with the time of the page request
                 t_now += page_datamovement_queue_delay;
                 m_total_remote_datamovement_latency += page_datamovement_queue_delay;
+                t_now += network_processing_time;
+                m_total_remote_datamovement_latency += network_processing_time;
                 m_total_remote_dram_hardware_latency_cachelines -= cacheline_hw_access_latency;  // remove previously added latency
                 t_now -= cacheline_hw_access_latency;  // remove previously added latency
                 t_now += page_hw_access_latency;
@@ -1273,7 +1285,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
 
         // m_inflight_pages.erase(phys_page);
         SubsecondTime global_time = Sim()->getClockSkewMinimizationServer()->getGlobalTime();
-        SubsecondTime page_arrival_time = t_remote_queue_request + page_hw_access_latency + page_compression_latency + page_datamovement_queue_delay;  // page_datamovement_queue_delay already contains the page decompression latency
+        SubsecondTime page_arrival_time = t_remote_queue_request + page_hw_access_latency + page_compression_latency + page_datamovement_queue_delay + network_processing_time;  // page_datamovement_queue_delay already contains the page decompression latency
         m_inflight_pages[phys_page] = SubsecondTime::max(global_time, page_arrival_time);
         if (global_time > page_arrival_time + SubsecondTime::NS(50)) {  // if global time is more than 50 ns ahead of page_arrival_time
             ++m_global_time_much_larger_than_page_arrival;
