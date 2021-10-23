@@ -1381,7 +1381,7 @@ DramPerfModelDisagg::updateLocalIPCStat(SubsecondTime global_time)
         IPC_window_start_time = global_time;
     IPC_window_cur_size += 1;
     if (IPC_window_cur_size == IPC_window_capacity) {
-        ComponentPeriod cp = ComponentPeriod::fromFreqHz(1000000000 * Sim()->getCfg()->getInt("perf_model/core/frequency"));
+        ComponentPeriod cp = ComponentPeriod::fromFreqHz(1000000000 * Sim()->getCfg()->getFloat("perf_model/core/frequency"));
         SubsecondTimeCycleConverter converter = SubsecondTimeCycleConverter(&cp);
 
         IPC_window_end_time = global_time;
