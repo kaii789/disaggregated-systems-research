@@ -107,6 +107,7 @@ BarrierSyncServer::synchronize(core_id_t core_id, SubsecondTime time)
          DramPerfModel* m_dram_perf_model = m_manager->getDramCntlr()->getDramPerfModel();
          m_dram_perf_model->updateBandwidth();
          m_dram_perf_model->updateLatency();
+         m_dram_perf_model->updateLocalIPCStat(m_global_time);
       }
     }
 

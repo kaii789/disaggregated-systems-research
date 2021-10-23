@@ -248,6 +248,13 @@ class DramPerfModelDisagg : public DramPerfModel
         long long int m_update_bandwidth_count = 0;
         long long int m_update_latency_count = 0;
 
+        // For local IPC calculation
+        SubsecondTime IPC_window_start_time;
+        SubsecondTime IPC_window_end_time;
+        UInt64 IPC_window_capacity = 100;
+        UInt64 IPC_window_cur_size = 0;
+        std::vector<double> m_local_IPCs;
+
         SubsecondTime getDramAccessCost(SubsecondTime start_time, UInt64 size, core_id_t requester, IntPtr address, ShmemPerf *perf, bool is_remote, bool is_exclude_cacheline);
         void parseDeviceAddress(IntPtr address, UInt32 &channel, UInt32 &rank, UInt32 &bank_group, UInt32 &bank, UInt32 &column, UInt64 &dram_page);
         UInt64 parseAddressBits(UInt64 address, UInt32 &data, UInt32 offset, UInt32 size, UInt64 base_address);
@@ -269,6 +276,7 @@ class DramPerfModelDisagg : public DramPerfModel
         void finalizeStats();
         void updateBandwidth();
         void updateLatency();
+        void updateLocalIPCStat(SubsecondTime global_time);
 
         bool isRemoteAccess(IntPtr address, core_id_t requester, DramCntlrInterface::access_t access_type); 
         SubsecondTime getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_size, core_id_t requester, IntPtr address, DramCntlrInterface::access_t access_type, ShmemPerf *perf);

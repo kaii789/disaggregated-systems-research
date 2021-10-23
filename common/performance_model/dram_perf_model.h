@@ -9,6 +9,8 @@
 // To incorporate disagg perf model
 #include "address_home_lookup.h"
 
+#include <cmath>
+
 class ShmemPerf;
 
 // Note: Each Dram Controller owns a single DramModel object
@@ -40,6 +42,7 @@ class DramPerfModel
       virtual void finalizeStats() = 0;
       virtual void updateBandwidth() = 0;
       virtual void updateLatency();
+      virtual void updateLocalIPCStat(SubsecondTime global_time);
 
       UInt64 getTotalAccesses() { return m_num_accesses; }
 };

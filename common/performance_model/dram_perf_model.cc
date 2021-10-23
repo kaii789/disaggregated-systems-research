@@ -41,3 +41,6 @@ DramPerfModel* DramPerfModel::createDramPerfModel(core_id_t core_id, UInt32 cach
 
 void DramPerfModel::updateLatency() {
 }
+
+void DramPerfModel::updateLocalIPCStat(SubsecondTime global_time) {
+}

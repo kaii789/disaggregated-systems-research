@@ -368,6 +368,14 @@ DramPerfModelDisagg::~DramPerfModelDisagg()
     }
     std::cout << "\n\n";
 
+    // Local IPC Stats
+    std::cout << "\nLocal IPC:\n";
+    for (std::vector<double>::iterator it = m_local_IPCs.begin(); it != m_local_IPCs.end(); ++it) {
+        double local_IPC = *it;
+        std::cout << local_IPC << ' ';
+    }
+    std::cout << "\n\n";
+
     if (m_queue_model.size())
     {
         for(UInt32 channel = 0; channel < m_num_channels; ++channel)
@@ -1364,6 +1372,27 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     m_total_access_latency += access_latency;
     update_local_remote_latency_stat(access_latency);
     return access_latency;
+}
+
+void
+DramPerfModelDisagg::updateLocalIPCStat(SubsecondTime global_time)
+{
+    if (IPC_window_cur_size == 0)
+        IPC_window_start_time = global_time;
+    IPC_window_cur_size += 1;
+    if (IPC_window_cur_size == IPC_window_capacity) {
+        ComponentPeriod cp = ComponentPeriod::fromFreqHz(1000000000 * Sim()->getCfg()->getInt("perf_model/core/frequency"));
+        SubsecondTimeCycleConverter converter = SubsecondTimeCycleConverter(&cp);
+
+        IPC_window_end_time = global_time;
+        SubsecondTime diff = IPC_window_end_time - IPC_window_start_time;
+        UInt64 cycles = converter.subsecondTimeToCycles(diff);
+        double IPC = 100000.0 / (double) cycles;
+        std::round(IPC * 100000.0) / 100000.0;
+        m_local_IPCs.push_back(IPC);
+
+        IPC_window_cur_size = 0;
+    }
 }
 
 void
