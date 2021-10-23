@@ -101,7 +101,7 @@ class DramPerfModelDisagg : public DramPerfModel
         bool m_speed_up_simulation;  // When this is true, some optional stats aren't calculated
 
         // Local Memory
-        QueueModel* m_queue_model_single;
+        QueueModel* m_dram_queue_model_single;
         std::vector<QueueModel*> m_queue_model;
         std::vector<QueueModel*> m_rank_avail;
         std::vector<QueueModel*> m_bank_group_avail;
@@ -117,7 +117,7 @@ class DramPerfModelDisagg : public DramPerfModel
         std::vector<BankInfo> m_banks;
 
         // Remote memory
-        QueueModel* m_r_queue_model_single;
+        QueueModel* m_r_dram_queue_model_single;
         std::vector<QueueModel*> m_r_queue_model;
         std::vector<QueueModel*> m_r_rank_avail;
         std::vector<QueueModel*> m_r_bank_group_avail;

@@ -157,12 +157,12 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
                         m_bus_bandwidth.getRoundedLatency(8))); // bytes to bits
         } 
     }
-    m_queue_model_single = QueueModel::create(
+    m_dram_queue_model_single = QueueModel::create(
                 name + "-single-queue", core_id, Sim()->getCfg()->getString("perf_model/dram/queue_model/type"),
                 m_bus_bandwidth.getRoundedLatency(8), m_bus_bandwidth.getBandwidthBitsPerUs());
-    m_r_queue_model_single = QueueModel::create(
+    m_r_dram_queue_model_single = QueueModel::create(
                 name + "-single-remote-queue", core_id, Sim()->getCfg()->getString("perf_model/dram/queue_model/type"),
-                m_r_bus_bandwidth.getRoundedLatency(8), m_r_bus_bandwidth.getBandwidthBitsPerUs());
+                m_bus_bandwidth.getRoundedLatency(8), m_bus_bandwidth.getBandwidthBitsPerUs());
 
     String data_movement_queue_model_type;
     if (m_r_use_separate_queue_model) {
@@ -702,11 +702,11 @@ DramPerfModelDisagg::getDramAccessCost(SubsecondTime start_time, UInt64 size, co
         size = 63/64 & size;  // assuming 4 KB = 64 cacheline pages
     }
     if (is_remote) {
-        ddr_processing_time = m_r_bus_bandwidth.getRoundedLatency(8 * size); // bytes to bits
-        ddr_queue_delay = m_r_queue_model_single->computeQueueDelay(t_now, ddr_processing_time, requester);
+        ddr_processing_time = m_bus_bandwidth.getRoundedLatency(8 * size); // bytes to bits
+        ddr_queue_delay = m_r_dram_queue_model_single->computeQueueDelay(t_now, ddr_processing_time, requester);
     } else {
         ddr_processing_time = m_bus_bandwidth.getRoundedLatency(8 * size); // bytes to bits
-        ddr_queue_delay = m_queue_model_single->computeQueueDelay(t_now, ddr_processing_time, requester);
+        ddr_queue_delay = m_dram_queue_model_single->computeQueueDelay(t_now, ddr_processing_time, requester);
     }
 
     perf->updateTime(t_now);
