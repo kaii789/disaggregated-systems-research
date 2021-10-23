@@ -249,9 +249,9 @@ class DramPerfModelDisagg : public DramPerfModel
         long long int m_update_latency_count = 0;
 
         // For local IPC calculation
-        SubsecondTime IPC_window_start_time;
-        SubsecondTime IPC_window_end_time;
-        UInt64 IPC_window_capacity = 100;
+        UInt64 IPC_window_start_instr_count;
+        UInt64 IPC_window_end_instr_count;
+        UInt64 IPC_window_capacity = 20;
         UInt64 IPC_window_cur_size = 0;
         std::vector<double> m_local_IPCs;
 
@@ -276,7 +276,7 @@ class DramPerfModelDisagg : public DramPerfModel
         void finalizeStats();
         void updateBandwidth();
         void updateLatency();
-        void updateLocalIPCStat(SubsecondTime global_time);
+        void updateLocalIPCStat();
 
         bool isRemoteAccess(IntPtr address, core_id_t requester, DramCntlrInterface::access_t access_type); 
         SubsecondTime getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_size, core_id_t requester, IntPtr address, DramCntlrInterface::access_t access_type, ShmemPerf *perf);
