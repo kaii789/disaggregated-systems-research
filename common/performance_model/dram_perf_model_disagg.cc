@@ -38,6 +38,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_randomize_offset    (Sim()->getCfg()->getInt("perf_model/dram/ddr/randomize_offset"))
     , m_column_bits_shift   (Sim()->getCfg()->getInt("perf_model/dram/ddr/column_bits_shift"))
     , m_bus_bandwidth       (m_dram_speed * m_data_bus_width / 1000) // In bits/ns: MT/s=transfers/us * bits/transfer
+    , m_r_dram_bus_bandwidth  (m_dram_speed * m_data_bus_width * 64 / 1000) // In bits/ns: MT/s=transfers/us * bits/transfer
     , m_r_bus_bandwidth     (m_dram_speed * m_data_bus_width / (1000 * Sim()->getCfg()->getFloat("perf_model/dram/remote_mem_bw_scalefactor"))) // Remote memory
     , m_r_part_bandwidth    (m_dram_speed * m_data_bus_width / (1000 * Sim()->getCfg()->getFloat("perf_model/dram/remote_mem_bw_scalefactor") / (1 - Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_fraction")))) // Remote memory - Partitioned Queues => Page Queue
     , m_r_part2_bandwidth   (m_dram_speed * m_data_bus_width / (1000 * Sim()->getCfg()->getFloat("perf_model/dram/remote_mem_bw_scalefactor") / Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_fraction"))) // Remote memory - Partitioned Queues => Cacheline Queue
@@ -710,7 +711,7 @@ DramPerfModelDisagg::getDramAccessCost(SubsecondTime start_time, UInt64 size, co
         size = 63/64 & size;  // assuming 4 KB = 64 cacheline pages
     }
     if (is_remote) {
-        ddr_processing_time = m_bus_bandwidth.getRoundedLatency(8 * size); // bytes to bits
+        ddr_processing_time = m_r_dram_bus_bandwidth.getRoundedLatency(8 * size); // bytes to bits
         ddr_queue_delay = m_r_dram_queue_model_single->computeQueueDelay(t_now, ddr_processing_time, requester);
     } else {
         ddr_processing_time = m_bus_bandwidth.getRoundedLatency(8 * size); // bytes to bits
