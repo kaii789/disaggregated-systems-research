@@ -703,7 +703,11 @@ SubsecondTime
 DramPerfModelDisagg::getDramAccessCost(SubsecondTime start_time, UInt64 size, core_id_t requester, IntPtr address, ShmemPerf *perf, bool is_remote, bool is_exclude_cacheline)
 {
     SubsecondTime t_now = start_time;
-    SubsecondTime dram_access_cost = SubsecondTime::NS() * 40;
+    SubsecondTime dram_access_cost;
+    if (size == m_cache_line_size)
+        SubsecondTime::NS() * 15;
+    else
+        SubsecondTime::NS() * 300;
 
     SubsecondTime ddr_processing_time;
     SubsecondTime ddr_queue_delay;
