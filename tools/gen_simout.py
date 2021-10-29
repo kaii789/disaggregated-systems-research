@@ -225,7 +225,7 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
       results['dram.remotequeuemodel_datamovement2_percent_queue_full'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue-2.num-requests-queue-full'], results['dram-datamovement-queue-2.num-requests']))
       results['dram.remotequeuemodel_datamovement2_percent_capped_by_custom_cap'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue-2.num-requests-capped-by-custom-cap'], results['dram-datamovement-queue-2.num-requests']))
 
-  results['dram.local_avg_dirty_write_buffer_size'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.local-dram-sum-dirty-write-buffer-size'], results['dram.accesses']))
+  results['dram.local-avg-dirty-write-buffer-size'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.local-dram-sum-dirty-write-buffer-size'], results['dram.accesses']))
 
   # Compression
   bytes_saved = results['compression.bytes-saved'][0] if 'compression.bytes-saved' in results else 0
@@ -294,8 +294,8 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     ('      num remote writes', 'dram.remote-writes', str),
     # ('    num dram reads', 'dram.readwrite-reads', str),
     # ('    num dram writes', 'dram.readwrite-writes', str),
-    ('    local avg inflight dirty write buffer size', 'dram.local_avg_dirty_write_buffer_size', str),
-    ('    local max inflight dirty write buffer size', 'dram.local_max_dirty_write_buffer_size', str),
+    ('    local avg inflight dirty write buffer size', 'dram.local-avg-dirty-write-buffer-size', str),
+    ('    local max inflight dirty write buffer size', 'dram.local-dram-max-dirty-write-buffer-size', str),
     ('  average dram access latency (ns)', 'dram.avglatency', format_ns(2)),
     ('    local dram avg access latency (ns)', 'dram.localavglatency', format_ns(2)),
     ('      local dram avg hardware latency (ns)', 'dram.localavghardwarelatency', format_ns(2)),
