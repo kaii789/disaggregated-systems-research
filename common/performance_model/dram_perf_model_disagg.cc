@@ -142,6 +142,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_total_local_dram_hardware_latency(SubsecondTime::Zero())
     , m_total_remote_dram_hardware_latency_cachelines(SubsecondTime::Zero())
     , m_total_remote_dram_hardware_latency_pages(SubsecondTime::Zero())
+    , m_total_local_dram_hardware_write_latency_pages(SubsecondTime::Zero())
     , m_global_time_much_larger_than_page_arrival(0)
     , m_sum_global_time_much_larger(SubsecondTime::Zero())
     , m_local_total_remote_access_latency(SubsecondTime::Zero())
@@ -280,6 +281,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     registerStatsMetric("dram", core_id, "total-remote-access-latency", &m_total_remote_access_latency);
     registerStatsMetric("dram", core_id, "total-remote-dram-hardware-latency-cachelines", &m_total_remote_dram_hardware_latency_cachelines);
     registerStatsMetric("dram", core_id, "total-remote-dram-hardware-latency-pages", &m_total_remote_dram_hardware_latency_pages);
+    registerStatsMetric("dram", core_id, "total-local-dram-hardware-write-latency-pages", &m_total_local_dram_hardware_write_latency_pages);
     registerStatsMetric("dram", core_id, "total-remote-datamovement-latency", &m_total_remote_datamovement_latency);
     // registerStatsMetric("dram", core_id, "local-reads-remote-origin", &m_local_reads_remote_origin);
     // registerStatsMetric("dram", core_id, "local-writes-remote-origin", &m_local_writes_remote_origin);
@@ -304,6 +306,9 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
 
     registerStatsMetric("dram", core_id, "page-movement-num-global-time-much-larger", &m_global_time_much_larger_than_page_arrival);
     registerStatsMetric("dram", core_id, "page-movement-global-time-much-larger-total-time", &m_sum_global_time_much_larger);
+
+    registerStatsMetric("dram", core_id, "local-dram-sum-dirty-write-buffer-size", &m_sum_write_buffer_size);
+    registerStatsMetric("dram", core_id, "local-dram-max-dirty-write-buffer-size", &m_max_dirty_write_buffer_size);
 
     // Stats for partition_queues experiments
     if (m_r_partition_queues) {
@@ -696,6 +701,33 @@ DramPerfModelDisagg::parseDeviceAddress(IntPtr address, UInt32 &channel, UInt32 
     }
 
     //printf("[%2d] address %12lx linearAddress %12lx channel %2x rank %2x bank_group %2x bank %2x dram_page %8lx crb %4u\n", m_core_id, address, linearAddress, channel, rank, bank_group, bank, dram_page, (((channel * m_num_ranks) + rank) * m_num_banks) + bank);
+}
+
+// DRAM hardware access cost
+SubsecondTime
+DramPerfModelDisagg::getDramWriteCost(SubsecondTime start_time, UInt64 size, core_id_t requester, IntPtr address, ShmemPerf *perf, bool is_exclude_cacheline)
+{
+    // Precondition: this method is called from remote
+    SubsecondTime t_now = start_time;
+    SubsecondTime dram_access_cost = SubsecondTime::NS() * 15;
+
+    SubsecondTime ddr_processing_time;
+    SubsecondTime ddr_queue_delay;
+    if (is_exclude_cacheline && size > 64) {
+        size = 63/64 & size;  // assuming 4 KB = 64 cacheline pages
+    }
+    ddr_processing_time = m_bus_bandwidth.getRoundedLatency(8 * size); // bytes to bits
+    ddr_queue_delay = m_dram_queue_model_single->computeQueueDelay(t_now, ddr_processing_time, requester);
+
+    perf->updateTime(t_now);
+    t_now += ddr_queue_delay;
+    perf->updateTime(t_now, ShmemPerf::DRAM_QUEUE);
+    t_now += ddr_processing_time;
+    perf->updateTime(t_now, ShmemPerf::DRAM_BUS);
+    t_now += dram_access_cost;
+    perf->updateTime(t_now, ShmemPerf::DRAM_DEVICE);
+
+    return t_now - start_time;  // Net increase of time, ie the pure hardware access cost
 }
 
 // DRAM hardware access cost
@@ -1150,6 +1182,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         ++m_page_moves;
         SubsecondTime page_compression_latency = SubsecondTime::Zero();  // when page compression is not enabled, this is always 0
         SubsecondTime page_hw_access_latency = SubsecondTime::Zero();
+        SubsecondTime local_page_hw_write_latency = SubsecondTime::Zero();
         std::vector<std::pair<UInt64, SubsecondTime>> updated_inflight_page_arrival_time_deltas;
         if (m_r_simulate_datamov_overhead && !m_r_cacheline_gran) {
             //check if queue is full
@@ -1197,10 +1230,13 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             if (m_r_partition_queues) {
                 // Set exclude_cacheline to true (in this case, should still pass in the original page size for the size parameter)
                 page_hw_access_latency = getDramAccessCost(t_remote_queue_request, page_size_for_dram, requester, address, perf, true, true);
+                local_page_hw_write_latency = getDramWriteCost(t_remote_queue_request, page_size_for_dram, requester, address, perf, true);
             } else {
                 page_hw_access_latency = getDramAccessCost(t_remote_queue_request, page_size_for_dram, requester, address, perf, true, false);
+                local_page_hw_write_latency = getDramWriteCost(t_remote_queue_request, page_size_for_dram, requester, address, perf, false);
             }
             m_total_remote_dram_hardware_latency_pages += page_hw_access_latency;
+            m_total_local_dram_hardware_write_latency_pages += local_page_hw_write_latency;
 
             // Compute network transmission delay
             if (m_r_partition_queues > 0)
@@ -1238,6 +1274,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
                     m_total_remote_dram_hardware_latency_cachelines -= cacheline_hw_access_latency;  // remove previously added latency
                     t_now -= cacheline_hw_access_latency;  // remove previously added latency
                     t_now += page_hw_access_latency;
+                    t_now += local_page_hw_write_latency;
                     if (m_r_mode != 4 && !m_r_enable_selective_moves) {
                         t_now -= datamovement_delay;  // only subtract if it was added earlier
                         m_total_remote_datamovement_latency -= datamovement_delay;
@@ -1271,6 +1308,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
                 m_total_remote_dram_hardware_latency_cachelines -= cacheline_hw_access_latency;  // remove previously added latency
                 t_now -= cacheline_hw_access_latency;  // remove previously added latency
                 t_now += page_hw_access_latency;
+                t_now += local_page_hw_write_latency;
                 if (m_r_mode != 4 && !m_r_enable_selective_moves) {
                     t_now -= datamovement_delay;  // only subtract if it was added earlier
                     m_total_remote_datamovement_latency -= datamovement_delay;
@@ -1282,7 +1320,9 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             // Include the hardware access cost of the page
             page_hw_access_latency = getDramAccessCost(t_remote_queue_request, m_page_size, requester, address, perf, true, false);
             t_now += page_hw_access_latency;
+            t_now += local_page_hw_write_latency;
             m_total_remote_dram_hardware_latency_pages += page_hw_access_latency;
+            m_total_local_dram_hardware_write_latency_pages += local_page_hw_write_latency;
             m_total_remote_dram_hardware_latency_cachelines -= cacheline_hw_access_latency;  // remove previously added latency
             if (m_r_mode != 4 && !m_r_enable_selective_moves) {
                 t_now -= datamovement_delay;  // only subtract if it was added earlier
@@ -1308,7 +1348,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
 
         // m_inflight_pages.erase(phys_page);
         SubsecondTime global_time = Sim()->getClockSkewMinimizationServer()->getGlobalTime();
-        SubsecondTime page_arrival_time = t_remote_queue_request + page_hw_access_latency + page_compression_latency + page_datamovement_delay + page_network_processing_time;  // page_datamovement_delay already contains the page decompression latency
+        SubsecondTime page_arrival_time = t_remote_queue_request + page_hw_access_latency + page_compression_latency + page_datamovement_delay + page_network_processing_time + local_page_hw_write_latency;  // page_datamovement_delay already contains the page decompression latency
         m_inflight_pages[phys_page] = SubsecondTime::max(global_time, page_arrival_time);
         if (global_time > page_arrival_time + SubsecondTime::NS(50)) {  // if global time is more than 50 ns ahead of page_arrival_time
             ++m_global_time_much_larger_than_page_arrival;
@@ -1465,6 +1505,9 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
     //     updateBandwidth();
     // */
 
+    // Update dirty write buffer avg stat
+    m_sum_write_buffer_size += m_dirty_write_buffer_size;
+
     if (m_track_page_bw_utilization_stats) {
         // Update BW utilization count
         update_bw_utilization_count(pkt_time);
@@ -1493,6 +1536,13 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
             m_inflight_redundant.erase(i->first);
             m_data_movement->removeInflightPage(i->first);
             m_inflight_pages.erase(i++);
+
+            // Dirty write buffer
+            UInt64 inflight_page = i->first;
+            if (m_inflight_page_to_dirty_write_count.find(inflight_page) != m_inflight_page_to_dirty_write_count.end()) {
+                m_dirty_write_buffer_size -= m_inflight_page_to_dirty_write_count[inflight_page];
+                m_inflight_page_to_dirty_write_count.erase(inflight_page);
+            }
         } else {
             ++i;
         }
@@ -1744,6 +1794,23 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
             m_inflight_hits++; 
 
             if (m_r_partition_queues != 0) {
+                // Update dirty write buffer
+                if (access_type == DramCntlrInterface::WRITE) {
+                    UInt64 dirty_write_count = 0;
+                    if (m_inflight_page_to_dirty_write_count.find(phys_page) != m_inflight_page_to_dirty_write_count.end())
+                        dirty_write_count = m_inflight_page_to_dirty_write_count[phys_page];
+                    dirty_write_count += 1;
+                    // if (std::find(m_inflight_page_to_dirty_write_count.begin(), m_inflight_page_to_dirty_write_count.end(), phys_page) != m_inflight_page_to_dirty_write_count.end()) {
+                    //     m_inflight_page_to_dirty_write_count[phys_page] = dirty_write_count;
+                    // } else {
+                    //     m_inflight_page_to_dirty_write_count.insert(phys_page, dirty_write_count);
+                    // }
+                    m_inflight_page_to_dirty_write_count[phys_page] = dirty_write_count;
+
+                    m_dirty_write_buffer_size += 1;
+                    m_max_dirty_write_buffer_size = std::max(m_max_dirty_write_buffer_size, m_dirty_write_buffer_size);
+                }
+
                 double cacheline_queue_utilization_percentage;
                 if (m_r_partition_queues == 1)
                     cacheline_queue_utilization_percentage = m_data_movement_2->getCachelineQueueUtilizationPercentage(t_now);

@@ -149,6 +149,7 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     results['dram.localavghardwarelatency'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.total-local-dram-hardware-latency'], results['dram.local-accesses']))
     results['dram.remoteavglatency'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.total-remote-access-latency'], results['dram.remote-accesses']))
     results['dram.remoteavghardwarelatency_pages'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.total-remote-dram-hardware-latency-pages'], results['dram.page-moves']))  # Prefetched pages not currently accounted for in sniper stats
+    results['dram.localavghardwarewritelatency_pages'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.total-local-dram-hardware-write-latency-pages'], results['dram.page-moves']))  # Prefetched pages not currently accounted for in sniper stats
     if ('dram-datamovement-queue.num-cacheline-requests' in results and sum(results['dram-datamovement-queue.num-cacheline-requests']) > 0) or ('dram-datamovement-queue-2.num-requests' in results and sum(results['dram-datamovement-queue-2.num-requests']) > 0):
       # Partition queues was on
       results['dram.remoteavghardwarelatency_cachelines'] = map(lambda (a,b,c,d): (a-d)/(b+c) if (b+c) else float('inf'), zip(results['dram.total-remote-dram-hardware-latency-cachelines'], results['dram.remote-accesses'], results['dram.redundant-moves-type2'], results['dram.page-moves']))
@@ -224,6 +225,7 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
       results['dram.remotequeuemodel_datamovement2_percent_queue_full'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue-2.num-requests-queue-full'], results['dram-datamovement-queue-2.num-requests']))
       results['dram.remotequeuemodel_datamovement2_percent_capped_by_custom_cap'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue-2.num-requests-capped-by-custom-cap'], results['dram-datamovement-queue-2.num-requests']))
 
+  results['dram.local_avg_dirty_write_buffer_size'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.local-dram-sum-dirty-write-buffer-size'], results['dram.accesses']))
 
   # Compression
   bytes_saved = results['compression.bytes-saved'][0] if 'compression.bytes-saved' in results else 0
@@ -292,9 +294,12 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     ('      num remote writes', 'dram.remote-writes', str),
     # ('    num dram reads', 'dram.readwrite-reads', str),
     # ('    num dram writes', 'dram.readwrite-writes', str),
+    ('    local avg inflight dirty write buffer size', 'dram.local_avg_dirty_write_buffer_size', str),
+    ('    local max inflight dirty write buffer size', 'dram.local_max_dirty_write_buffer_size', str),
     ('  average dram access latency (ns)', 'dram.avglatency', format_ns(2)),
     ('    local dram avg access latency (ns)', 'dram.localavglatency', format_ns(2)),
     ('      local dram avg hardware latency (ns)', 'dram.localavghardwarelatency', format_ns(2)),
+    ('      local dram avg hardware write latency: pages (ns)', 'dram.localavghardwarewritelatency_pages', format_ns(2)),
     ('    remote dram avg access latency (ns)', 'dram.remoteavglatency', format_ns(2)),
     ('      remote dram avg hardware latency: cachelines (ns)', 'dram.remoteavghardwarelatency_cachelines', format_ns(2)),
     ('      remote dram avg hardware latency: pages (ns)', 'dram.remoteavghardwarelatency_pages', format_ns(2)),
