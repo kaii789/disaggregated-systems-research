@@ -299,7 +299,7 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     ('  average dram access latency (ns)', 'dram.avglatency', format_ns(2)),
     ('    local dram avg access latency (ns)', 'dram.localavglatency', format_ns(2)),
     ('      local dram avg hardware latency (ns)', 'dram.localavghardwarelatency', format_ns(2)),
-    ('      local dram avg hardware write latency: pages (ns)', 'dram.localavghardwarewritelatency_pages', format_ns(2)),
+    ('    local dram avg hardware write latency: pages (ns)', 'dram.localavghardwarewritelatency_pages', format_ns(2)),
     ('    remote dram avg access latency (ns)', 'dram.remoteavglatency', format_ns(2)),
     ('      remote dram avg hardware latency: cachelines (ns)', 'dram.remoteavghardwarelatency_cachelines', format_ns(2)),
     ('      remote dram avg hardware latency: pages (ns)', 'dram.remoteavghardwarelatency_pages', format_ns(2)),
