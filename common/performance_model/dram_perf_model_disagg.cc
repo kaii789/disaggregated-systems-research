@@ -1508,9 +1508,6 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
     //     updateBandwidth();
     // */
 
-    // Update dirty write buffer avg stat
-    m_sum_write_buffer_size += m_dirty_write_buffer_size;
-
     if (m_track_page_bw_utilization_stats) {
         // Update BW utilization count
         update_bw_utilization_count(pkt_time);
@@ -1550,6 +1547,9 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
             ++i;
         }
     }
+
+    // Update dirty write buffer avg stat
+    m_sum_write_buffer_size += m_dirty_write_buffer_size;
 
     for (i = m_inflightevicted_pages.begin(); i != m_inflightevicted_pages.end();) {
         if (i->second <= SubsecondTime::max(Sim()->getClockSkewMinimizationServer()->getGlobalTime(), pkt_time)) {
