@@ -100,6 +100,7 @@ class DramPerfModelDisagg : public DramPerfModel
         SubsecondTime m_r_ideal_pagethrottle_remote_access_history_window_size;  // Track remote page accesses using the most recent window size number of ns
         bool m_track_page_bw_utilization_stats;
         bool m_speed_up_simulation;  // When this is true, some optional stats aren't calculated
+        bool m_r_cacheline_hw_no_queue_delay;  // When this is true, remove HW access queue delay from cacheline requests' critical path to simulate prioritized cachelines
 
         // Local Memory
         QueueModel* m_dram_queue_model_single;
@@ -235,6 +236,9 @@ class DramPerfModelDisagg : public DramPerfModel
         SubsecondTime m_total_local_dram_hardware_latency;
         SubsecondTime m_total_remote_dram_hardware_latency_cachelines;
         SubsecondTime m_total_remote_dram_hardware_latency_pages;
+        UInt64 m_total_local_dram_hardware_latency_count;
+        UInt64 m_total_remote_dram_hardware_latency_cachelines_count;
+        UInt64 m_total_remote_dram_hardware_latency_pages_count;
         UInt64 m_global_time_much_larger_than_page_arrival;
         SubsecondTime m_sum_global_time_much_larger;
 

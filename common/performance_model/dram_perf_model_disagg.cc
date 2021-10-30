@@ -87,6 +87,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_r_ideal_pagethrottle_remote_access_history_window_size   (SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/r_ideal_pagethrottle_access_history_window_size")))
     , m_track_page_bw_utilization_stats    (Sim()->getCfg()->getBool("perf_model/dram/track_page_bw_utilization_stats"))  // Whether to track page queue bw utilization stats
     , m_speed_up_simulation    (Sim()->getCfg()->getBool("perf_model/dram/speed_up_disagg_simulation"))  // When this is true, some optional stats aren't calculated
+    , m_r_cacheline_hw_no_queue_delay    (Sim()->getCfg()->getBool("perf_model/dram/r_cacheline_hw_no_queue_delay"))  // When this is true, remove HW access queue delay from cacheline requests' critical path to simulate prioritized cachelines
     , m_banks               (m_total_banks)
     , m_r_banks               (m_total_banks)
     , m_inflight_page_delayed(0)
@@ -142,6 +143,9 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_total_local_dram_hardware_latency(SubsecondTime::Zero())
     , m_total_remote_dram_hardware_latency_cachelines(SubsecondTime::Zero())
     , m_total_remote_dram_hardware_latency_pages(SubsecondTime::Zero())
+    , m_total_local_dram_hardware_latency_count(0)
+    , m_total_remote_dram_hardware_latency_cachelines_count(0)
+    , m_total_remote_dram_hardware_latency_pages_count(0)
     , m_global_time_much_larger_than_page_arrival(0)
     , m_sum_global_time_much_larger(SubsecondTime::Zero())
     , m_local_total_remote_access_latency(SubsecondTime::Zero())
@@ -277,9 +281,12 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     registerStatsMetric("dram", core_id, "total-access-latency", &m_total_access_latency); // cgiannoula
     registerStatsMetric("dram", core_id, "total-local-access-latency", &m_total_local_access_latency);
     registerStatsMetric("dram", core_id, "total-local-dram-hardware-latency", &m_total_local_dram_hardware_latency);
+    registerStatsMetric("dram", core_id, "total-local-dram-hardware-latency-count", &m_total_local_dram_hardware_latency_count);
     registerStatsMetric("dram", core_id, "total-remote-access-latency", &m_total_remote_access_latency);
     registerStatsMetric("dram", core_id, "total-remote-dram-hardware-latency-cachelines", &m_total_remote_dram_hardware_latency_cachelines);
     registerStatsMetric("dram", core_id, "total-remote-dram-hardware-latency-pages", &m_total_remote_dram_hardware_latency_pages);
+    registerStatsMetric("dram", core_id, "total-remote-dram-hardware-latency-cachelines-count", &m_total_remote_dram_hardware_latency_cachelines_count);
+    registerStatsMetric("dram", core_id, "total-remote-dram-hardware-latency-pages-count", &m_total_remote_dram_hardware_latency_pages_count);
     registerStatsMetric("dram", core_id, "total-remote-datamovement-latency", &m_total_remote_datamovement_latency);
     // registerStatsMetric("dram", core_id, "local-reads-remote-origin", &m_local_reads_remote_origin);
     // registerStatsMetric("dram", core_id, "local-writes-remote-origin", &m_local_writes_remote_origin);
@@ -353,7 +360,10 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     }
 
     // For debugging
-    std::cout << "Initial m_r_cacheline_queue_fraction=" << m_r_cacheline_queue_fraction << std::endl;
+    if (m_r_partition_queues)
+        std::cout << "Initial m_r_cacheline_queue_fraction=" << m_r_cacheline_queue_fraction << std::endl;
+    std::cout << "Uncompressed cacheline remote dram HW bandwidth processing time= " << m_r_dram_bus_bandwidth.getRoundedLatency(8 * m_cache_line_size).getPS() / 1000.0 << " ns, ";
+    std::cout << "Uncompressed page remote dram HW bandwidth processing time= " << m_r_dram_bus_bandwidth.getRoundedLatency(8 * m_page_size).getPS() / 1000.0 << " ns" << std::endl;
     
     // RNG
     srand (time(NULL));
@@ -418,9 +428,11 @@ DramPerfModelDisagg::~DramPerfModelDisagg()
         delete m_data_movement_2;
     }
 
-    std::cout << "Final m_r_cacheline_queue_fraction=" << m_r_cacheline_queue_fraction << std::endl;
-    std::cout << "Final m_r_cacheline_queue_fraction_increased=" << m_r_cacheline_queue_fraction_increased << ", Final m_r_cacheline_queue_fraction_decreased=" << m_r_cacheline_queue_fraction_decreased << std::endl; 
-    std::cout << "Final m_min_r_cacheline_queue_fraction_stat_scaled=" << m_min_r_cacheline_queue_fraction_stat_scaled << ", Final m_max_r_cacheline_queue_fraction_stat_scaled=" << m_max_r_cacheline_queue_fraction_stat_scaled << std::endl; 
+    if (m_r_partition_queues) {
+        std::cout << "Final m_r_cacheline_queue_fraction=" << m_r_cacheline_queue_fraction << std::endl;
+        std::cout << "Final m_r_cacheline_queue_fraction_increased=" << m_r_cacheline_queue_fraction_increased << ", Final m_r_cacheline_queue_fraction_decreased=" << m_r_cacheline_queue_fraction_decreased << std::endl;
+        std::cout << "Final m_min_r_cacheline_queue_fraction_stat_scaled=" << m_min_r_cacheline_queue_fraction_stat_scaled << ", Final m_max_r_cacheline_queue_fraction_stat_scaled=" << m_max_r_cacheline_queue_fraction_stat_scaled << std::endl;
+    }
 }
 
 // Modifies input vector by sorting it
@@ -713,6 +725,9 @@ DramPerfModelDisagg::getDramAccessCost(SubsecondTime start_time, UInt64 size, co
     if (is_remote) {
         ddr_processing_time = m_r_dram_bus_bandwidth.getRoundedLatency(8 * size); // bytes to bits
         ddr_queue_delay = m_r_dram_queue_model_single->computeQueueDelay(t_now, ddr_processing_time, requester);
+        if (m_r_cacheline_hw_no_queue_delay && size <= 64) {
+            ddr_queue_delay = SubsecondTime::Zero();  // option to remove queue delay from cachelines, to simulate prioritized cachelines
+        }
     } else {
         ddr_processing_time = m_bus_bandwidth.getRoundedLatency(8 * size); // bytes to bits
         ddr_queue_delay = m_dram_queue_model_single->computeQueueDelay(t_now, ddr_processing_time, requester);
@@ -953,6 +968,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         // When partition queues is off, access the requested cacheline first
         cacheline_hw_access_latency = getDramAccessCost(pkt_time, pkt_size, requester, address, perf, true, false);
         m_total_remote_dram_hardware_latency_cachelines += cacheline_hw_access_latency;
+        m_total_remote_dram_hardware_latency_cachelines_count++;
     }
 
     SubsecondTime t_now = pkt_time + cacheline_hw_access_latency;
@@ -1201,6 +1217,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
                 page_hw_access_latency = getDramAccessCost(t_remote_queue_request, page_size_for_dram, requester, address, perf, true, false);
             }
             m_total_remote_dram_hardware_latency_pages += page_hw_access_latency;
+            m_total_remote_dram_hardware_latency_pages_count++;
 
             // Compute network transmission delay
             if (m_r_partition_queues > 0)
@@ -1281,6 +1298,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             page_hw_access_latency = getDramAccessCost(t_remote_queue_request, m_page_size, requester, address, perf, true, false);
             t_now += page_hw_access_latency;
             m_total_remote_dram_hardware_latency_pages += page_hw_access_latency;
+            m_total_remote_dram_hardware_latency_pages_count++;
             if (m_r_mode != 4 && !m_r_enable_selective_moves) {
                 t_now -= datamovement_delay;  // only subtract if it was added earlier
                 m_total_remote_datamovement_latency -= datamovement_delay;
@@ -1332,6 +1350,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             cacheline_hw_access_latency = getDramAccessCost(pkt_time, pkt_size, requester, address, perf, true, false);  // A change for 64 byte page granularity
             t_remote_queue_request = pkt_time + cacheline_hw_access_latency;
             m_total_remote_dram_hardware_latency_cachelines += cacheline_hw_access_latency;
+            m_total_remote_dram_hardware_latency_cachelines_count++;
             t_now += cacheline_hw_access_latency;
         }
 
@@ -1717,6 +1736,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
    
     SubsecondTime cacheline_hw_access_latency = getDramAccessCost(pkt_time, pkt_size, requester, address, perf, false, false);
     m_total_local_dram_hardware_latency += cacheline_hw_access_latency;
+    m_total_local_dram_hardware_latency_count++;
     SubsecondTime t_now = pkt_time + cacheline_hw_access_latency;
 
     // Update Memory Counters? 
@@ -1753,6 +1773,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                 } else if (m_inflight_redundant[phys_page] < m_r_limit_redundant_moves) {
                     SubsecondTime add_cacheline_hw_access_latency = getDramAccessCost(t_now, pkt_size, requester, address, perf, true, false);
                     m_total_remote_dram_hardware_latency_cachelines += add_cacheline_hw_access_latency;
+                    m_total_remote_dram_hardware_latency_cachelines_count++;
 
                     UInt32 size = pkt_size;
                     SubsecondTime cacheline_compression_latency = SubsecondTime::Zero();  // when cacheline compression is not enabled, this is always 0
