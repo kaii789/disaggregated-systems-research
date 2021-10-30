@@ -366,21 +366,24 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
 
 DramPerfModelDisagg::~DramPerfModelDisagg()
 {
-    // Remote Avg Latency Stats
-    std::cout << "\nAvg Remote DRAM Access Latencies:\n";
-    for (std::vector<SubsecondTime>::iterator it = m_local_total_remote_access_latency_avgs.begin(); it != m_local_total_remote_access_latency_avgs.end(); ++it) {
-        UInt64 local_remote_access_latency_avg = it->getNS();
-        std::cout << local_remote_access_latency_avg << ' ';
-    }
-    std::cout << "\n\n";
+    bool print_extra_stats = Sim()->getCfg()->getBool("perf_model/dram/track_extra_stats");
+    if (print_extra_stats) {
+        // Remote Avg Latency Stats
+        std::cout << "\nAvg Remote DRAM Access Latencies:\n";
+        for (std::vector<SubsecondTime>::iterator it = m_local_total_remote_access_latency_avgs.begin(); it != m_local_total_remote_access_latency_avgs.end(); ++it) {
+            UInt64 local_remote_access_latency_avg = it->getNS();
+            std::cout << local_remote_access_latency_avg << ' ';
+        }
+        std::cout << "\n\n";
 
-    // Local IPC Stats
-    std::cout << "\nLocal IPC:\n";
-    for (std::vector<double>::iterator it = m_local_IPCs.begin(); it != m_local_IPCs.end(); ++it) {
-        double local_IPC = *it;
-        std::cout << local_IPC << ' ';
+        // Local IPC Stats
+        std::cout << "\nLocal IPC:\n";
+        for (std::vector<double>::iterator it = m_local_IPCs.begin(); it != m_local_IPCs.end(); ++it) {
+            double local_IPC = *it;
+            std::cout << local_IPC << ' ';
+        }
+        std::cout << "\n\n";
     }
-    std::cout << "\n\n";
 
     if (m_queue_model.size())
     {
