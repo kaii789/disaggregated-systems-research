@@ -1542,6 +1542,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
             if (m_inflight_page_to_dirty_write_count.find(inflight_page) != m_inflight_page_to_dirty_write_count.end()) {
                 m_dirty_write_buffer_size -= m_inflight_page_to_dirty_write_count[inflight_page];
                 m_inflight_page_to_dirty_write_count.erase(inflight_page);
+                m_max_dirty_write_buffer_size = std::max(m_max_dirty_write_buffer_size, m_dirty_write_buffer_size);
             }
         } else {
             ++i;
@@ -1811,7 +1812,6 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                     m_inflight_page_to_dirty_write_count[phys_page] = dirty_write_count;
 
                     m_dirty_write_buffer_size += 1;
-                    m_max_dirty_write_buffer_size = std::max(m_max_dirty_write_buffer_size, m_dirty_write_buffer_size);
                 }
 
                 double cacheline_queue_utilization_percentage;
