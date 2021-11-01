@@ -462,8 +462,8 @@ class ExperimentManager:
                         ].containing_experiment = process_request.containing_experiment
 
                         # Create temp dir
-                        process_temp_dir_name = "run_{}_process_{}_temp".format(
-                            process_info[index].experiment_run.experiment_run_no, index
+                        process_temp_dir_name = "run_{}".format(
+                            process_info[index].experiment_run.experiment_run_no
                         )
                         process_temp_dir = os.path.join(
                             process_info[
