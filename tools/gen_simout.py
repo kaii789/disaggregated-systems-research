@@ -147,11 +147,25 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     results['dram.total-access-latency'] = map(sum, zip(results['dram.total-remote-access-latency'], results['dram.total-local-access-latency']))
     results['dram.localavglatency'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.total-local-access-latency'], results['dram.local-accesses']))
     results['dram.localavghardwarelatency'] = map(lambda (a,b): a/b if b else 0.0, zip(results['dram.total-local-dram-hardware-latency'], results['dram.total-local-dram-hardware-latency-count']))
+    results['dram.localavghardwarelatency_processing_time'] = map(lambda (a,b): a/b if b else 0.0, zip(results['dram.total-local-dram-hardware-latency-processing-time'], results['dram.total-local-dram-hardware-latency-count']))
+    results['dram.localavghardwarelatency_queue_delay'] = map(lambda (a,b): a/b if b else 0.0, zip(results['dram.total-local-dram-hardware-latency-queue-delay'], results['dram.total-local-dram-hardware-latency-count']))
+
     results['dram.remoteavglatency'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.total-remote-access-latency'], results['dram.remote-accesses']))
     results['dram.remoteavghardwarelatency_pages'] = map(lambda (a,b): a/b if b else 0.0, zip(results['dram.total-remote-dram-hardware-latency-pages'], results['dram.total-remote-dram-hardware-latency-pages-count']))  # Prefetched pages not currently accounted for in sniper stats
+    results['dram.remoteavghardwarelatency_pages_processing_time'] = map(lambda (a,b): a/b if b else 0.0, zip(results['dram.total-remote-dram-hardware-latency-pages-processing-time'], results['dram.total-remote-dram-hardware-latency-pages-count']))  # Prefetched pages not currently accounted for in sniper stats
+    results['dram.remoteavghardwarelatency_pages_queue_delay'] = map(lambda (a,b): a/b if b else 0.0, zip(results['dram.total-remote-dram-hardware-latency-pages-queue-delay'], results['dram.total-remote-dram-hardware-latency-pages-count']))  # Prefetched pages not currently accounted for in sniper stats
+    
     results['dram.localavghardwarewritelatency_pages'] = map(lambda (a,b): a/b if b else 0.0, zip(results['dram.total-local-dram-hardware-write-latency-pages'], results['dram.total-remote-dram-hardware-latency-pages-count']))  # Prefetched pages not currently accounted for in sniper stats
+    
     results['dram.remoteavghardwarelatency_cachelines'] = map(lambda (a,b): (a)/b if b else 0.0, zip(results['dram.total-remote-dram-hardware-latency-cachelines'], results['dram.total-remote-dram-hardware-latency-cachelines-count']))
-    results['dram.remote_datamovement_avglatency'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.total-remote-datamovement-latency'], results['dram.remote-accesses']))
+    results['dram.remoteavghardwarelatency_cachelines_processing_time'] = map(lambda (a,b): (a)/b if b else 0.0, zip(results['dram.total-remote-dram-hardware-latency-cachelines-processing-time'], results['dram.total-remote-dram-hardware-latency-cachelines-count']))
+    results['dram.remoteavghardwarelatency_cachelines_queue_delay'] = map(lambda (a,b): (a)/b if b else 0.0, zip(results['dram.total-remote-dram-hardware-latency-cachelines-queue-delay'], results['dram.total-remote-dram-hardware-latency-cachelines-count']))
+    
+    results['dram.remote_datamovement_avglatency'] = map(lambda (a,b): a/b if b else 0.0, zip(results['dram.total-remote-datamovement-latency'], results['dram.remote-accesses']))
+    results['dram.avg_remotetolocal_cacheline_network_processing_time'] = map(lambda (a,b): a/b if b else 0.0, zip(results['dram.total-network-cacheline-processing-time'], results['dram.total-remote-to-local-cacheline-move-count']))
+    results['dram.avg_remotetolocal_cacheline_network_queue_delay'] = map(lambda (a,b): a/b if b else 0.0, zip(results['dram.total-network-cacheline-queue-delay'], results['dram.total-remote-to-local-cacheline-move-count']))
+    results['dram.avg_remotetolocal_page_network_processing_time'] = map(lambda (a,b): a/b if b else 0.0, zip(results['dram.total-network-page-processing-time'], results['dram.total-remote-to-local-page-move-count']))
+    results['dram.avg_remotetolocal_page_network_queue_delay'] = map(lambda (a,b): a/b if b else 0.0, zip(results['dram.total-network-page-queue-delay'], results['dram.total-remote-to-local-page-move-count']))
   if 'dram.page-movement-num-global-time-much-larger' in results and sum(results['dram.page-movement-num-global-time-much-larger']) > 0:
     results['dram.pagemovement_avg_globaltime_much_larger'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.page-movement-global-time-much-larger-total-time'], results['dram.page-movement-num-global-time-much-larger']))
   results['dram.avglatency'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.total-access-latency'], results['dram.accesses']))
@@ -295,11 +309,21 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     ('  average dram access latency (ns)', 'dram.avglatency', format_ns(2)),
     ('    local dram avg access latency (ns)', 'dram.localavglatency', format_ns(2)),
     ('      local dram avg hardware latency (ns)', 'dram.localavghardwarelatency', format_ns(2)),
+    ('        local dram avg HW processing time (ns)', 'dram.localavghardwarelatency_processing_time', format_ns(2)),
+    ('        local dram avg HW queue delay (ns)', 'dram.localavghardwarelatency_queue_delay', format_ns(2)),
     ('    local dram avg hardware write latency: pages (ns)', 'dram.localavghardwarewritelatency_pages', format_ns(2)),
     ('    remote dram avg access latency (ns)', 'dram.remoteavglatency', format_ns(2)),
     ('      remote dram avg hardware latency: cachelines (ns)', 'dram.remoteavghardwarelatency_cachelines', format_ns(2)),
+    ('        remote dram avg HW processing time: cachelines (ns)', 'dram.remoteavghardwarelatency_cachelines_processing_time', format_ns(2)),
+    ('        remote dram avg HW queue delay: cachelines (ns)', 'dram.remoteavghardwarelatency_cachelines_queue_delay', format_ns(2)),
     ('      remote dram avg hardware latency: pages (ns)', 'dram.remoteavghardwarelatency_pages', format_ns(2)),
-    ('      remote avg datamovement latency (ns)', 'dram.remote_datamovement_avglatency', format_ns(2)),
+    ('        remote dram avg HW processing time: pages (ns)', 'dram.remoteavghardwarelatency_pages_processing_time', format_ns(2)),
+    ('        remote dram avg HW queue delay: pages (ns)', 'dram.remoteavghardwarelatency_pages_queue_delay', format_ns(2)),
+    ('      avg remote-to-local datamovement latency (ns)', 'dram.remote_datamovement_avglatency', format_ns(2)),
+    ('        avg remote-to-local network processing time: cachelines (ns)', 'dram.avg_remotetolocal_cacheline_network_processing_time', format_ns(2)),
+    ('        avg remote-to-local network queue delay: cachelines (ns)', 'dram.avg_remotetolocal_cacheline_network_queue_delay', format_ns(2)),
+    ('        avg remote-to-local network processing time: pages (ns)', 'dram.avg_remotetolocal_page_network_processing_time', format_ns(2)),
+    ('        avg remote-to-local network queue delay: pages (ns)', 'dram.avg_remotetolocal_page_network_queue_delay', format_ns(2)),
     ('      remote avg pagemove global time much larger (ns)', 'dram.pagemovement_avg_globaltime_much_larger', format_ns(2)),
     ('      remote pagemove global time much larger count', 'dram.page-movement-num-global-time-much-larger', str),
     ('      remote both queues total avg access latency (ns)', 'dram.both_queues_total_avgdelay', format_ns(2)),

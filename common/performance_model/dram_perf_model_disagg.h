@@ -48,6 +48,7 @@ class DramPerfModelDisagg : public DramPerfModel
         const bool m_randomize_address;
         const UInt32 m_randomize_offset;
         const UInt32 m_column_bits_shift; // Position of column bits for closed-page mapping (after cutting interleaving/channel/rank/bank from bottom)
+        SubsecondTime m_dram_hw_fixed_latency;  // Only used in the simplified dram HW access cost queuing model, a fixed latency for dram access cost
         const ComponentBandwidth m_bus_bandwidth;
         const ComponentBandwidth m_r_dram_bus_bandwidth;
         ComponentBandwidth m_r_bus_bandwidth;   // Remote
@@ -233,13 +234,30 @@ class DramPerfModelDisagg : public DramPerfModel
         SubsecondTime m_total_local_access_latency;
         SubsecondTime m_total_remote_access_latency;
         SubsecondTime m_total_remote_datamovement_latency;
+        
         SubsecondTime m_total_local_dram_hardware_latency;
-        SubsecondTime m_total_local_dram_hardware_write_latency_pages;
         SubsecondTime m_total_remote_dram_hardware_latency_cachelines;
         SubsecondTime m_total_remote_dram_hardware_latency_pages;
         UInt64 m_total_local_dram_hardware_latency_count;
         UInt64 m_total_remote_dram_hardware_latency_cachelines_count;
         UInt64 m_total_remote_dram_hardware_latency_pages_count;
+        SubsecondTime m_total_local_dram_hardware_write_latency_pages;
+        // UInt64 m_local_get_dram_access_cost_called;
+        // UInt64 m_remote_cacheline_get_dram_access_cost_called;
+        // UInt64 m_remote_page_get_dram_access_cost_called;
+        SubsecondTime m_local_get_dram_access_cost_processing_time;
+        SubsecondTime m_local_get_dram_access_cost_queue_delay;
+        SubsecondTime m_remote_cacheline_get_dram_access_cost_processing_time;
+        SubsecondTime m_remote_cacheline_get_dram_access_cost_queue_delay;
+        SubsecondTime m_remote_page_get_dram_access_cost_processing_time;
+        SubsecondTime m_remote_page_get_dram_access_cost_queue_delay;
+        SubsecondTime m_cacheline_network_processing_time;
+        SubsecondTime m_cacheline_network_queue_delay;
+        SubsecondTime m_page_network_processing_time;
+        SubsecondTime m_page_network_queue_delay;
+        UInt64 m_remote_to_local_cacheline_move_count;
+        UInt64 m_remote_to_local_page_move_count;
+
         UInt64 m_global_time_much_larger_than_page_arrival;
         SubsecondTime m_sum_global_time_much_larger;
 
@@ -266,8 +284,8 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_sum_write_buffer_size = 0;
         UInt64 m_max_dirty_write_buffer_size = 0;
 
-        SubsecondTime getDramAccessCost(SubsecondTime start_time, UInt64 size, core_id_t requester, IntPtr address, ShmemPerf *perf, bool is_remote, bool is_exclude_cacheline);
-        SubsecondTime getDramWriteCost(SubsecondTime start_time, UInt64 size, core_id_t requester, IntPtr address, ShmemPerf *perf, bool is_exclude_cacheline);
+        SubsecondTime getDramAccessCost(SubsecondTime start_time, UInt64 size, core_id_t requester, IntPtr address, ShmemPerf *perf, bool is_remote, bool is_exclude_cacheline, bool is_page);
+        SubsecondTime getDramWriteCost(SubsecondTime start_time, UInt64 size, core_id_t requester, IntPtr address, ShmemPerf *perf, bool is_exclude_cacheline, bool is_page);
         void parseDeviceAddress(IntPtr address, UInt32 &channel, UInt32 &rank, UInt32 &bank_group, UInt32 &bank, UInt32 &column, UInt64 &dram_page);
         UInt64 parseAddressBits(UInt64 address, UInt32 &data, UInt32 offset, UInt32 size, UInt64 base_address);
         SubsecondTime possiblyEvict(UInt64 phys_page, SubsecondTime pkt_time, core_id_t requester);
