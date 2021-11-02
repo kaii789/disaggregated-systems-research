@@ -1201,7 +1201,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         }
     }
     // Cancel moving the page if the amount of reserved bufferspace in localdram for inflight + inflight_evicted pages is not enough to support an additional move
-    if (move_page && m_r_reserved_bufferspace > 0 && ((m_inflight_pages.size() + m_inflightevicted_pages.size())  >= ((double)m_r_reserved_bufferspace/100)*(m_localdram_size/m_page_size))) {
+    if (m_r_partition_queues != 0 && move_page && m_r_reserved_bufferspace > 0 && ((m_inflight_pages.size() + m_inflightevicted_pages.size())  >= ((double)m_r_reserved_bufferspace/100)*(m_localdram_size/m_page_size))) {
         move_page = false;
         ++m_move_page_cancelled_bufferspace_full;
     }
@@ -1432,25 +1432,32 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         if (m_use_ideal_page_throttling || !m_speed_up_simulation)
             m_moved_pages_no_access_yet.push_back(phys_page);
 
-        // m_inflight_pages.erase(phys_page);
-        SubsecondTime global_time = Sim()->getClockSkewMinimizationServer()->getGlobalTime();
-        SubsecondTime page_arrival_time = t_remote_queue_request + page_hw_access_latency + page_compression_latency + page_datamovement_delay + page_network_processing_time + local_page_hw_write_latency;  // page_datamovement_delay already contains the page decompression latency
-        m_inflight_pages[phys_page] = SubsecondTime::max(global_time, page_arrival_time);
-        if (global_time > page_arrival_time + SubsecondTime::NS(50)) {  // if global time is more than 50 ns ahead of page_arrival_time
-            ++m_global_time_much_larger_than_page_arrival;
-            m_sum_global_time_much_larger += global_time - page_arrival_time;
-        }
-        m_inflight_redundant[phys_page] = 0; 
-        if (m_inflight_pages.size() > m_max_bufferspace)
-            m_max_bufferspace++;
 
-        for (auto it = updated_inflight_page_arrival_time_deltas.begin(); it != updated_inflight_page_arrival_time_deltas.end(); ++it) {
-            if (m_inflight_pages.count(it->first) && it->second > SubsecondTime::Zero()) {
-                m_inflight_pages_delay_time += it->second;
-                m_inflight_pages[it->first] += it->second;  // update arrival time if it's still an inflight page
-                ++m_inflight_page_delayed;
+        if (m_r_partition_queues == 0 && move_page && m_r_reserved_bufferspace > 0 && ((m_inflight_pages.size() + m_inflightevicted_pages.size())  >= ((double)m_r_reserved_bufferspace/100)*(m_localdram_size/m_page_size))) {
+            // Estimate how long it would take to send packet if inflight page buffer is full
+            t_now += SubsecondTime::NS() * 2000;
+        } else {
+            // m_inflight_pages.erase(phys_page);
+            SubsecondTime global_time = Sim()->getClockSkewMinimizationServer()->getGlobalTime();
+            SubsecondTime page_arrival_time = t_remote_queue_request + page_hw_access_latency + page_compression_latency + page_datamovement_delay + page_network_processing_time + local_page_hw_write_latency;  // page_datamovement_delay already contains the page decompression latency
+            m_inflight_pages[phys_page] = SubsecondTime::max(global_time, page_arrival_time);
+            if (global_time > page_arrival_time + SubsecondTime::NS(50)) {  // if global time is more than 50 ns ahead of page_arrival_time
+                ++m_global_time_much_larger_than_page_arrival;
+                m_sum_global_time_much_larger += global_time - page_arrival_time;
+            }
+            m_inflight_redundant[phys_page] = 0; 
+            if (m_inflight_pages.size() > m_max_bufferspace)
+                m_max_bufferspace++;
+
+            for (auto it = updated_inflight_page_arrival_time_deltas.begin(); it != updated_inflight_page_arrival_time_deltas.end(); ++it) {
+                if (m_inflight_pages.count(it->first) && it->second > SubsecondTime::Zero()) {
+                    m_inflight_pages_delay_time += it->second;
+                    m_inflight_pages[it->first] += it->second;  // update arrival time if it's still an inflight page
+                    ++m_inflight_page_delayed;
+                }
             }
         }
+
     }
     if (!move_page || !m_r_simulate_datamov_overhead || m_r_cacheline_gran) {  // move_page == false, or earlier condition (m_r_simulate_datamov_overhead && !m_r_cacheline_gran) is false
         // Actually put the cacheline request on the queue, since after now we're sure we actually use the cacheline request
