@@ -61,6 +61,7 @@ class DramPerfModelDisagg : public DramPerfModel
         const SubsecondTime m_bank_open_delay;
         const SubsecondTime m_bank_close_delay;
         const SubsecondTime m_dram_access_cost;
+        const SubsecondTime m_r_added_dram_access_cost;
         const SubsecondTime m_intercommand_delay;       // Rank availability
         const SubsecondTime m_intercommand_delay_short; // Rank availability
         const SubsecondTime m_intercommand_delay_long;  // Bank group availability

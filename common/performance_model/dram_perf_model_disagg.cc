@@ -50,6 +50,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_bank_open_delay     (SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/ddr/bank_open_delay")))
     , m_bank_close_delay    (SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/ddr/bank_close_delay")))
     , m_dram_access_cost    (SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/ddr/access_cost")))
+    , m_r_added_dram_access_cost    (SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/added_dram_access_cost")))
     , m_intercommand_delay  (SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/ddr/intercommand_delay"))) // Rank availability
     , m_intercommand_delay_short  (SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/ddr/intercommand_delay_short"))) // Rank availability
     , m_intercommand_delay_long  (SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/ddr/intercommand_delay_long"))) // Bank group availability
@@ -800,6 +801,10 @@ DramPerfModelDisagg::getDramAccessCost(SubsecondTime start_time, UInt64 size, co
         if (is_page) {
             m_remote_page_get_dram_access_cost_processing_time += ddr_processing_time;
             m_remote_page_get_dram_access_cost_queue_delay += ddr_queue_delay;
+
+            // Debug: Add extra dram access cost if page
+            t_now += m_r_added_dram_access_cost;
+            perf->updateTime(t_now);
         } else {
             m_remote_cacheline_get_dram_access_cost_processing_time += ddr_processing_time;
             m_remote_cacheline_get_dram_access_cost_queue_delay += ddr_queue_delay;
