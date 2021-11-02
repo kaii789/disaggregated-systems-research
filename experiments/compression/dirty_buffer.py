@@ -31,21 +31,21 @@ no_remote_memory_list = [
 ]
 
 config_list = [
-    # # 1) No Compression
-    # automation.ExperimentRunConfig(
-    #     [
-    #         # automation.ConfigEntry("general", "magic", "false"),
-    #         automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
-    #         automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
-    #         automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
-    #         automation.ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
-    #         automation.ConfigEntry("perf_model/dram", "remote_memory_mode", "1"),
-    #         automation.ConfigEntry("perf_model/dram", "remote_init", "true"),
-    #         # automation.ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
-    #         # automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
-    #         automation.ConfigEntry("perf_model/dram", "speed_up_disagg_simulation", "true"),
-    #     ]
-    # ),
+     # 1) No Compression
+     automation.ExperimentRunConfig(
+         [
+             # automation.ConfigEntry("general", "magic", "false"),
+             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
+             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
+             automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+             automation.ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
+             automation.ConfigEntry("perf_model/dram", "remote_memory_mode", "1"),
+             automation.ConfigEntry("perf_model/dram", "remote_init", "true"),
+             # automation.ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+             # automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
+             automation.ConfigEntry("perf_model/dram", "speed_up_disagg_simulation", "true"),
+         ]
+     ),
     # # 2 LZBDI
     # automation.ExperimentRunConfig(
     #     [
@@ -59,21 +59,21 @@ config_list = [
     #         automation.ConfigEntry("perf_model/dram", "speed_up_disagg_simulation", "true"),
     #     ]
     # ),
-    # # 3 Deflate
-    # automation.ExperimentRunConfig(
-    #     [
-    #         automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
-    #         automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
-    #         automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "zlib"),
-    #         automation.ConfigEntry("perf_model/dram/compression_model/zlib", "compression_latency", "15"),
-    #         automation.ConfigEntry("perf_model/dram/compression_model/zlib", "decompression_latency", "15"),
-    #         automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
-    #         automation.ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
-    #         automation.ConfigEntry("perf_model/dram", "remote_memory_mode", "1"),
-    #         automation.ConfigEntry("perf_model/dram", "remote_init", "true"),
-    #         automation.ConfigEntry("perf_model/dram", "speed_up_disagg_simulation", "true"),
-    #     ]
-    # ),
+     # 3 Deflate
+     automation.ExperimentRunConfig(
+         [
+             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
+             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+             automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "zlib"),
+             automation.ConfigEntry("perf_model/dram/compression_model/zlib", "compression_latency", "15"),
+             automation.ConfigEntry("perf_model/dram/compression_model/zlib", "decompression_latency", "15"),
+             automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+             automation.ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
+             automation.ConfigEntry("perf_model/dram", "remote_memory_mode", "1"),
+             automation.ConfigEntry("perf_model/dram", "remote_init", "true"),
+             automation.ConfigEntry("perf_model/dram", "speed_up_disagg_simulation", "true"),
+         ]
+     ),
     # 4 PQ On
     automation.ExperimentRunConfig(
         [
@@ -103,23 +103,23 @@ config_list = [
     #         automation.ConfigEntry("perf_model/dram", "speed_up_disagg_simulation", "true"),
     #     ]
     # ),
-    # # 6 PQ On, Compression On: Deflate
-    # automation.ExperimentRunConfig(
-    #     [
-    #         automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
-    #         automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
-    #         automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "zlib"),
-    #         automation.ConfigEntry("perf_model/dram/compression_model/zlib", "compression_latency", "15"),
-    #         automation.ConfigEntry("perf_model/dram/compression_model/zlib", "decompression_latency", "15"),
-    #         automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "4"),
-    #         automation.ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.2"),
-    #         automation.ConfigEntry("perf_model/dram", "use_dynamic_cacheline_queue_fraction_adjustment", "false"),
-    #         automation.ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
-    #         automation.ConfigEntry("perf_model/dram", "remote_memory_mode", "1"),
-    #         automation.ConfigEntry("perf_model/dram", "remote_init", "true"),
-    #         automation.ConfigEntry("perf_model/dram", "speed_up_disagg_simulation", "true"),
-    #     ]
-    # ),
+     # 6 PQ On, Compression On: Deflate
+     automation.ExperimentRunConfig(
+         [
+             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
+             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+             automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "zlib"),
+             automation.ConfigEntry("perf_model/dram/compression_model/zlib", "compression_latency", "15"),
+             automation.ConfigEntry("perf_model/dram/compression_model/zlib", "decompression_latency", "15"),
+             automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "4"),
+             automation.ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.2"),
+             automation.ConfigEntry("perf_model/dram", "use_dynamic_cacheline_queue_fraction_adjustment", "false"),
+             automation.ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
+             automation.ConfigEntry("perf_model/dram", "remote_memory_mode", "1"),
+             automation.ConfigEntry("perf_model/dram", "remote_init", "true"),
+             automation.ConfigEntry("perf_model/dram", "speed_up_disagg_simulation", "true"),
+         ]
+     ),
 ]
 
 
@@ -483,6 +483,88 @@ def run_darknet(model_type):
                                 start_experiment_no=1,
                             )
                         )
+
+
+    # Everything else
+    model_to_local_dram_size = {
+        "darknet19": [8],
+        "resnet50": [6],
+        "resnet152": [6],
+        "vgg-16": [12],
+        "yolov3": [12]
+    }
+    for num_MB in model_to_local_dram_size[model_type]:
+        for page_size in page_size_list:
+            for net_lat in netlat_list:
+                for bw_scalefactor in bw_scalefactor_list:
+                    for rbus_scalefactor in remote_dram_bus_scalefactor_list:
+                        localdram_size_str = "{}MB".format(num_MB)
+                        command_str = darknet_base_str_options.format(
+                            model_type,
+                            sniper_options="-g perf_model/dram/remote_dram_bus_scalefactor={} -g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+                                rbus_scalefactor,
+                                page_size,
+                                int(num_MB * ONE_MB_TO_BYTES),
+                                int(net_lat),
+                                float(bw_scalefactor),
+                                int(1 * ONE_BILLION),
+                            ),
+                        )
+                        # 1 billion instructions cap
+
+                        experiments.append(
+                            automation.Experiment(
+                                experiment_name="darknet_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_rbus_scalefactor_{}_combo".format(
+                                    model_type.lower().replace("-", ""), localdram_size_str, net_lat, bw_scalefactor, page_size, rbus_scalefactor
+                                ),
+                                command_str=command_str,
+                                experiment_run_configs=config_list,
+                                output_root_directory=".",
+                                start_experiment_no=1,
+                            )
+                        )
+
+
+    # Everything else
+    model_to_local_dram_size = {
+        "darknet19": [16],
+        "resnet50": [12],
+        "resnet152": [8],
+        "vgg-16": [28],
+        "yolov3": [27]
+    }
+    for num_MB in model_to_local_dram_size[model_type]:
+        for page_size in page_size_list:
+            for net_lat in netlat_list:
+                for bw_scalefactor in bw_scalefactor_list:
+                    for rbus_scalefactor in remote_dram_bus_scalefactor_list:
+                        localdram_size_str = "{}MB".format(num_MB)
+                        command_str = darknet_base_str_options.format(
+                            model_type,
+                            sniper_options="-g perf_model/dram/remote_dram_bus_scalefactor={} -g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+                                rbus_scalefactor,
+                                page_size,
+                                int(num_MB * ONE_MB_TO_BYTES),
+                                int(net_lat),
+                                float(bw_scalefactor),
+                                int(1 * ONE_BILLION),
+                            ),
+                        )
+                        # 1 billion instructions cap
+
+                        experiments.append(
+                            automation.Experiment(
+                                experiment_name="darknet_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_rbus_scalefactor_{}_combo".format(
+                                    model_type.lower().replace("-", ""), localdram_size_str, net_lat, bw_scalefactor, page_size, rbus_scalefactor
+                                ),
+                                command_str=command_str,
+                                experiment_run_configs=config_list,
+                                output_root_directory=".",
+                                start_experiment_no=1,
+                            )
+                        )
+
+
 
     return experiments
 
@@ -975,8 +1057,10 @@ def run_sql(sql_filename):  # TPCH
 # TODO: Experiment run
 experiments = []
 experiments.extend(run_darknet("resnet50"))
+#experiments.extend(run_darknet("resnet152"))
 experiments.extend(run_darknet("darknet19"))
 experiments.extend(run_darknet("vgg-16"))
+#experiments.extend(run_darknet("yolov3"))
 # experiments.extend(run_spmv("pkustk14.mtx"))
 # experiments.extend(run_ligra_nonsym("MIS"))
 # experiments.extend(run_ligra_nonsym("Radii"))
