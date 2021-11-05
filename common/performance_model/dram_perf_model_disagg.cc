@@ -2354,7 +2354,8 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
 
         m_dirty_pages.erase(evicted_page);
     }
-    return sw_overhead + evict_compression_latency;  // latencies that are on the critical path
+    // return sw_overhead + evict_compression_latency;
+    return sw_overhead;  // latencies that are on the critical path
 }
 
 
