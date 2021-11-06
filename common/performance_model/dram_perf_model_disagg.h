@@ -89,7 +89,7 @@ class DramPerfModelDisagg : public DramPerfModel
         double m_r_cacheline_queue_fraction; // The fraction of remote bandwidth used for the cacheline queue (decimal between 0 and 1) 
         bool m_use_dynamic_cl_queue_fraction_adjustment; // Whether to dynamically adjust m_r_cacheline_queue_fraction
         const bool m_r_cacheline_gran; // Move data and operate in cacheline granularity
-        const UInt32 m_r_reserved_bufferspace; // Max % of local DRAM that can be reserved for pages in transit
+        const double m_r_reserved_bufferspace; // Max % of local DRAM that can be reserved for pages in transit
         const UInt32 m_r_limit_redundant_moves; 
         const bool m_r_throttle_redundant_moves;
         const bool m_r_use_separate_queue_model;  // Whether to use the separate remote queue model
@@ -137,6 +137,7 @@ class DramPerfModelDisagg : public DramPerfModel
         std::map<UInt64, SubsecondTime> m_inflight_pages; // Inflight pages that are being transferred from remote memory to local memory
         std::map<UInt64, UInt32> m_inflight_redundant;    // Count the number of redundant moves that occur for each inflight page while it is being transferred
         std::map<UInt64, SubsecondTime> m_inflightevicted_pages; // Inflight pages that are being transferred from local memory to remote memory
+        std::map<UInt64, SubsecondTime> m_inflight_pages_extra; // Inflight pages that are being transferred from remote memory to local memory, that exceed the limit from inflight buffer size or network bw (track arrival time while not counting it in the normal data structures)
 
         UInt64 m_inflight_page_delayed;
         SubsecondTime m_inflight_pages_delay_time;
@@ -218,10 +219,15 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_redundant_moves_type2_cancelled_datamovement_queue_full;
         UInt64 m_redundant_moves_type2_cancelled_limit_redundant_moves; // number of times a cacheline queue request is cancelled due to m_r_limit_redundant_moves
         UInt64 m_redundant_moves_type2_slower_than_page_arrival;  // these situations don't result in redundant moves
-        UInt64 m_max_bufferspace;                   // the maximum number of localdram pages actually used to back inflight and inflight_evicted pages 
+        UInt64 m_max_total_bufferspace;                        // the maximum number of localdram pages actually used to back inflight_pages and inflightevicted_pages pages 
+        UInt64 m_max_inflight_bufferspace;                     // the maximum number of localdram pages actually used to back inflight pages in the m_inflight_pages map
+        UInt64 m_max_inflight_extra_bufferspace;               // the maximum number of localdram pages in the inflight_extra map
+        UInt64 m_max_inflightevicted_bufferspace;              // the maximum number of localdram pages actually used to back inflight evicted pages in the m_inflightevicted_pages map
         UInt64 m_move_page_cancelled_bufferspace_full;         // the number of times moving a remote page to local was cancelled due to localdram bufferspace being full
-        UInt64 m_move_page_cancelled_datamovement_queue_full;  // the number of times moving a remote page to local was cancelled due to the queue for pages being full
+        UInt64 m_move_page_cancelled_datamovement_queue_full;  // the number of times moving a remote page to local was cancelled due to the network bandwidth queue for pages being full
         UInt64 m_move_page_cancelled_rmode5;                   // the number of times a remote page was not moved to local due to rmode5
+        UInt64 m_bufferspace_full_page_still_moved;            // localdram bufferspace was full, but page was still moved with an additional estimated penalty (currently only when PQ=off)
+        UInt64 m_datamovement_queue_full_page_still_moved;     // network bandwidth queue for pages was full, but page was still moved with an additional estimated penalty (currently only when PQ=off)
         UInt64 m_rmode5_page_moved_due_to_threshold;           // the number of time when in rmode5 and acting according to rmode2, a page was moved because the threshold number of accesses was reached
         UInt64 m_unique_pages_accessed;             // track number of unique pages accessed
         UInt64 m_ideal_page_throttling_swaps_inflight;         // number of times the ideal page throttling algorithm swaps a throttled page with a previously moved page that was inflight
