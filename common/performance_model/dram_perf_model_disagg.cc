@@ -126,7 +126,10 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_redundant_moves_type2_cancelled_datamovement_queue_full(0)
     , m_redundant_moves_type2_cancelled_limit_redundant_moves(0)
     , m_redundant_moves_type2_slower_than_page_arrival(0)
-    , m_max_bufferspace     (0)
+    , m_max_total_bufferspace(0)
+    , m_max_inflight_bufferspace(0)
+    , m_max_inflight_extra_bufferspace(0)
+    , m_max_inflightevicted_bufferspace(0)
     , m_move_page_cancelled_bufferspace_full(0)
     , m_move_page_cancelled_datamovement_queue_full(0)
     , m_move_page_cancelled_rmode5(0)
@@ -334,7 +337,10 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     registerStatsMetric("dram", core_id, "local-evictions", &m_local_evictions);
     registerStatsMetric("dram", core_id, "extra-traffic", &m_extra_pages);
     registerStatsMetric("dram", core_id, "redundant-moves", &m_redundant_moves);
-    registerStatsMetric("dram", core_id, "max-bufferspace", &m_max_bufferspace);
+    registerStatsMetric("dram", core_id, "max-total-bufferspace", &m_max_total_bufferspace);
+    registerStatsMetric("dram", core_id, "max-inflight-bufferspace", &m_max_inflight_bufferspace);
+    registerStatsMetric("dram", core_id, "max-inflight-extra-bufferspace", &m_max_inflight_extra_bufferspace);
+    registerStatsMetric("dram", core_id, "max-inflightevicted-bufferspace", &m_max_inflightevicted_bufferspace);
     registerStatsMetric("dram", core_id, "page-prefetches", &m_page_prefetches);
     registerStatsMetric("dram", core_id, "queue-full-page-prefetch-not-done", &m_prefetch_page_not_done_datamovement_queue_full);
     registerStatsMetric("dram", core_id, "page-local-already-page-prefetch-not-done", &m_prefetch_page_not_done_page_local_already);
@@ -1433,21 +1439,27 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             m_moved_pages_no_access_yet.push_back(phys_page);
 
 
+        SubsecondTime global_time = Sim()->getClockSkewMinimizationServer()->getGlobalTime();
+        SubsecondTime page_arrival_time = t_remote_queue_request + page_hw_access_latency + page_compression_latency + page_datamovement_delay + page_network_processing_time + local_page_hw_write_latency;  // page_datamovement_delay already contains the page decompression latency
+        if (global_time > page_arrival_time + SubsecondTime::NS(50)) {  // if global time is more than 50 ns ahead of page_arrival_time
+            ++m_global_time_much_larger_than_page_arrival;
+            m_sum_global_time_much_larger += global_time - page_arrival_time;
+        }
         if (m_r_partition_queues == 0 && move_page && m_r_reserved_bufferspace > 0 && ((m_inflight_pages.size() + m_inflightevicted_pages.size())  >= ((double)m_r_reserved_bufferspace/100)*(m_localdram_size/m_page_size))) {
             // Estimate how long it would take to send packet if inflight page buffer is full
-            t_now += SubsecondTime::NS() * 2000;
+            SubsecondTime extra_delay_penalty = SubsecondTime::NS() * 2000;
+            t_now += extra_delay_penalty;
+            m_inflight_pages_extra[phys_page] = SubsecondTime::max(global_time, page_arrival_time + extra_delay_penalty);
+            if (m_inflight_pages_extra.size() > m_max_inflight_extra_bufferspace)
+                m_max_inflight_extra_bufferspace++;
         } else {
             // m_inflight_pages.erase(phys_page);
-            SubsecondTime global_time = Sim()->getClockSkewMinimizationServer()->getGlobalTime();
-            SubsecondTime page_arrival_time = t_remote_queue_request + page_hw_access_latency + page_compression_latency + page_datamovement_delay + page_network_processing_time + local_page_hw_write_latency;  // page_datamovement_delay already contains the page decompression latency
             m_inflight_pages[phys_page] = SubsecondTime::max(global_time, page_arrival_time);
-            if (global_time > page_arrival_time + SubsecondTime::NS(50)) {  // if global time is more than 50 ns ahead of page_arrival_time
-                ++m_global_time_much_larger_than_page_arrival;
-                m_sum_global_time_much_larger += global_time - page_arrival_time;
-            }
             m_inflight_redundant[phys_page] = 0; 
-            if (m_inflight_pages.size() > m_max_bufferspace)
-                m_max_bufferspace++;
+            if (m_inflight_pages.size() > m_max_inflight_bufferspace)
+                m_max_inflight_bufferspace++;
+            if (m_inflight_pages.size() + m_inflightevicted_pages.size() > m_max_total_bufferspace)
+                m_max_total_bufferspace++;  // update stat
 
             for (auto it = updated_inflight_page_arrival_time_deltas.begin(); it != updated_inflight_page_arrival_time_deltas.end(); ++it) {
                 if (m_inflight_pages.count(it->first) && it->second > SubsecondTime::Zero()) {
@@ -1503,6 +1515,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
 
     //std::cout << "Remote Latency: " << t_now - pkt_time << std::endl;
     possiblyPrefetch(phys_page, t_now, requester);
+
     SubsecondTime access_latency = t_now - pkt_time;
     m_total_remote_access_latency += access_latency;
     m_total_access_latency += access_latency;
@@ -1619,12 +1632,13 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
         }
     }
 
+    SubsecondTime current_time = SubsecondTime::max(Sim()->getClockSkewMinimizationServer()->getGlobalTime(), pkt_time);
     // m_inflight_pages: tracks which pages are being moved and when the movement will complete
     // Check if the page movement is over and if so, remove from the list
     // Do this for both queues, forward and backward
     std::map<UInt64, SubsecondTime>::iterator i;
     for (i = m_inflight_pages.begin(); i != m_inflight_pages.end();) {
-        if (i->second <= SubsecondTime::max(Sim()->getClockSkewMinimizationServer()->getGlobalTime(), pkt_time)) {
+        if (i->second <= current_time) {
             m_inflight_redundant.erase(i->first);
             m_data_movement->removeInflightPage(i->first);
             m_inflight_pages.erase(i++);
@@ -1640,12 +1654,19 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
             ++i;
         }
     }
-
     // Update dirty write buffer avg stat
     m_sum_write_buffer_size += m_dirty_write_buffer_size;
+    
+    for (i = m_inflight_pages_extra.begin(); i != m_inflight_pages_extra.end();) {
+        if (i->second <= current_time) {
+            m_inflight_pages_extra.erase(i++);
+        } else {
+            ++i;
+        }
+    }
 
     for (i = m_inflightevicted_pages.begin(); i != m_inflightevicted_pages.end();) {
-        if (i->second <= SubsecondTime::max(Sim()->getClockSkewMinimizationServer()->getGlobalTime(), pkt_time)) {
+        if (i->second <= current_time) {
             m_inflightevicted_pages.erase(i++);
         } else {
             ++i;
@@ -1874,17 +1895,22 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
     SubsecondTime t_remote_queue_request = t_now;  // time of making queue request (after DRAM hardware access cost added)
 
     ++m_num_recent_local_accesses;
-    if ((m_inflight_pages.find(phys_page) == m_inflight_pages.end()) || m_r_enable_selective_moves) {
-        // The phys_page is not included in m_inflight_pages or m_r_enable_selective_moves is true, then total access latency = t_now - pkt_time
+    if (((m_inflight_pages.find(phys_page) == m_inflight_pages.end()) && (m_inflight_pages_extra.find(phys_page) == m_inflight_pages_extra.end())) || m_r_enable_selective_moves) {
+        // The phys_page is not included in m_inflight_pages and m_inflight_pages_extra, or m_r_enable_selective_moves is true: then total access latency = t_now - pkt_time
         SubsecondTime access_latency = t_now - pkt_time;
         m_total_local_access_latency += access_latency;
         m_total_access_latency += access_latency;
         // LOG_PRINT("getAccessLatency branch 1: %lu ns", access_latency.getNS());
         return access_latency;
     } else {
-        // The phys_age is an inflight page and m_r_enable_selective_moves is false
+        // The phys_page is an inflight page and m_r_enable_selective_moves is false
         //SubsecondTime current_time = std::min(Sim()->getClockSkewMinimizationServer()->getGlobalTime(), t_now);
-        SubsecondTime access_latency = m_inflight_pages[phys_page] > t_now ? (m_inflight_pages[phys_page] - pkt_time) : (t_now - pkt_time);
+        SubsecondTime access_latency;
+        if (m_inflight_pages_extra.find(phys_page) != m_inflight_pages_extra.end()) {
+            access_latency = m_inflight_pages_extra[phys_page] > t_now ? (m_inflight_pages_extra[phys_page] - pkt_time) : (t_now - pkt_time);
+        } else {
+            access_latency = m_inflight_pages[phys_page] > t_now ? (m_inflight_pages[phys_page] - pkt_time) : (t_now - pkt_time);
+        }
 
         if (access_latency > (t_now - pkt_time)) {
             // The page is still in transit from remote to local memory
@@ -2294,6 +2320,10 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
                 page_network_processing_time = m_r_bus_bandwidth.getRoundedLatency(8*size);
 
             m_inflightevicted_pages[evicted_page] = t_remote_queue_request + evict_compression_latency + page_datamovement_delay + page_network_processing_time;
+            if (m_inflightevicted_pages.size() > m_max_inflightevicted_bufferspace)
+                m_max_inflightevicted_bufferspace++;
+            if (m_inflight_pages.size() + m_inflightevicted_pages.size() > m_max_total_bufferspace)
+                m_max_total_bufferspace++;  // update stat
 
         // } else if (std::find(m_remote_pages.begin(), m_remote_pages.end(), evicted_page) == m_remote_pages.end()) {
         } else if (!m_remote_pages.count(evicted_page)) {
@@ -2357,6 +2387,10 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
                 page_network_processing_time = m_r_bus_bandwidth.getRoundedLatency(8*size);
 
             m_inflightevicted_pages[evicted_page] = t_remote_queue_request + evict_compression_latency + page_datamovement_delay + page_network_processing_time;
+            if (m_inflightevicted_pages.size() > m_max_inflightevicted_bufferspace)
+                m_max_inflightevicted_bufferspace++;
+            if (m_inflight_pages.size() + m_inflightevicted_pages.size() > m_max_total_bufferspace)
+                m_max_total_bufferspace++;  // update stat
         }
 
         m_dirty_pages.erase(evicted_page);
@@ -2476,6 +2510,11 @@ DramPerfModelDisagg::possiblyPrefetch(UInt64 phys_page, SubsecondTime t_now, cor
         //     m_local_pages_remote_origin[pref_page] = 1;
         // m_inflight_pages.erase(pref_page);
         m_inflight_pages[pref_page] = t_remote_queue_request + page_compression_latency + page_datamovement_delay + page_network_processing_time;  // use max of this time with Sim()->getClockSkewMinimizationServer()->getGlobalTime() here as well?
+        m_inflight_redundant[pref_page] = 0; 
+        if (m_inflight_pages.size() > m_max_inflight_bufferspace)
+            m_max_inflight_bufferspace++;
+        if (m_inflight_pages.size() + m_inflightevicted_pages.size() > m_max_total_bufferspace)
+            m_max_total_bufferspace++;  // update stat
         possiblyEvict(phys_page, t_remote_queue_request, requester);
     }
 }
