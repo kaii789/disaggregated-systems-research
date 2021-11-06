@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
-#import pandas as pd
-#import numpy as np
+import pandas as pd
+import numpy as np
 import matplotlib as plt
 plt.use('Agg')
 import os
@@ -31,182 +31,104 @@ no_remote_memory_list = [
 ]
 
 config_list = [
-     # 1) No Compression
-     automation.ExperimentRunConfig(
-         [
-             # automation.ConfigEntry("general", "magic", "false"),
-             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
-             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
-             automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
-             automation.ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
-             automation.ConfigEntry("perf_model/dram", "remote_memory_mode", "1"),
-             automation.ConfigEntry("perf_model/dram", "remote_init", "true"),
-             automation.ConfigEntry("perf_model/dram", "r_cacheline_hw_no_queue_delay", "true"),
-             # automation.ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
-             # automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
-             automation.ConfigEntry("perf_model/dram", "speed_up_disagg_simulation", "true"),
-         ]
-     ),
-    # # 2 LZBDI
-    # automation.ExperimentRunConfig(
-    #     [
-    #         automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
-    #         automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
-    #         automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lzbdi"),
-    #         automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
-    #         automation.ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
-    #         automation.ConfigEntry("perf_model/dram", "remote_memory_mode", "1"),
-    #         automation.ConfigEntry("perf_model/dram", "remote_init", "true"),
-    #         automation.ConfigEntry("perf_model/dram", "speed_up_disagg_simulation", "true"),
-    #     ]
-    # ),
-     # 3 Deflate
-     #automation.ExperimentRunConfig(
-     #    [
-     #        automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
-     #        automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
-     #        automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "zlib"),
-     #        automation.ConfigEntry("perf_model/dram/compression_model/zlib", "compression_latency", "15"),
-     #        automation.ConfigEntry("perf_model/dram/compression_model/zlib", "decompression_latency", "15"),
-     #        automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
-     #        automation.ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
-     #        automation.ConfigEntry("perf_model/dram", "remote_memory_mode", "1"),
-     #        automation.ConfigEntry("perf_model/dram", "remote_init", "true"),
-     #        automation.ConfigEntry("perf_model/dram", "speed_up_disagg_simulation", "true"),
-     #    ]
-     #),
-    # 4 PQ On
+    # 1) No Compression
+    automation.ExperimentRunConfig(
+        [
+            # automation.ConfigEntry("general", "magic", "false"),
+            automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
+            automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
+            automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+            automation.ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
+            automation.ConfigEntry("perf_model/dram", "remote_memory_mode", "1"),
+            automation.ConfigEntry("perf_model/dram", "remote_init", "true"),
+            # automation.ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
+            # automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
+            automation.ConfigEntry("perf_model/dram", "speed_up_disagg_simulation", "true"),
+            automation.ConfigEntry("perf_model/dram", "r_cacheline_hw_no_queue_delay", "true"),
+        ]
+    ),
+    # 2 Deflate
+    automation.ExperimentRunConfig(
+        [
+            automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
+            automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+            automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "zlib"),
+            automation.ConfigEntry("perf_model/dram/compression_model/zlib", "compression_latency", "15"),
+            automation.ConfigEntry("perf_model/dram/compression_model/zlib", "decompression_latency", "15"),
+            automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+            automation.ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
+            automation.ConfigEntry("perf_model/dram", "remote_memory_mode", "1"),
+            automation.ConfigEntry("perf_model/dram", "remote_init", "true"),
+            automation.ConfigEntry("perf_model/dram", "speed_up_disagg_simulation", "true"),
+            automation.ConfigEntry("perf_model/dram", "r_cacheline_hw_no_queue_delay", "true"),
+        ]
+    ),
+    # 3 PQ On (25%)
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
             automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "4"),
-            automation.ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.05"),
+            automation.ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.25"),
             automation.ConfigEntry("perf_model/dram", "use_dynamic_cacheline_queue_fraction_adjustment", "false"),
             automation.ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
             automation.ConfigEntry("perf_model/dram", "remote_memory_mode", "1"),
             automation.ConfigEntry("perf_model/dram", "remote_init", "true"),
-            automation.ConfigEntry("perf_model/dram", "r_cacheline_hw_no_queue_delay", "true"),
             automation.ConfigEntry("perf_model/dram", "speed_up_disagg_simulation", "true"),
+            automation.ConfigEntry("perf_model/dram", "r_cacheline_hw_no_queue_delay", "true"),
         ]
     ),
+    # 4 PQ On (80%)
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
             automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "4"),
-            automation.ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.15"),
+            automation.ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.8"),
             automation.ConfigEntry("perf_model/dram", "use_dynamic_cacheline_queue_fraction_adjustment", "false"),
             automation.ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
             automation.ConfigEntry("perf_model/dram", "remote_memory_mode", "1"),
             automation.ConfigEntry("perf_model/dram", "remote_init", "true"),
-            automation.ConfigEntry("perf_model/dram", "r_cacheline_hw_no_queue_delay", "true"),
             automation.ConfigEntry("perf_model/dram", "speed_up_disagg_simulation", "true"),
+            automation.ConfigEntry("perf_model/dram", "r_cacheline_hw_no_queue_delay", "true"),
         ]
     ),
+    # 5 PQ On, Compression On: Deflate (25%)
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
-            automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
+            automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+            automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "zlib"),
+            automation.ConfigEntry("perf_model/dram/compression_model/zlib", "compression_latency", "15"),
+            automation.ConfigEntry("perf_model/dram/compression_model/zlib", "decompression_latency", "15"),
             automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "4"),
-            automation.ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.22"),
+            automation.ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.25"),
             automation.ConfigEntry("perf_model/dram", "use_dynamic_cacheline_queue_fraction_adjustment", "false"),
             automation.ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
             automation.ConfigEntry("perf_model/dram", "remote_memory_mode", "1"),
             automation.ConfigEntry("perf_model/dram", "remote_init", "true"),
-            automation.ConfigEntry("perf_model/dram", "r_cacheline_hw_no_queue_delay", "true"),
             automation.ConfigEntry("perf_model/dram", "speed_up_disagg_simulation", "true"),
+            automation.ConfigEntry("perf_model/dram", "r_cacheline_hw_no_queue_delay", "true"),
         ]
     ),
+    # 6 PQ On, Compression On: Deflate (80%)
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
-            automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
+            automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
+            automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "zlib"),
+            automation.ConfigEntry("perf_model/dram/compression_model/zlib", "compression_latency", "15"),
+            automation.ConfigEntry("perf_model/dram/compression_model/zlib", "decompression_latency", "15"),
             automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "4"),
-            automation.ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.3"),
+            automation.ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.8"),
             automation.ConfigEntry("perf_model/dram", "use_dynamic_cacheline_queue_fraction_adjustment", "false"),
             automation.ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
             automation.ConfigEntry("perf_model/dram", "remote_memory_mode", "1"),
             automation.ConfigEntry("perf_model/dram", "remote_init", "true"),
-            automation.ConfigEntry("perf_model/dram", "r_cacheline_hw_no_queue_delay", "true"),
             automation.ConfigEntry("perf_model/dram", "speed_up_disagg_simulation", "true"),
+            automation.ConfigEntry("perf_model/dram", "r_cacheline_hw_no_queue_delay", "true"),
         ]
     ),
-    automation.ExperimentRunConfig(
-        [
-            automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
-            automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
-            automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "4"),
-            automation.ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.5"),
-            automation.ConfigEntry("perf_model/dram", "use_dynamic_cacheline_queue_fraction_adjustment", "false"),
-            automation.ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
-            automation.ConfigEntry("perf_model/dram", "remote_memory_mode", "1"),
-            automation.ConfigEntry("perf_model/dram", "remote_init", "true"),
-            automation.ConfigEntry("perf_model/dram", "r_cacheline_hw_no_queue_delay", "true"),
-            automation.ConfigEntry("perf_model/dram", "speed_up_disagg_simulation", "true"),
-        ]
-    ),
-    automation.ExperimentRunConfig(
-        [
-            automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
-            automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
-            automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "4"),
-            automation.ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.6"),
-            automation.ConfigEntry("perf_model/dram", "use_dynamic_cacheline_queue_fraction_adjustment", "false"),
-            automation.ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
-            automation.ConfigEntry("perf_model/dram", "remote_memory_mode", "1"),
-            automation.ConfigEntry("perf_model/dram", "remote_init", "true"),
-            automation.ConfigEntry("perf_model/dram", "r_cacheline_hw_no_queue_delay", "true"),
-            automation.ConfigEntry("perf_model/dram", "speed_up_disagg_simulation", "true"),
-        ]
-    ),
-    automation.ExperimentRunConfig(
-        [
-            automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
-            automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
-            automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "4"),
-            automation.ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.7"),
-            automation.ConfigEntry("perf_model/dram", "use_dynamic_cacheline_queue_fraction_adjustment", "false"),
-            automation.ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
-            automation.ConfigEntry("perf_model/dram", "remote_memory_mode", "1"),
-            automation.ConfigEntry("perf_model/dram", "remote_init", "true"),
-            automation.ConfigEntry("perf_model/dram", "r_cacheline_hw_no_queue_delay", "true"),
-            automation.ConfigEntry("perf_model/dram", "speed_up_disagg_simulation", "true"),
-        ]
-    ),
-
-    # # 5 PQ On, Compression On: LZBDI
-    # automation.ExperimentRunConfig(
-    #     [
-    #         automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
-    #         automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
-    #         automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lzbdi"),
-    #         automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "4"),
-    #         automation.ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.2"),
-    #         automation.ConfigEntry("perf_model/dram", "use_dynamic_cacheline_queue_fraction_adjustment", "false"),
-    #         automation.ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
-    #         automation.ConfigEntry("perf_model/dram", "remote_memory_mode", "1"),
-    #         automation.ConfigEntry("perf_model/dram", "remote_init", "true"),
-    #         automation.ConfigEntry("perf_model/dram", "speed_up_disagg_simulation", "true"),
-    #     ]
-    # ),
-     # 6 PQ On, Compression On: Deflate
-    # automation.ExperimentRunConfig(
-    #     [
-    #         automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
-    #         automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
-    #         automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "zlib"),
-    #         automation.ConfigEntry("perf_model/dram/compression_model/zlib", "compression_latency", "15"),
-    #         automation.ConfigEntry("perf_model/dram/compression_model/zlib", "decompression_latency", "15"),
-    #         automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "4"),
-    #         automation.ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.2"),
-    #         automation.ConfigEntry("perf_model/dram", "use_dynamic_cacheline_queue_fraction_adjustment", "false"),
-    #         automation.ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
-    #         automation.ConfigEntry("perf_model/dram", "remote_memory_mode", "1"),
-    #         automation.ConfigEntry("perf_model/dram", "remote_init", "true"),
-    #         automation.ConfigEntry("perf_model/dram", "speed_up_disagg_simulation", "true"),
-    #     ]
-    # ),
 ]
 
 
@@ -280,9 +202,8 @@ ligra_input_to_file = {
 # bw_scalefactor_list = [1.536, 4, 16]
 # netlat_list = [120, 400, 880, 1000, 1600]
 page_size_list = [4096]
-remote_dram_bus_scalefactor_list = [1]
 bw_scalefactor_list = [2, 4, 8]
-netlat_list = [100] # 120
+netlat_list = [100, 400] # 120
 
 def input_file_checker(experiments):
     # Temporary function
@@ -380,40 +301,37 @@ def run_ligra_nonsym(application_name):
         for page_size in page_size_list:
             for net_lat in netlat_list:
                 for bw_scalefactor in bw_scalefactor_list:
-                    for rbus_scalefactor in remote_dram_bus_scalefactor_list:
-                        localdram_size_str = "{}MB".format(num_MB)
-                        command_str = ligra_base_str_options_nonsym.format(
-                            application_name,
-                            ligra_input_file,
-                            sniper_options="-g perf_model/dram/remote_dram_bus_scalefactor={} -g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
-                                rbus_scalefactor,
-                                page_size,
-                                int(num_MB * ONE_MB_TO_BYTES),
-                                int(net_lat),
-                                float(bw_scalefactor),
-                                int(1 * ONE_BILLION),
-                            ),
-                        )
+                    localdram_size_str = "{}MB".format(num_MB)
+                    command_str = ligra_base_str_options_nonsym.format(
+                        application_name,
+                        ligra_input_file,
+                        sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+                            page_size,
+                            int(num_MB * ONE_MB_TO_BYTES),
+                            int(net_lat),
+                            float(bw_scalefactor),
+                            int(1 * ONE_BILLION),
+                        ),
+                    )
 
-                        experiments.append(
-                            automation.Experiment(
-                                experiment_name="ligra_{}_{}localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_rbus_scalefactor_{}_combo".format(
-                                    application_name.lower(),
-                                    ""
-                                    if ligra_input_selection == "regular_input"
-                                    else ligra_input_selection + "_",
-                                    localdram_size_str,
-                                    net_lat,
-                                    bw_scalefactor,
-                                    page_size,
-                                    rbus_scalefactor
-                                ),
-                                command_str=command_str,
-                                experiment_run_configs=config_list,
-                                output_root_directory=".",
-                                start_experiment_no=1,
-                            )
+                    experiments.append(
+                        automation.Experiment(
+                            experiment_name="ligra_{}_{}localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_combo".format(
+                                application_name.lower(),
+                                ""
+                                if ligra_input_selection == "regular_input"
+                                else ligra_input_selection + "_",
+                                localdram_size_str,
+                                net_lat,
+                                bw_scalefactor,
+                                page_size
+                            ),
+                            command_str=command_str,
+                            experiment_run_configs=config_list,
+                            output_root_directory=".",
+                            start_experiment_no=1,
                         )
+                    )
 
     return experiments
 
@@ -464,40 +382,37 @@ def run_ligra_sym(application_name):
         for page_size in page_size_list:
             for net_lat in netlat_list:
                 for bw_scalefactor in bw_scalefactor_list:
-                    for rbus_scalefactor in remote_dram_bus_scalefactor_list:
-                        localdram_size_str = "{}MB".format(num_MB)
-                        command_str = ligra_base_str_options_sym.format(
-                            application_name,
-                            ligra_input_file,
-                            sniper_options="-g perf_model/dram/remote_dram_bus_scalefactor={} -g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
-                                rbus_scalefactor,
-                                page_size,
-                                int(num_MB * ONE_MB_TO_BYTES),
-                                int(net_lat),
-                                float(bw_scalefactor),
-                                int(1 * ONE_BILLION),
-                            ),
-                        )
+                    localdram_size_str = "{}MB".format(num_MB)
+                    command_str = ligra_base_str_options_sym.format(
+                        application_name,
+                        ligra_input_file,
+                        sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+                            page_size,
+                            int(num_MB * ONE_MB_TO_BYTES),
+                            int(net_lat),
+                            float(bw_scalefactor),
+                            int(1 * ONE_BILLION),
+                        ),
+                    )
 
-                        experiments.append(
-                            automation.Experiment(
-                                experiment_name="ligra_{}_{}localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_rbus_scalefactor_{}_combo".format(
-                                    application_name.lower(),
-                                    ""
-                                    if ligra_input_selection == "regular_input"
-                                    else ligra_input_selection + "_",
-                                    localdram_size_str,
-                                    net_lat,
-                                    bw_scalefactor,
-                                    page_size,
-                                    rbus_scalefactor
-                                ),
-                                command_str=command_str,
-                                experiment_run_configs=config_list,
-                                output_root_directory=".",
-                                start_experiment_no=1,
-                            )
+                    experiments.append(
+                        automation.Experiment(
+                            experiment_name="ligra_{}_{}localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_combo".format(
+                                application_name.lower(),
+                                ""
+                                if ligra_input_selection == "regular_input"
+                                else ligra_input_selection + "_",
+                                localdram_size_str,
+                                net_lat,
+                                bw_scalefactor,
+                                page_size
+                            ),
+                            command_str=command_str,
+                            experiment_run_configs=config_list,
+                            output_root_directory=".",
+                            start_experiment_no=1,
                         )
+                    )
 
     return experiments
 
@@ -544,72 +459,30 @@ def run_darknet(model_type):
         for page_size in page_size_list:
             for net_lat in netlat_list:
                 for bw_scalefactor in bw_scalefactor_list:
-                    for rbus_scalefactor in remote_dram_bus_scalefactor_list:
-                        localdram_size_str = "{}MB".format(num_MB)
-                        command_str = darknet_base_str_options.format(
-                            model_type,
-                            sniper_options="-g perf_model/dram/remote_dram_bus_scalefactor={} -g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
-                                rbus_scalefactor,
-                                page_size,
-                                int(num_MB * ONE_MB_TO_BYTES),
-                                int(net_lat),
-                                float(bw_scalefactor),
-                                int(1 * ONE_BILLION),
+                    localdram_size_str = "{}MB".format(num_MB)
+                    command_str = darknet_base_str_options.format(
+                        model_type,
+                        sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+                            page_size,
+                            int(num_MB * ONE_MB_TO_BYTES),
+                            int(net_lat),
+                            float(bw_scalefactor),
+                            int(1 * ONE_BILLION),
+                        ),
+                    )
+                    # 1 billion instructions cap
+
+                    experiments.append(
+                        automation.Experiment(
+                            experiment_name="darknet_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_combo".format(
+                                model_type.lower().replace("-", ""), localdram_size_str, net_lat, bw_scalefactor, page_size
                             ),
+                            command_str=command_str,
+                            experiment_run_configs=config_list,
+                            output_root_directory=".",
+                            start_experiment_no=1,
                         )
-                        # 1 billion instructions cap
-
-                        experiments.append(
-                            automation.Experiment(
-                                experiment_name="darknet_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_rbus_scalefactor_{}_combo".format(
-                                    model_type.lower().replace("-", ""), localdram_size_str, net_lat, bw_scalefactor, page_size, rbus_scalefactor
-                                ),
-                                command_str=command_str,
-                                experiment_run_configs=config_list,
-                                output_root_directory=".",
-                                start_experiment_no=1,
-                            )
-                        )
-
-
-    # Everything else
-    model_to_local_dram_size = {
-        "darknet19": [8],
-        "resnet50": [6],
-        "resnet152": [6],
-        "vgg-16": [12],
-        "yolov3": [12]
-    }
-    for num_MB in model_to_local_dram_size[model_type]:
-        for page_size in page_size_list:
-            for net_lat in netlat_list:
-                for bw_scalefactor in bw_scalefactor_list:
-                    for rbus_scalefactor in remote_dram_bus_scalefactor_list:
-                        localdram_size_str = "{}MB".format(num_MB)
-                        command_str = darknet_base_str_options.format(
-                            model_type,
-                            sniper_options="-g perf_model/dram/remote_dram_bus_scalefactor={} -g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
-                                rbus_scalefactor,
-                                page_size,
-                                int(num_MB * ONE_MB_TO_BYTES),
-                                int(net_lat),
-                                float(bw_scalefactor),
-                                int(1 * ONE_BILLION),
-                            ),
-                        )
-                        # 1 billion instructions cap
-
-                        experiments.append(
-                            automation.Experiment(
-                                experiment_name="darknet_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_rbus_scalefactor_{}_combo".format(
-                                    model_type.lower().replace("-", ""), localdram_size_str, net_lat, bw_scalefactor, page_size, rbus_scalefactor
-                                ),
-                                command_str=command_str,
-                                experiment_run_configs=config_list,
-                                output_root_directory=".",
-                                start_experiment_no=1,
-                            )
-                        )
+                    )
 
     return experiments
 
@@ -654,40 +527,37 @@ def run_nw(dimension):
         for page_size in page_size_list:  # put 64 byte page size in another file
             for net_lat in netlat_list:
                 for bw_scalefactor in bw_scalefactor_list:
-                    for rbus_scalefactor in remote_dram_bus_scalefactor_list:
-                        localdram_size_str = "{}MB".format(num_MB)
-                        command_str = nw_base_options.format(
-                            dimension,
-                            sniper_options="-g perf_model/dram/remote_dram_bus_scalefactor={} -g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
-                                rbus_scalefactor,
-                                page_size,
-                                int(num_MB * ONE_MB_TO_BYTES),
-                                int(net_lat),
-                                float(bw_scalefactor),
-                                int(1 * ONE_BILLION),
-                            ),
-                        )
-                        # 1 billion instructions cap
+                    localdram_size_str = "{}MB".format(num_MB)
+                    command_str = nw_base_options.format(
+                        dimension,
+                        sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+                            page_size,
+                            int(num_MB * ONE_MB_TO_BYTES),
+                            int(net_lat),
+                            float(bw_scalefactor),
+                            int(1 * ONE_BILLION),
+                        ),
+                    )
+                    # 1 billion instructions cap
 
-                        experiments.append(
-                            automation.Experiment(
-                                experiment_name="nw_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_rbus_scalefactor_{}_combo".format(
-                                    localdram_size_str, net_lat, bw_scalefactor, page_size, rbus_scalefactor
-                                ),
-                                command_str=command_str,
-                                experiment_run_configs=config_list,
-                                output_root_directory=".",
-                                start_experiment_no=1,
-                            )
+                    experiments.append(
+                        automation.Experiment(
+                            experiment_name="nw_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_combo".format(
+                                localdram_size_str, net_lat, bw_scalefactor, page_size
+                            ),
+                            command_str=command_str,
+                            experiment_run_configs=config_list,
+                            output_root_directory=".",
+                            start_experiment_no=1,
                         )
+                    )
 
     return experiments
 
 def run_spmv(matrix):
     experiments = []
     matrix_to_local_dram_size = {
-        "roadNet-CA.mtx": [8],
-        "pkustk14.mtx": [10],
+        "pkustk14.mtx": [23],
         "socPokec.mtx": [51],
     }
     # Remote memory off case
@@ -726,37 +596,33 @@ def run_spmv(matrix):
         for page_size in page_size_list:
             for net_lat in netlat_list:
                 for bw_scalefactor in bw_scalefactor_list:
-                    for rbus_scalefactor in remote_dram_bus_scalefactor_list:
-                        localdram_size_str = "{}MB".format(num_MB)
-                        command_str = spmv_base_options.format(
-                            matrix,
-                            sniper_options="-g perf_model/dram/remote_dram_bus_scalefactor={} -g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
-                                rbus_scalefactor,
-                                page_size,
-                                int(num_MB * ONE_MB_TO_BYTES),
-                                int(net_lat),
-                                float(bw_scalefactor),
-                                int(1 * ONE_BILLION),
+                    localdram_size_str = "{}MB".format(num_MB)
+                    command_str = spmv_base_options.format(
+                        matrix,
+                        sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+                            page_size,
+                            int(num_MB * ONE_MB_TO_BYTES),
+                            int(net_lat),
+                            float(bw_scalefactor),
+                            int(1 * ONE_BILLION),
+                        ),
+                    )
+
+                    experiments.append(
+                        automation.Experiment(
+                            experiment_name="spmv_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_combo".format(
+                                matrix[:matrix.find(".")].replace("-", ""),
+                                localdram_size_str,
+                                net_lat,
+                                bw_scalefactor,
+                                page_size
                             ),
+                            command_str=command_str,
+                            experiment_run_configs=config_list,
+                            output_root_directory=".",
+                            start_experiment_no=1,
                         )
-
-                        experiments.append(
-                            automation.Experiment(
-                                experiment_name="spmv_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_rbus_scalefactor_{}_combo".format(
-                                    matrix[:matrix.find(".")].replace("-", ""),
-                                    localdram_size_str,
-                                    net_lat,
-                                    bw_scalefactor,
-                                    page_size,
-                                    rbus_scalefactor
-                                ),
-                                command_str=command_str,
-                                experiment_run_configs=config_list,
-                                output_root_directory=".",
-                                start_experiment_no=1,
-                            )
-                        )
-
+                    )
     return experiments
 
 
@@ -801,36 +667,33 @@ def run_sssp_int(matrix):
         for page_size in page_size_list:
             for net_lat in netlat_list:
                 for bw_scalefactor in bw_scalefactor_list:
-                    for rbus_scalefactor in remote_dram_bus_scalefactor_list:
-                        localdram_size_str = "{}MB".format(num_MB)
-                        command_str = sssp_int_base_options.format(
-                            matrix,
-                            sniper_options="-g perf_model/dram/remote_dram_bus_scalefactor={} -g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
-                                rbus_scalefactor,
-                                page_size,
-                                int(num_MB * ONE_MB_TO_BYTES),
-                                int(net_lat),
-                                float(bw_scalefactor),
-                                int(1 * ONE_BILLION),
-                            ),
-                        )
+                    localdram_size_str = "{}MB".format(num_MB)
+                    command_str = sssp_int_base_options.format(
+                        matrix,
+                        sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+                            page_size,
+                            int(num_MB * ONE_MB_TO_BYTES),
+                            int(net_lat),
+                            float(bw_scalefactor),
+                            int(1 * ONE_BILLION),
+                        ),
+                    )
 
-                        experiments.append(
-                            automation.Experiment(
-                                experiment_name="sssp_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_rbus_scalefactor_{}_combo".format(
-                                    matrix[:matrix.find(".")].replace("-", ""),
-                                    localdram_size_str,
-                                    net_lat,
-                                    bw_scalefactor,
-                                    page_size,
-                                    rbus_scalefactor
-                                ),
-                                command_str=command_str,
-                                experiment_run_configs=config_list,
-                                output_root_directory=".",
-                                start_experiment_no=1,
-                            )
+                    experiments.append(
+                        automation.Experiment(
+                            experiment_name="sssp_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_combo".format(
+                                matrix[:matrix.find(".")].replace("-", ""),
+                                localdram_size_str,
+                                net_lat,
+                                bw_scalefactor,
+                                page_size
+                            ),
+                            command_str=command_str,
+                            experiment_run_configs=config_list,
+                            output_root_directory=".",
+                            start_experiment_no=1,
                         )
+                    )
     return experiments
 
 
@@ -874,32 +737,30 @@ def run_stream(type):
         for page_size in page_size_list:
             for net_lat in netlat_list:
                 for bw_scalefactor in bw_scalefactor_list:
-                    for rbus_scalefactor in remote_dram_bus_scalefactor_list:
-                        localdram_size_str = "{}MB".format(num_MB)
-                        command_str = stream_base_options.format(
-                            type,
-                            sniper_options="-g perf_model/dram/remote_dram_bus_scalefactor={} -g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
-                                rbus_scalefactor,
-                                page_size,
-                                int(num_MB * ONE_MB_TO_BYTES),
-                                int(net_lat),
-                                float(bw_scalefactor),
-                                int(1 * ONE_BILLION),
-                            ),
-                        )
-                        # 1 billion instructions cap
+                    localdram_size_str = "{}MB".format(num_MB)
+                    command_str = stream_base_options.format(
+                        type,
+                        sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+                            page_size,
+                            int(num_MB * ONE_MB_TO_BYTES),
+                            int(net_lat),
+                            float(bw_scalefactor),
+                            int(1 * ONE_BILLION),
+                        ),
+                    )
+                    # 1 billion instructions cap
 
-                        experiments.append(
-                            automation.Experiment(
-                                experiment_name="stream_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_rbus_scalefactor_{}_combo".format(
-                                    type, localdram_size_str, net_lat, bw_scalefactor, page_size, rbus_scalefactor
-                                ),
-                                command_str=command_str,
-                                experiment_run_configs=config_list,
-                                output_root_directory=".",
-                                start_experiment_no=1,
-                            )
+                    experiments.append(
+                        automation.Experiment(
+                            experiment_name="stream_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_combo".format(
+                                type, localdram_size_str, net_lat, bw_scalefactor, page_size
+                            ),
+                            command_str=command_str,
+                            experiment_run_configs=config_list,
+                            output_root_directory=".",
+                            start_experiment_no=1,
                         )
+                    )
 
     return experiments
 
@@ -939,31 +800,29 @@ def run_hpcg():
         for page_size in page_size_list:
             for net_lat in netlat_list:
                 for bw_scalefactor in bw_scalefactor_list:
-                    for rbus_scalefactor in remote_dram_bus_scalefactor_list:
-                        localdram_size_str = "{}MB".format(num_MB)
-                        command_str = hpcg_base_options.format(
-                            sniper_options="-g perf_model/dram/remote_dram_bus_scalefactor={} -g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
-                                rbus_scalefactor,
-                                page_size,
-                                int(num_MB * ONE_MB_TO_BYTES),
-                                int(net_lat),
-                                float(bw_scalefactor),
-                                int(1 * ONE_BILLION),
-                            ),
-                        )
-                        # 1 billion instructions cap
+                    localdram_size_str = "{}MB".format(num_MB)
+                    command_str = hpcg_base_options.format(
+                        sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+                            page_size,
+                            int(num_MB * ONE_MB_TO_BYTES),
+                            int(net_lat),
+                            float(bw_scalefactor),
+                            int(1 * ONE_BILLION),
+                        ),
+                    )
+                    # 1 billion instructions cap
 
-                        experiments.append(
-                            automation.Experiment(
-                                experiment_name="hpcgupdated_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_rbus_scalefactor_{}_combo".format(
-                                    localdram_size_str, net_lat, bw_scalefactor, page_size, rbus_scalefactor
-                                ),
-                                command_str=command_str,
-                                experiment_run_configs=config_list,
-                                output_root_directory=".",
-                                start_experiment_no=1,
-                            )
+                    experiments.append(
+                        automation.Experiment(
+                            experiment_name="hpcgupdated_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_combo".format(
+                                localdram_size_str, net_lat, bw_scalefactor, page_size
+                            ),
+                            command_str=command_str,
+                            experiment_run_configs=config_list,
+                            output_root_directory=".",
+                            start_experiment_no=1,
                         )
+                    )
 
     return experiments
 
@@ -1002,31 +861,29 @@ def run_sls():
         for page_size in page_size_list:
             for net_lat in netlat_list:
                 for bw_scalefactor in bw_scalefactor_list:
-                    for rbus_scalefactor in remote_dram_bus_scalefactor_list:
-                        localdram_size_str = "{}MB".format(num_MB)
-                        command_str = sls_base_options.format(
-                            sniper_options="-g perf_model/dram/remote_dram_bus_scalefactor={} -g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
-                                rbus_scalefactor,
-                                page_size,
-                                int(num_MB * ONE_MB_TO_BYTES),
-                                int(net_lat),
-                                float(bw_scalefactor),
-                                int(1 * ONE_BILLION),
-                            ),
-                        )
-                        # 1 billion instructions cap
+                    localdram_size_str = "{}MB".format(num_MB)
+                    command_str = sls_base_options.format(
+                        sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+                            page_size,
+                            int(num_MB * ONE_MB_TO_BYTES),
+                            int(net_lat),
+                            float(bw_scalefactor),
+                            int(1 * ONE_BILLION),
+                        ),
+                    )
+                    # 1 billion instructions cap
 
-                        experiments.append(
-                            automation.Experiment(
-                                experiment_name="sls_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_rbus_scalefactor_{}_combo".format(
-                                    localdram_size_str, net_lat, bw_scalefactor, page_size, rbus_scalefactor
-                                ),
-                                command_str=command_str,
-                                experiment_run_configs=config_list,
-                                output_root_directory=".",
-                                start_experiment_no=1,
-                            )
+                    experiments.append(
+                        automation.Experiment(
+                            experiment_name="sls_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_combo".format(
+                                localdram_size_str, net_lat, bw_scalefactor, page_size
+                            ),
+                            command_str=command_str,
+                            experiment_run_configs=config_list,
+                            output_root_directory=".",
+                            start_experiment_no=1,
                         )
+                    )
 
     return experiments
 
@@ -1070,65 +927,64 @@ def run_sql(sql_filename):  # TPCH
         for page_size in page_size_list:
             for net_lat in netlat_list:
                 for bw_scalefactor in bw_scalefactor_list:
-                    for rbus_scalefactor in remote_dram_bus_scalefactor_list:
-                        localdram_size_str = "{}MB".format(num_MB)
-                        command_str = sql_base_options.format(
-                            sql_filename,
-                            # Set magic=false since sqlite3 currently doesn't have ROI markers
-                            sniper_options="-g perf_model/dram/remote_dram_bus_scalefactor={} -g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{} -g general/magic=false".format(
-                                rbus_scalefactor,
-                                page_size,
-                                int(num_MB * ONE_MB_TO_BYTES),
-                                int(net_lat),
-                                float(bw_scalefactor),
-                                int(1 * ONE_BILLION),
-                            ),
-                        )
-                        # 1 billion instructions cap
+                    localdram_size_str = "{}MB".format(num_MB)
+                    command_str = sql_base_options.format(
+                        sql_filename,
+                        # Set magic=false since sqlite3 currently doesn't have ROI markers
+                        sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{} -g general/magic=false".format(
+                            page_size,
+                            int(num_MB * ONE_MB_TO_BYTES),
+                            int(net_lat),
+                            float(bw_scalefactor),
+                            int(1 * ONE_BILLION),
+                        ),
+                    )
+                    # 1 billion instructions cap
 
-                        experiments.append(
-                            automation.Experiment(
-                                experiment_name="sql_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_rbus_scalefactor_{}_combo".format(
-                                    sql_filename, localdram_size_str, net_lat, bw_scalefactor, page_size, rbus_scalefactor
-                                ),
-                                command_str=command_str,
-                                experiment_run_configs=config_list,
-                                output_root_directory=".",
-                                start_experiment_no=1,
-                            )
+                    experiments.append(
+                        automation.Experiment(
+                            experiment_name="sql_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_combo".format(
+                                sql_filename, localdram_size_str, net_lat, bw_scalefactor, page_size
+                            ),
+                            command_str=command_str,
+                            experiment_run_configs=config_list,
+                            output_root_directory=".",
+                            start_experiment_no=1,
                         )
+                    )
 
     return experiments
 
 # TODO: Experiment run
 experiments = []
-#experiments.extend(run_darknet("resnet50"))
-#experiments.extend(run_darknet("resnet152"))
-#experiments.extend(run_darknet("darknet19"))
-#experiments.extend(run_darknet("vgg-16"))
-#experiments.extend(run_darknet("yolov3"))
-#experiments.extend(run_spmv("pkustk14.mtx"))
-experiments.extend(run_spmv("roadNet-CA.mtx"))
-# experiments.extend(run_ligra_nonsym("MIS"))
-# experiments.extend(run_ligra_nonsym("Radii"))
-# experiments.extend(run_ligra_sym("KCore"))
 
-#experiments.extend(run_ligra_sym("Triangle"))
-#experiments.extend(run_ligra_nonsym("Components"))
-#experiments.extend(run_ligra_nonsym("BFS"))
-#experiments.extend(run_ligra_nonsym("BC"))
-# experiments.extend(run_nw("4096"))
-#experiments.extend(run_ligra_nonsym("PageRank"))
+# Swift-067
+experiments.extend(run_darknet("resnet50"))
+experiments.extend(run_darknet("darknet19"))
+experiments.extend(run_darknet("vgg-16"))
+experiments.extend(run_spmv("pkustk14.mtx"))
+experiments.extend(run_ligra_nonsym("MIS"))
+experiments.extend(run_ligra_nonsym("Radii"))
+experiments.extend(run_ligra_sym("KCore"))
+
+# Swift-068
+experiments.extend(run_ligra_sym("Triangle"))
+experiments.extend(run_ligra_nonsym("Components"))
+experiments.extend(run_ligra_nonsym("BFS"))
+experiments.extend(run_ligra_nonsym("BC"))
+experiments.extend(run_nw("4096"))
+experiments.extend(run_ligra_nonsym("PageRank"))
 
 
-# experiments.extend(run_darknet("yolov3"))
 
 # experiments.extend(run_sls())
-# experiments.extend(run_darknet("resnet152"))
 # experiments.extend(run_hpcg())
 # experiments.extend(run_sql("5"))  # TPCH
 
 # experiments.extend(run_stream("3"))  # Stream?
+# experiments.extend(run_darknet("yolov3"))
+# experiments.extend(run_darknet("resnet152"))
+
 
 timezone = pytz.timezone("Canada/Eastern")
 log_filename = "run-sniper-repeat_1.log"
@@ -1143,7 +999,7 @@ with open(log_filename, "w") as log_file:
     print(log_str, file=log_file)
 
     experiment_manager = automation.ExperimentManager(
-        output_root_directory=".", max_concurrent_processes=24, log_file=log_file
+        output_root_directory=".", max_concurrent_processes=48, log_file=log_file
     )
     experiment_manager.add_experiments(experiments)
     # compiled_application_checker(experiments)
