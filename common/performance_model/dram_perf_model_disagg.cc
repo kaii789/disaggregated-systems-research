@@ -78,7 +78,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_r_cacheline_queue_fraction    (Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_fraction")) // The fraction of remote bandwidth used for the cacheline queue (decimal between 0 and 1)
     , m_use_dynamic_cl_queue_fraction_adjustment    (Sim()->getCfg()->getBool("perf_model/dram/use_dynamic_cacheline_queue_fraction_adjustment"))  // Whether to dynamically adjust m_r_cacheline_queue_fraction
     , m_r_cacheline_gran      (Sim()->getCfg()->getBool("perf_model/dram/remote_use_cacheline_granularity")) // Move data and operate in cacheline granularity
-    , m_r_reserved_bufferspace      (Sim()->getCfg()->getInt("perf_model/dram/remote_reserved_buffer_space")) // Max % of local DRAM that can be reserved for pages in transit
+    , m_r_reserved_bufferspace      (Sim()->getCfg()->getFloat("perf_model/dram/remote_reserved_buffer_space")) // Max % of local DRAM that can be reserved for pages in transit
     , m_r_limit_redundant_moves      (Sim()->getCfg()->getInt("perf_model/dram/remote_limit_redundant_moves"))
     , m_r_throttle_redundant_moves      (Sim()->getCfg()->getBool("perf_model/dram/remote_throttle_redundant_moves"))
     , m_r_use_separate_queue_model      (Sim()->getCfg()->getBool("perf_model/dram/queue_model/use_separate_remote_queue_model")) // Whether to use the separate remote queue model
@@ -133,6 +133,8 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_move_page_cancelled_bufferspace_full(0)
     , m_move_page_cancelled_datamovement_queue_full(0)
     , m_move_page_cancelled_rmode5(0)
+    , m_bufferspace_full_page_still_moved(0)
+    , m_datamovement_queue_full_page_still_moved(0)
     , m_rmode5_page_moved_due_to_threshold(0)
     , m_unique_pages_accessed      (0)
     , m_ideal_page_throttling_swaps_inflight(0)
@@ -332,6 +334,8 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     registerStatsMetric("dram", core_id, "page-moves", &m_page_moves);
     registerStatsMetric("dram", core_id, "bufferspace-full-move-page-cancelled", &m_move_page_cancelled_bufferspace_full);
     registerStatsMetric("dram", core_id, "queue-full-move-page-cancelled", &m_move_page_cancelled_datamovement_queue_full);
+    registerStatsMetric("dram", core_id, "bufferspace-full-page-still-moved", &m_bufferspace_full_page_still_moved);
+    registerStatsMetric("dram", core_id, "queue-full-page-still-moved", &m_datamovement_queue_full_page_still_moved);    
     registerStatsMetric("dram", core_id, "inflight-hits", &m_inflight_hits);
     registerStatsMetric("dram", core_id, "writeback-pages", &m_writeback_pages);
     registerStatsMetric("dram", core_id, "local-evictions", &m_local_evictions);
@@ -1212,7 +1216,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         ++m_move_page_cancelled_bufferspace_full;
     }
     // Cancel moving the page if the queue used to move the page is already full
-    if (move_page && m_data_movement->getPageQueueUtilizationPercentage(t_now) > m_r_page_queue_utilization_threshold) {  // save 5% for evicted pages?
+    if (m_r_partition_queues != 0 && move_page && m_data_movement->getPageQueueUtilizationPercentage(t_now) > m_r_page_queue_utilization_threshold) {  // save 5% for evicted pages?
         move_page = false;
         ++m_move_page_cancelled_datamovement_queue_full;
 
@@ -1445,11 +1449,22 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             ++m_global_time_much_larger_than_page_arrival;
             m_sum_global_time_much_larger += global_time - page_arrival_time;
         }
-        if (m_r_partition_queues == 0 && move_page && m_r_reserved_bufferspace > 0 && ((m_inflight_pages.size() + m_inflightevicted_pages.size())  >= ((double)m_r_reserved_bufferspace/100)*(m_localdram_size/m_page_size))) {
+        if (m_r_partition_queues == 0 && move_page && m_r_reserved_bufferspace > 0 && ((m_inflight_pages.size() + m_inflightevicted_pages.size()) >= ((double)m_r_reserved_bufferspace/100)*(m_localdram_size/m_page_size))) {
+            // PQ=off, page movement would exceed inflight pages bufferspace
             // Estimate how long it would take to send packet if inflight page buffer is full
             SubsecondTime extra_delay_penalty = SubsecondTime::NS() * 2000;
             t_now += extra_delay_penalty;
             m_inflight_pages_extra[phys_page] = SubsecondTime::max(global_time, page_arrival_time + extra_delay_penalty);
+            ++m_bufferspace_full_page_still_moved;
+            if (m_inflight_pages_extra.size() > m_max_inflight_extra_bufferspace)
+                m_max_inflight_extra_bufferspace++;
+        } else if (m_r_partition_queues == 0 && move_page && m_data_movement->getPageQueueUtilizationPercentage(t_now) > m_r_page_queue_utilization_threshold) {
+            // PQ=off, page movement would exceed network bandwidth
+            // Estimate how long it would take to send packet if inflight page buffer is full
+            SubsecondTime extra_delay_penalty = SubsecondTime::NS() * 10000;
+            t_now += extra_delay_penalty;
+            m_inflight_pages_extra[phys_page] = SubsecondTime::max(global_time, page_arrival_time + extra_delay_penalty);
+            ++m_datamovement_queue_full_page_still_moved;
             if (m_inflight_pages_extra.size() > m_max_inflight_extra_bufferspace)
                 m_max_inflight_extra_bufferspace++;
         } else {
