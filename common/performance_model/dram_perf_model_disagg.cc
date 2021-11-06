@@ -89,7 +89,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_r_ideal_pagethrottle_remote_access_history_window_size   (SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/r_ideal_pagethrottle_access_history_window_size")))
     , m_track_page_bw_utilization_stats    (Sim()->getCfg()->getBool("perf_model/dram/track_page_bw_utilization_stats"))  // Whether to track page queue bw utilization stats
     , m_speed_up_simulation    (Sim()->getCfg()->getBool("perf_model/dram/speed_up_disagg_simulation"))  // When this is true, some optional stats aren't calculated
-    , m_r_cacheline_hw_no_queue_delay    (Sim()->getCfg()->getBool("perf_model/dram/r_cacheline_hw_no_queue_delay"))  // When this is true, remove HW access queue delay from cacheline requests' critical path to simulate prioritized cachelines
+    , m_r_pq_cacheline_hw_no_queue_delay    (Sim()->getCfg()->getBool("perf_model/dram/r_cacheline_hw_no_queue_delay"))  // When this is true, remove HW access queue delay from PQ=on cacheline requests' critical path to simulate prioritized cachelines
     , m_banks               (m_total_banks)
     , m_r_banks               (m_total_banks)
     , m_inflight_page_delayed(0)
@@ -814,7 +814,7 @@ DramPerfModelDisagg::getDramAccessCost(SubsecondTime start_time, UInt64 size, co
             perf->updateTime(t_now);
         } else {
             // This is a cacheline
-            if (m_r_cacheline_hw_no_queue_delay && m_r_partition_queues) {
+            if (m_r_pq_cacheline_hw_no_queue_delay && m_r_partition_queues) {
                 ddr_queue_delay = SubsecondTime::Zero();  // option to remove hw queue delay from cachelines when PQ=on, to simulate prioritized cachelines
             }
             m_remote_cacheline_get_dram_access_cost_processing_time += ddr_processing_time;
