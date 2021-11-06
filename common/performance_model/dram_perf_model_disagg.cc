@@ -795,9 +795,6 @@ DramPerfModelDisagg::getDramAccessCost(SubsecondTime start_time, UInt64 size, co
     if (is_remote) {
         ddr_processing_time = m_r_dram_bus_bandwidth.getRoundedLatency(8 * size); // bytes to bits
         ddr_queue_delay = m_r_dram_queue_model_single->computeQueueDelay(t_now, ddr_processing_time, requester);
-        if (m_r_cacheline_hw_no_queue_delay && size <= 64) {
-            ddr_queue_delay = SubsecondTime::Zero();  // option to remove queue delay from cachelines, to simulate prioritized cachelines
-        }
         if (is_page) {
             m_remote_page_get_dram_access_cost_processing_time += ddr_processing_time;
             m_remote_page_get_dram_access_cost_queue_delay += ddr_queue_delay;
@@ -806,6 +803,10 @@ DramPerfModelDisagg::getDramAccessCost(SubsecondTime start_time, UInt64 size, co
             t_now += m_r_added_dram_access_cost;
             perf->updateTime(t_now);
         } else {
+            // This is a cacheline
+            if (m_r_cacheline_hw_no_queue_delay && m_r_partition_queues) {
+                ddr_queue_delay = SubsecondTime::Zero();  // option to remove hw queue delay from cachelines when PQ=on, to simulate prioritized cachelines
+            }
             m_remote_cacheline_get_dram_access_cost_processing_time += ddr_processing_time;
             m_remote_cacheline_get_dram_access_cost_queue_delay += ddr_queue_delay;
         }
