@@ -20,6 +20,7 @@
 #include <stdio.h>					// (in path known to compiler)			needed by printf
 #include <stdlib.h>					// (in path known to compiler)			needed by malloc
 #include <stdbool.h>				// (in path known to compiler)			needed by true/false
+#include "sim_api.h"
 
 //======================================================================================================================================================150
 //	UTILITIES
@@ -286,12 +287,16 @@ main(	int argc,
 	//	CPU/MCPU
 	//====================================================================================================100
 
+	SimRoiStart();
+
 	kernel_cpu(	par_cpu,
 				dim_cpu,
 				box_cpu,
 				rv_cpu,
 				qv_cpu,
 				fv_cpu);
+
+	SimRoiEnd();
 
 	time6 = get_time();
 

@@ -197,6 +197,22 @@ ligra_input_to_file = {
     "regular_input_sym": "rMat_1000000sym",
 }
 
+timeseries_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/timeseries/src/scrimp {sniper_root}/benchmarks/timeseries/inputs/{{0}} 50 0.25 1 4".format(
+    sniper_root=subfolder_sniper_root_relpath
+)
+
+lavaMD_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/rodinia/bin/lavaMD -boxes1d 5".format(
+    sniper_root=subfolder_sniper_root_relpath
+)
+
+particle_filter_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/rodinia/bin/particle_filter -x 4096 -y 4096 -z 1 -np 30000".format(
+    sniper_root=subfolder_sniper_root_relpath
+)
+
+srad_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {sniper_root}/disaggr_config/local_memory_cache.cfg -c repeat_testing.cfg {{sniper_options}} -- {sniper_root}/benchmarks/rodinia/bin/srad_v2 4096 4096 1 1 1 1 1 1 1".format(
+    sniper_root=subfolder_sniper_root_relpath
+)
+
 # TODO:
 # page_size_list = [4096, 512, 1024, 2048, 64]
 # bw_scalefactor_list = [1.536, 4, 16]
@@ -955,36 +971,307 @@ def run_sql(sql_filename):  # TPCH
 
     return experiments
 
+def run_timeseries(input):
+    experiments = []
+
+    # Remote memory off case
+    num_MB = 8
+    page_size = 4096
+    net_lat = 120
+    bw_scalefactor = 4
+    localdram_size_str = "{}MB".format(num_MB)
+    command_str = timeseries_base_options.format(
+        input,
+        sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+            page_size,
+            int(num_MB * ONE_MB_TO_BYTES),
+            int(net_lat),
+            float(bw_scalefactor),
+            int(1 * ONE_BILLION),
+        ),
+    )
+
+    experiments.append(
+        automation.Experiment(
+            experiment_name="timeseries_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_noremotemem".format(
+                input,
+                localdram_size_str,
+                net_lat,
+                bw_scalefactor,
+                page_size
+            ),
+            command_str=command_str,
+            experiment_run_configs=no_remote_memory_list,
+            output_root_directory=".",
+        )
+    )
+
+    input_to_local_dram_size = {
+        "randomSerie262144.txt": [16],
+    }
+
+    # Everything else
+    for num_MB in input_to_local_dram_size[input]:
+        for page_size in page_size_list:
+            for net_lat in netlat_list:
+                for bw_scalefactor in bw_scalefactor_list:
+                    localdram_size_str = "{}MB".format(num_MB)
+                    command_str = timeseries_base_options.format(
+                        input,
+                        sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+                            page_size,
+                            int(num_MB * ONE_MB_TO_BYTES),
+                            int(net_lat),
+                            float(bw_scalefactor),
+                            int(1 * ONE_BILLION),
+                        ),
+                    )
+                    # 1 billion instructions cap
+
+                    experiments.append(
+                        automation.Experiment(
+                            experiment_name="timeseries_{}_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_combo".format(
+                                input, localdram_size_str, net_lat, bw_scalefactor, page_size
+                            ),
+                            command_str=command_str,
+                            experiment_run_configs=config_list,
+                            output_root_directory=".",
+                            start_experiment_no=1,
+                        )
+                    )
+
+    return experiments
+
+def run_lavaMD():
+    experiments = []
+
+    # Remote memory off case
+    num_MB = 8
+    page_size = 4096
+    net_lat = 120
+    bw_scalefactor = 4
+    localdram_size_str = "{}MB".format(num_MB)
+    command_str = lavaMD_base_options.format(
+        sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+            page_size,
+            int(num_MB * ONE_MB_TO_BYTES),
+            int(net_lat),
+            float(bw_scalefactor),
+            int(1 * ONE_BILLION),
+        ),
+    )
+
+    experiments.append(
+        automation.Experiment(
+            experiment_name="lavaMD_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_noremotemem".format(
+                localdram_size_str,
+                net_lat,
+                bw_scalefactor,
+                page_size
+            ),
+            command_str=command_str,
+            experiment_run_configs=no_remote_memory_list,
+            output_root_directory=".",
+        )
+    )
+
+    local_dram_size = [10] # TODO: Fix me
+
+    # Everything else
+    for num_MB in local_dram_size:
+        for page_size in page_size_list:
+            for net_lat in netlat_list:
+                for bw_scalefactor in bw_scalefactor_list:
+                    localdram_size_str = "{}MB".format(num_MB)
+                    command_str = lavaMD_base_options.format(
+                        sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+                            page_size,
+                            int(num_MB * ONE_MB_TO_BYTES),
+                            int(net_lat),
+                            float(bw_scalefactor),
+                            int(1 * ONE_BILLION),
+                        ),
+                    )
+                    # 1 billion instructions cap
+
+                    experiments.append(
+                        automation.Experiment(
+                            experiment_name="lavaMD_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_combo".format(
+                                localdram_size_str, net_lat, bw_scalefactor, page_size
+                            ),
+                            command_str=command_str,
+                            experiment_run_configs=config_list,
+                            output_root_directory=".",
+                            start_experiment_no=1,
+                        )
+                    )
+
+    return experiments
+
+def run_srad():
+    experiments = []
+
+    # Remote memory off case
+    num_MB = 8
+    page_size = 4096
+    net_lat = 120
+    bw_scalefactor = 4
+    localdram_size_str = "{}MB".format(num_MB)
+    command_str = srad_base_options.format(
+        sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+            page_size,
+            int(num_MB * ONE_MB_TO_BYTES),
+            int(net_lat),
+            float(bw_scalefactor),
+            int(1 * ONE_BILLION),
+        ),
+    )
+
+    experiments.append(
+        automation.Experiment(
+            experiment_name="srad_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_noremotemem".format(
+                localdram_size_str,
+                net_lat,
+                bw_scalefactor,
+                page_size
+            ),
+            command_str=command_str,
+            experiment_run_configs=no_remote_memory_list,
+            output_root_directory=".",
+        )
+    )
+
+    local_dram_size = [87]
+
+    # Everything else
+    for num_MB in local_dram_size:
+        for page_size in page_size_list:
+            for net_lat in netlat_list:
+                for bw_scalefactor in bw_scalefactor_list:
+                    localdram_size_str = "{}MB".format(num_MB)
+                    command_str = srad_base_options.format(
+                        sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+                            page_size,
+                            int(num_MB * ONE_MB_TO_BYTES),
+                            int(net_lat),
+                            float(bw_scalefactor),
+                            int(1 * ONE_BILLION),
+                        ),
+                    )
+                    # 1 billion instructions cap
+
+                    experiments.append(
+                        automation.Experiment(
+                            experiment_name="srad_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_combo".format(
+                                localdram_size_str, net_lat, bw_scalefactor, page_size
+                            ),
+                            command_str=command_str,
+                            experiment_run_configs=config_list,
+                            output_root_directory=".",
+                            start_experiment_no=1,
+                        )
+                    )
+
+    return experiments
+
+def run_particle_filter():
+    experiments = []
+
+    # Remote memory off case
+    num_MB = 8
+    page_size = 4096
+    net_lat = 120
+    bw_scalefactor = 4
+    localdram_size_str = "{}MB".format(num_MB)
+    command_str = particle_filter_base_options.format(
+        sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+            page_size,
+            int(num_MB * ONE_MB_TO_BYTES),
+            int(net_lat),
+            float(bw_scalefactor),
+            int(1 * ONE_BILLION),
+        ),
+    )
+
+    experiments.append(
+        automation.Experiment(
+            experiment_name="particle_filter_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_noremotemem".format(
+                localdram_size_str,
+                net_lat,
+                bw_scalefactor,
+                page_size
+            ),
+            command_str=command_str,
+            experiment_run_configs=no_remote_memory_list,
+            output_root_directory=".",
+        )
+    )
+
+    local_dram_size = [34]
+
+    # Everything else
+    for num_MB in local_dram_size:
+        for page_size in page_size_list:
+            for net_lat in netlat_list:
+                for bw_scalefactor in bw_scalefactor_list:
+                    localdram_size_str = "{}MB".format(num_MB)
+                    command_str = particle_filter_base_options.format(
+                        sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+                            page_size,
+                            int(num_MB * ONE_MB_TO_BYTES),
+                            int(net_lat),
+                            float(bw_scalefactor),
+                            int(1 * ONE_BILLION),
+                        ),
+                    )
+                    # 1 billion instructions cap
+
+                    experiments.append(
+                        automation.Experiment(
+                            experiment_name="particle_filter_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_combo".format(
+                                localdram_size_str, net_lat, bw_scalefactor, page_size
+                            ),
+                            command_str=command_str,
+                            experiment_run_configs=config_list,
+                            output_root_directory=".",
+                            start_experiment_no=1,
+                        )
+                    )
+
+    return experiments
+
 # TODO: Experiment run
 experiments = []
 
 # Swift-067
-experiments.extend(run_darknet("resnet50"))
-experiments.extend(run_darknet("darknet19"))
-experiments.extend(run_darknet("vgg-16"))
-experiments.extend(run_spmv("pkustk14.mtx"))
-experiments.extend(run_ligra_nonsym("MIS"))
-experiments.extend(run_ligra_nonsym("Radii"))
-experiments.extend(run_ligra_sym("KCore"))
+# experiments.extend(run_darknet("resnet50"))
+# experiments.extend(run_darknet("darknet19"))
+# experiments.extend(run_darknet("vgg-16"))
+# experiments.extend(run_spmv("pkustk14.mtx"))
+# experiments.extend(run_ligra_nonsym("MIS"))
+# experiments.extend(run_ligra_nonsym("Radii"))
+# experiments.extend(run_ligra_sym("KCore"))
 
 # Swift-068
-experiments.extend(run_ligra_sym("Triangle"))
-experiments.extend(run_ligra_nonsym("Components"))
-experiments.extend(run_ligra_nonsym("BFS"))
-experiments.extend(run_ligra_nonsym("BC"))
-experiments.extend(run_nw("4096"))
-experiments.extend(run_ligra_nonsym("PageRank"))
-
-
+# experiments.extend(run_ligra_sym("Triangle"))
+# experiments.extend(run_ligra_nonsym("Components"))
+# experiments.extend(run_ligra_nonsym("BFS"))
+# experiments.extend(run_ligra_nonsym("BC"))
+# experiments.extend(run_nw("4096"))
+# experiments.extend(run_ligra_nonsym("PageRank"))
 
 # experiments.extend(run_sls())
 # experiments.extend(run_hpcg())
 # experiments.extend(run_sql("5"))  # TPCH
-
 # experiments.extend(run_stream("3"))  # Stream?
+
+experiments.extend(run_timeseries("randomSerie262144.txt"))
+experiments.extend(run_particle_filter())
+experiments.extend(run_srad())
+
+# experiments.extend(run_lavaMD())
 # experiments.extend(run_darknet("yolov3"))
 # experiments.extend(run_darknet("resnet152"))
-
 
 timezone = pytz.timezone("Canada/Eastern")
 log_filename = "run-sniper-repeat_1.log"

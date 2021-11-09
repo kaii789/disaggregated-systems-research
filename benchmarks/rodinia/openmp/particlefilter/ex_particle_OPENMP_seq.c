@@ -9,6 +9,7 @@
 #include <sys/time.h>
 #include <omp.h>
 #include <limits.h>
+#include "sim_api.h"
 #define PI 3.1415926535897932
 /**
 @var M value for Linear Congruential Generator (LCG); use GCC's value
@@ -586,11 +587,15 @@ int main(int argc, char * argv[]){
 	int * I = (int *)malloc(sizeof(int)*IszX*IszY*Nfr);
 	long long start = get_time();
 	//call video sequence
+	SimRoiStart();
 	videoSequence(I, IszX, IszY, Nfr, seed);
+	SimRoiEnd();
 	long long endVideoSequence = get_time();
 	printf("VIDEO SEQUENCE TOOK %f\n", elapsed_time(start, endVideoSequence));
 	//call particle filter
+	SimRoiStart();
 	particleFilter(I, IszX, IszY, Nfr, seed, Nparticles);
+	SimRoiEnd();
 	long long endParticleFilter = get_time();
 	printf("PARTICLE FILTER TOOK %f\n", elapsed_time(endVideoSequence, endParticleFilter));
 	printf("ENTIRE PROGRAM TOOK %f\n", elapsed_time(start, endParticleFilter));

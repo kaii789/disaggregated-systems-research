@@ -11,6 +11,7 @@
 #include <string.h>
 #include <math.h>
 #include <omp.h>
+#include "sim_api.h"
 
 void random_matrix(float *I, int rows, int cols);
 
@@ -106,7 +107,7 @@ int main(int argc, char* argv[])
     }
    
 	printf("Start the SRAD main loop\n");
-
+	SimRoiStart();
 #ifdef ITERATION
 	for (iter=0; iter< niter; iter++){
 #endif        
@@ -205,6 +206,7 @@ int main(int argc, char* argv[])
    }
 #endif 
 
+	SimRoiEnd();
 	printf("Computation Done\n");
 
 	free(I);
