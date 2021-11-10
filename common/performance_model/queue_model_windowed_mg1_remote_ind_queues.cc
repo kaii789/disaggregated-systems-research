@@ -223,10 +223,6 @@ double QueueModelWindowedMG1RemoteIndQueues::getPageQueueUtilizationPercentage(S
 }
 
 double QueueModelWindowedMG1RemoteIndQueues::getCachelineQueueUtilizationPercentage(SubsecondTime pkt_time) {
-   if (!m_r_partition_queues) {
-      return getPageQueueUtilizationPercentage(pkt_time);
-   }
-   
    // Remove packets that now fall outside the window
    // Advance the window based on the global (barrier) time, as this guarantees the earliest time any thread may be at.
    // Use a backup value of 10 window sizes before the current request to avoid excessive memory usage in case something fishy is going on.
