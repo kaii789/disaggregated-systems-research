@@ -236,6 +236,10 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
       results['dram.remotequeuemodel_datamovement2_percent_capped_by_custom_cap'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue-2.num-requests-capped-by-custom-cap'], results['dram-datamovement-queue-2.num-requests']))
 
   results['dram.local-avg-dirty-write-buffer-size'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.local-dram-sum-dirty-write-buffer-size'], results['dram.accesses']))
+  results['dram.avg_simultaneous_inflight_cachelines_reads'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.sum-simultaneous-inflight-cachelines-reads'], results['dram.accesses']))
+  results['dram.avg_simultaneous_inflight_cachelines_writes'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.sum-simultaneous-inflight-cachelines-writes'], results['dram.accesses']))
+  results['dram.avg_simultaneous_inflight_cachelines_total'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.sum-simultaneous-inflight-cachelines-total'], results['dram.accesses']))
+
 
   # Compression
   bytes_saved = results['compression.bytes-saved'][0] if 'compression.bytes-saved' in results else 0
@@ -306,6 +310,12 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     # ('    num dram writes', 'dram.readwrite-writes', str),
     ('    local avg inflight dirty write buffer size', 'dram.local-avg-dirty-write-buffer-size', str),
     ('    local max inflight dirty write buffer size', 'dram.local-dram-max-dirty-write-buffer-size', str),
+    ('    avg simultaneous inflight cachelines - total', 'dram.avg_simultaneous_inflight_cachelines_total', str),
+    ('    max simultaneous inflight cachelines - total', 'dram.max-simultaneous-inflight-cachelines-total', str),
+    ('    avg simultaneous inflight cachelines - reads', 'dram.avg_simultaneous_inflight_cachelines_reads', str),
+    ('    max simultaneous inflight cachelines - reads', 'dram.max-simultaneous-inflight-cachelines-reads', str),
+    ('    avg simultaneous inflight cachelines - writes', 'dram.avg_simultaneous_inflight_cachelines_writes', str),
+    ('    max simultaneous inflight cachelines - writes', 'dram.max-simultaneous-inflight-cachelines-writes', str),
     ('  average dram access latency (ns)', 'dram.avglatency', format_ns(2)),
     ('    local dram avg access latency (ns)', 'dram.localavglatency', format_ns(2)),
     ('      local dram avg hardware latency (ns)', 'dram.localavghardwarelatency', format_ns(2)),
