@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <omp.h>
 #include <sys/time.h>
+#include "sim_api.h"
 
 // Returns the current system time in microseconds 
 long long get_time()
@@ -306,9 +307,9 @@ int main(int argc, char **argv)
 	printf("Start computing the transient temperature\n");
 	
     long long start_time = get_time();
-
+    SimRoiStart();
     compute_tran_temp(result,sim_time, temp, power, grid_rows, grid_cols);
-
+    SimRoiEnd();
     long long end_time = get_time();
 
     printf("Ending simulation\n");
