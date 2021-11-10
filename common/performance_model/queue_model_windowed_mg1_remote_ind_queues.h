@@ -57,6 +57,7 @@ private:
    UInt64 m_cacheline_service_time_sum2; // In ps^2
 
    const SubsecondTime m_r_added_latency; // Additional network latency from remote access
+   const UInt32 m_r_partition_queues;     // Whether partitioned queues is enabled
    double m_r_cacheline_queue_fraction;   // The fraction of remote bandwidth used for the cacheline queue (decimal between 0 and 1) 
 
    String m_name;  // temporary, for debugging

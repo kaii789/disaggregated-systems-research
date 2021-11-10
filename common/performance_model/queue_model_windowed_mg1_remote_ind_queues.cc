@@ -25,6 +25,7 @@ QueueModelWindowedMG1RemoteIndQueues::QueueModelWindowedMG1RemoteIndQueues(Strin
    , m_page_service_time_sum2(0)
    , m_cacheline_service_time_sum2(0)
    , m_r_added_latency(SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/remote_mem_add_lat"))) // Network latency for remote DRAM access 
+   , m_r_partition_queues(Sim()->getCfg()->getInt("perf_model/dram/remote_partitioned_queues")) // Whether partitioned queues is enabled
    , m_r_cacheline_queue_fraction(Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_fraction"))
    , m_name(name)
    , m_specified_bw_GB_per_s((double)bw_bits_per_us / 8 / 1000)  // convert bits/us to GB/s
@@ -222,6 +223,10 @@ double QueueModelWindowedMG1RemoteIndQueues::getPageQueueUtilizationPercentage(S
 }
 
 double QueueModelWindowedMG1RemoteIndQueues::getCachelineQueueUtilizationPercentage(SubsecondTime pkt_time) {
+   if (!m_r_partition_queues) {
+      return getPageQueueUtilizationPercentage(pkt_time);
+   }
+   
    // Remove packets that now fall outside the window
    // Advance the window based on the global (barrier) time, as this guarantees the earliest time any thread may be at.
    // Use a backup value of 10 window sizes before the current request to avoid excessive memory usage in case something fishy is going on.
@@ -237,6 +242,10 @@ double QueueModelWindowedMG1RemoteIndQueues::getCachelineQueueUtilizationPercent
 }
 
 double QueueModelWindowedMG1RemoteIndQueues::getTotalQueueUtilizationPercentage(SubsecondTime pkt_time) {
+   if (!m_r_partition_queues) {
+      return getPageQueueUtilizationPercentage(pkt_time);
+   }
+
    // Remove packets that now fall outside the window
    // Advance the window based on the global (barrier) time, as this guarantees the earliest time any thread may be at.
    // Use a backup value of 10 window sizes before the current request to avoid excessive memory usage in case something fishy is going on.
@@ -269,6 +278,9 @@ SubsecondTime
 QueueModelWindowedMG1RemoteIndQueues::computeQueueDelayNoEffect(SubsecondTime pkt_time, SubsecondTime processing_time, request_t request_type, core_id_t requester)
 {
    SubsecondTime t_queue = SubsecondTime::Zero();
+   if (!m_r_partition_queues) {
+      request_type = QueueModel::PAGE;
+   }
 
    // Advance the window based on the global (barrier) time, as this guarantees the earliest time any thread may be at.
    // Use a backup value of 10 window sizes before the current request to avoid excessive memory usage in case something fishy is going on.
@@ -322,6 +334,9 @@ SubsecondTime
 QueueModelWindowedMG1RemoteIndQueues::computeQueueDelayTrackBytes(SubsecondTime pkt_time, SubsecondTime processing_time, UInt64 num_bytes, request_t request_type, core_id_t requester, bool is_inflight_page, UInt64 phys_page)
 {
    SubsecondTime t_queue = SubsecondTime::Zero();
+   if (!m_r_partition_queues) {
+      request_type = QueueModel::PAGE;
+   }
 
    // Advance the window based on the global (barrier) time, as this guarantees the earliest time any thread may be at.
    // Use a backup value of 10 window sizes before the current request to avoid excessive memory usage in case something fishy is going on.
