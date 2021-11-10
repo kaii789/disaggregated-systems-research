@@ -290,7 +290,7 @@ def run_ligra_nonsym(application_name):
         "Components": [26],
         "PageRank": [16],
         "MIS": [20],
-        "Radii": [30],
+        "Radii": [22],
     }
     # Remote memory off case
     num_MB = 8
@@ -1260,7 +1260,7 @@ experiments = []
 # Swift-067
 experiments.extend(run_darknet("resnet50"))
 experiments.extend(run_darknet("darknet19"))
-experiments.extend(run_darknet("vgg-16"))
+# experiments.extend(run_darknet("vgg-16"))
 experiments.extend(run_spmv("pkustk14.mtx"))
 experiments.extend(run_ligra_nonsym("MIS"))
 experiments.extend(run_ligra_nonsym("Radii"))
