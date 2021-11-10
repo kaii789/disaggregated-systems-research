@@ -17,6 +17,7 @@ no_remote_memory_list = [
     automation.ExperimentRunConfig(
         [
             # automation.ConfigEntry("general", "magic", "false"),
+            automation.ConfigEntry("general", "total_cores", "4"),
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
             automation.ConfigEntry("perf_model/dram", "enable_remote_mem", "false"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
@@ -35,6 +36,7 @@ config_list = [
     automation.ExperimentRunConfig(
         [
             # automation.ConfigEntry("general", "magic", "false"),
+            automation.ConfigEntry("general", "total_cores", "4"),
             automation.ConfigEntry("perf_model/dram/ddr", "data_bus_width", "256"),
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
@@ -51,6 +53,7 @@ config_list = [
     # 2 Deflate
     automation.ExperimentRunConfig(
         [
+            automation.ConfigEntry("general", "total_cores", "4"),
             automation.ConfigEntry("perf_model/dram/ddr", "data_bus_width", "256"),
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
@@ -68,6 +71,7 @@ config_list = [
     # 3 PQ On (25%)
     automation.ExperimentRunConfig(
         [
+            automation.ConfigEntry("general", "total_cores", "4"),
             automation.ConfigEntry("perf_model/dram/ddr", "data_bus_width", "256"),
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
@@ -84,6 +88,7 @@ config_list = [
     # 4 PQ On (80%)
     automation.ExperimentRunConfig(
         [
+            automation.ConfigEntry("general", "total_cores", "4"),
             automation.ConfigEntry("perf_model/dram/ddr", "data_bus_width", "256"),
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
@@ -100,6 +105,7 @@ config_list = [
     # 5 PQ On, Compression On: Deflate (25%)
     automation.ExperimentRunConfig(
         [
+            automation.ConfigEntry("general", "total_cores", "4"),
             automation.ConfigEntry("perf_model/dram/ddr", "data_bus_width", "256"),
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
@@ -119,6 +125,7 @@ config_list = [
     # 6 PQ On, Compression On: Deflate (80%)
     automation.ExperimentRunConfig(
         [
+            automation.ConfigEntry("general", "total_cores", "4"),
             automation.ConfigEntry("perf_model/dram/ddr", "data_bus_width", "256"),
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
