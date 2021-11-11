@@ -18,6 +18,7 @@ no_remote_memory_list = [
         [
             # automation.ConfigEntry("general", "magic", "false"),
             automation.ConfigEntry("general", "total_cores", "4"),
+            automation.ConfigEntry("perf_model/dram/ddr", "data_bus_width", "256"),
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
             automation.ConfigEntry("perf_model/dram", "enable_remote_mem", "false"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
