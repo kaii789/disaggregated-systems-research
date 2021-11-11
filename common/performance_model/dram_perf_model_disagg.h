@@ -103,6 +103,7 @@ class DramPerfModelDisagg : public DramPerfModel
         bool m_track_page_bw_utilization_stats;
         bool m_speed_up_simulation;  // When this is true, some optional stats aren't calculated
         bool m_r_pq_cacheline_hw_no_queue_delay;  // When this is true, remove HW access queue delay from PQ=on cacheline requests' critical path to simulate prioritized cachelines
+        bool m_track_inflight_cachelines;  // Whether to track simultaneous inflight cachelines (slows down simulation)
 
         // Local Memory
         QueueModel* m_dram_queue_model_single;
@@ -216,6 +217,7 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_redundant_moves_type1;
         UInt64 partition_queues_cacheline_slower_than_page;  // with the new change, these situations no longer result in redundant moves
         UInt64 m_redundant_moves_type2;
+        UInt64 m_redundant_moves_type2_cancelled_already_inflight;  // cacheline queue (read) request cancelled because the cacheline is already inflight (only applicable when m_track_inflight_cachelines is true)
         UInt64 m_redundant_moves_type2_cancelled_datamovement_queue_full;
         UInt64 m_redundant_moves_type2_cancelled_limit_redundant_moves; // number of times a cacheline queue request is cancelled due to m_r_limit_redundant_moves
         UInt64 m_redundant_moves_type2_slower_than_page_arrival;  // these situations don't result in redundant moves

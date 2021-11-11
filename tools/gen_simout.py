@@ -354,6 +354,7 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     ('    num redundant moves type1', 'dram.redundant-moves-type1', str),
     ('      num type1 cacheline slower than page', 'dram.pq-cacheline-slower-than-page', str),
     ('    num redundant moves type2', 'dram.redundant-moves-type2', str),
+    ('      num type2 cancelled due to already inflight', 'dram.already-inflight-redundant-moves-type2-cancelled', str),
     ('      num type2 cancelled due to full queue', 'dram.queue-full-redundant-moves-type2-cancelled', str),
     ('      num type2 cacheline slower than page arrival', 'dram.cacheline-slower-than-inflight-page-arrival', str),
     ('  max simultaneous # inflight pages, both directions (bufferspace)', 'dram.max-total-bufferspace', str),
