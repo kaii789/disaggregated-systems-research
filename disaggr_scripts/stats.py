@@ -101,7 +101,7 @@ def get_average_bw(res_dir):
     print(weighted_average)
     return weighted_average
 
-def get_inflight_stats(res_dir):
+def get_inflight_page_stats(res_dir):
     res = sniper_lib.get_results(resultsdir=res_dir)
     results = res['results']
 
@@ -110,6 +110,23 @@ def get_inflight_stats(res_dir):
     inflight_extra = results['dram.max-inflight-extra-bufferspace']     # max simultaneous # inflight extra remote->local pages
     inflightevicted = results['dram.max-inflightevicted-bufferspace']   # max simultaneous # inflight local->remote evicted pages (bufferspace)
     return total[0], inflight[0], inflight_extra[0], inflightevicted[0]  # return stats for Core 0
+
+def get_inflight_cacheline_stats(res_dir):
+    res = sniper_lib.get_results(resultsdir=res_dir)
+    results = res['results']
+    results['dram.accesses'] = list(map(sum, zip(results['dram.reads'], results['dram.writes'])))
+
+    results['dram.avg_simultaneous_inflight_cachelines_reads'] = list(starmap(lambda a,b: a/b if b else float('inf'), zip(results['dram.sum-simultaneous-inflight-cachelines-reads'], results['dram.accesses'])))
+    results['dram.avg_simultaneous_inflight_cachelines_writes'] = list(starmap(lambda a,b: a/b if b else float('inf'), zip(results['dram.sum-simultaneous-inflight-cachelines-writes'], results['dram.accesses'])))
+    results['dram.avg_simultaneous_inflight_cachelines_total'] = list(starmap(lambda a,b: a/b if b else float('inf'), zip(results['dram.sum-simultaneous-inflight-cachelines-total'], results['dram.accesses'])))
+
+    avg_total = results['dram.avg_simultaneous_inflight_cachelines_total']    # avg simultaneous inflight cachelines - total
+    max_total = results['dram.max-simultaneous-inflight-cachelines-total']    # max simultaneous inflight cachelines - total
+    avg_reads = results['dram.avg_simultaneous_inflight_cachelines_reads']    # avg simultaneous inflight cachelines - reads
+    max_reads = results['dram.max-simultaneous-inflight-cachelines-reads']    # max simultaneous inflight cachelines - reads
+    avg_writes = results['dram.avg_simultaneous_inflight_cachelines_writes']  # avg simultaneous inflight cachelines - writes
+    max_writes = results['dram.max-simultaneous-inflight-cachelines-writes']  # max simultaneous inflight cachelines - writes
+    return avg_total[0], max_total[0], avg_reads[0], max_reads[0], avg_writes[0], max_writes[0]
 
 class CachelineLatencies(Enum):
     DRAM_HW_READ_FIXED_LATENCY = auto()
