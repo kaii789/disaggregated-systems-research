@@ -211,6 +211,13 @@ public:
        else
            return rhs;
    }
+   static inline SubsecondTime min(const SubsecondTime& lhs, const SubsecondTime& rhs)
+   {
+       if (lhs.m_time > rhs.m_time)
+           return rhs;
+       else
+           return lhs;
+   }
 
 private:
    friend class ComponentPeriod;

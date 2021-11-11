@@ -235,10 +235,12 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
       results['dram.remotequeuemodel_datamovement2_percent_queue_full'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue-2.num-requests-queue-full'], results['dram-datamovement-queue-2.num-requests']))
       results['dram.remotequeuemodel_datamovement2_percent_capped_by_custom_cap'] = map(lambda (a,b): 100*float(a)/b if b else float('inf'), zip(results['dram-datamovement-queue-2.num-requests-capped-by-custom-cap'], results['dram-datamovement-queue-2.num-requests']))
 
-  results['dram.local-avg-dirty-write-buffer-size'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.local-dram-sum-dirty-write-buffer-size'], results['dram.accesses']))
-  results['dram.avg_simultaneous_inflight_cachelines_reads'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.sum-simultaneous-inflight-cachelines-reads'], results['dram.accesses']))
-  results['dram.avg_simultaneous_inflight_cachelines_writes'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.sum-simultaneous-inflight-cachelines-writes'], results['dram.accesses']))
-  results['dram.avg_simultaneous_inflight_cachelines_total'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.sum-simultaneous-inflight-cachelines-total'], results['dram.accesses']))
+  if 'dram.local-dram-sum-dirty-write-buffer-size' in results:
+    results['dram.local-avg-dirty-write-buffer-size'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.local-dram-sum-dirty-write-buffer-size'], results['dram.accesses']))
+  if 'dram.sum-simultaneous-inflight-cachelines-total' in results:
+    results['dram.avg_simultaneous_inflight_cachelines_reads'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.sum-simultaneous-inflight-cachelines-reads'], results['dram.accesses']))
+    results['dram.avg_simultaneous_inflight_cachelines_writes'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.sum-simultaneous-inflight-cachelines-writes'], results['dram.accesses']))
+    results['dram.avg_simultaneous_inflight_cachelines_total'] = map(lambda (a,b): a/b if b else float('inf'), zip(results['dram.sum-simultaneous-inflight-cachelines-total'], results['dram.accesses']))
 
 
   # Compression
