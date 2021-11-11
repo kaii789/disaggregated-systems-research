@@ -4,6 +4,8 @@
 #include "dram_perf_model_readwrite.h"
 #include "dram_perf_model_normal.h"
 #include "dram_perf_model_disagg.h"
+#include "dram_perf_model_disagg_remote_only.h"
+#include "dram_perf_model_disagg_page_move_free.h"
 #include "dram_perf_model_disagg_multipage.h"
 #include "config.hpp"
 
@@ -28,6 +30,14 @@ DramPerfModel* DramPerfModel::createDramPerfModel(core_id_t core_id, UInt32 cach
    else if (type == "disaggregated")
    {
       return new DramPerfModelDisagg(core_id, cache_block_size, address_home_lookup);
+   }
+   else if (type == "disaggregated_remote_only")
+   {
+      return new DramPerfModelDisaggRemoteOnly(core_id, cache_block_size, address_home_lookup);
+   }
+   else if (type == "disaggregated_page_move_free")
+   {
+      return new DramPerfModelDisaggPageMoveFree(core_id, cache_block_size, address_home_lookup);
    }
    else if (type == "disaggregated_multipage")
    {
