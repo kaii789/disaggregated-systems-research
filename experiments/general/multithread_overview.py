@@ -245,7 +245,7 @@ ligra_input_to_file = {
 # bw_scalefactor_list = [1.536, 4, 16]
 # netlat_list = [120, 400, 880, 1000, 1600]
 page_size_list = [4096]
-bw_scalefactor_list = [2, 4, 8]
+bw_scalefactor_list = [2 * 4, 4 * 4, 8 * 4]
 netlat_list = [100, 400] # 120
 
 def input_file_checker(experiments):
@@ -1271,13 +1271,13 @@ def run_sls():
 experiments = []
 
 # Swift-067
-# experiments.extend(run_ligra_nonsym("MIS"))
-# experiments.extend(run_ligra_nonsym("Radii"))
-# experiments.extend(run_ligra_sym("KCore"))
-# experiments.extend(run_ligra_sym("Triangle"))
-# experiments.extend(run_ligra_nonsym("Components"))
-# experiments.extend(run_ligra_nonsym("BFS"))
-# experiments.extend(run_ligra_nonsym("BC"))
+experiments.extend(run_ligra_nonsym("MIS"))
+experiments.extend(run_ligra_nonsym("Radii"))
+experiments.extend(run_ligra_sym("KCore"))
+experiments.extend(run_ligra_sym("Triangle"))
+experiments.extend(run_ligra_nonsym("Components"))
+experiments.extend(run_ligra_nonsym("BFS"))
+experiments.extend(run_ligra_nonsym("BC"))
 experiments.extend(run_ligra_nonsym("PageRank"))
 experiments.extend(run_spmv("pkustk14.mtx"))
 experiments.extend(run_nw("4096"))
