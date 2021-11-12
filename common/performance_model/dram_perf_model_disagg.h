@@ -85,7 +85,7 @@ class DramPerfModelDisagg : public DramPerfModel
         const UInt32 m_r_disturbance_factor; // Other systems using the remote memory and creating disturbance
         const bool m_r_dontevictdirty; // Do not evict dirty data
         const bool m_r_enable_selective_moves; 
-        const UInt32 m_r_partition_queues; // Enable partitioned queues
+        UInt32 m_r_partition_queues; // Enable partitioned queues
         double m_r_cacheline_queue_fraction; // The fraction of remote bandwidth used for the cacheline queue (decimal between 0 and 1) 
         bool m_use_dynamic_cl_queue_fraction_adjustment; // Whether to dynamically adjust m_r_cacheline_queue_fraction
         const bool m_r_cacheline_gran; // Move data and operate in cacheline granularity
@@ -104,6 +104,7 @@ class DramPerfModelDisagg : public DramPerfModel
         bool m_speed_up_simulation;  // When this is true, some optional stats aren't calculated
         bool m_r_pq_cacheline_hw_no_queue_delay;  // When this is true, remove HW access queue delay from PQ=on cacheline requests' critical path to simulate prioritized cachelines
         bool m_track_inflight_cachelines;  // Whether to track simultaneous inflight cachelines (slows down simulation)
+        bool m_auto_turn_off_partition_queues;
 
         // Local Memory
         QueueModel* m_dram_queue_model_single;

@@ -91,6 +91,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_speed_up_simulation    (Sim()->getCfg()->getBool("perf_model/dram/speed_up_disagg_simulation"))  // When this is true, some optional stats aren't calculated
     , m_r_pq_cacheline_hw_no_queue_delay    (Sim()->getCfg()->getBool("perf_model/dram/r_cacheline_hw_no_queue_delay"))  // When this is true, remove HW access queue delay from PQ=on cacheline requests' critical path to simulate prioritized cachelines
     , m_track_inflight_cachelines    (Sim()->getCfg()->getBool("perf_model/dram/track_inflight_cachelines"))  // Whether to track simultaneous inflight cachelines (slows down simulation)
+    , m_auto_turn_off_partition_queues    (Sim()->getCfg()->getBool("perf_model/dram/auto_turn_off_partition_queues"))
     , m_banks               (m_total_banks)
     , m_r_banks               (m_total_banks)
     , m_inflight_page_delayed(0)
@@ -2210,6 +2211,8 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                             access_latency = add_cacheline_request_time + datamov_delay - pkt_time;
                         }
                     }
+                } else if (m_auto_turn_off_partition_queues) {
+                    m_r_partition_queues = 0;  // turn off partition queues when limit redundant moves is exceeded
                 } else {
                     ++m_redundant_moves_type2_cancelled_limit_redundant_moves;
                     // std::cout << "Inflight page " << phys_page << " redundant moves > limit, = " << m_inflight_redundant[phys_page] << std::endl;
