@@ -1233,8 +1233,13 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         move_page = false;
         ++m_move_page_cancelled_bufferspace_full;
     }
-    // Cancel moving the page if the queue used to move the page is already full
-    if (m_r_partition_queues != 0 && move_page && m_data_movement->getPageQueueUtilizationPercentage(t_now) > m_r_page_queue_utilization_threshold) {  // save 5% for evicted pages?
+    double page_queue_utilization_percentage = m_data_movement->getPageQueueUtilizationPercentage(t_now);
+    double cacheline_queue_utilization_percentage = m_data_movement->getCachelineQueueUtilizationPercentage(t_now);
+    if (m_r_partition_queues == 1) {
+        cacheline_queue_utilization_percentage = m_data_movement_2->getCachelineQueueUtilizationPercentage(t_now);
+    }
+    // Cancel moving the page if the queue used to move the page is already full AND there is space in the cacheline queue
+    if (m_r_partition_queues != 0 && move_page && page_queue_utilization_percentage > m_r_page_queue_utilization_threshold && cacheline_queue_utilization_percentage <= m_r_cacheline_queue_utilization_threshold) {  // save 5% for evicted pages?
         move_page = false;
         ++m_move_page_cancelled_datamovement_queue_full;
 
@@ -1485,7 +1490,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             ++m_global_time_much_larger_than_page_arrival;
             m_sum_global_time_much_larger += global_time - page_arrival_time;
         }
-        if (m_r_partition_queues == 0 && move_page && m_r_reserved_bufferspace > 0 && ((m_inflight_pages.size() + m_inflightevicted_pages.size()) >= ((double)m_r_reserved_bufferspace/100)*(m_localdram_size/m_page_size))) {
+        if (m_r_partition_queues == 0 && m_r_reserved_bufferspace > 0 && ((m_inflight_pages.size() + m_inflightevicted_pages.size()) >= ((double)m_r_reserved_bufferspace/100)*(m_localdram_size/m_page_size))) {
             // PQ=off, page movement would exceed inflight pages bufferspace
             // Estimate how long it would take to send packet if inflight page buffer is full
             SubsecondTime extra_delay_penalty = SubsecondTime::NS() * 2000;
@@ -1494,12 +1499,14 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             ++m_bufferspace_full_page_still_moved;
             if (m_inflight_pages_extra.size() > m_max_inflight_extra_bufferspace)
                 m_max_inflight_extra_bufferspace++;
-        } else if (m_r_partition_queues == 0 && move_page && m_data_movement->getPageQueueUtilizationPercentage(t_now) > m_r_page_queue_utilization_threshold) {
+        } else if (page_queue_utilization_percentage > m_r_page_queue_utilization_threshold) {
             // PQ=off, page movement would exceed network bandwidth
             // Estimate how long it would take to send packet if inflight page buffer is full
             SubsecondTime extra_delay_penalty = SubsecondTime::NS() * 10000;
-            t_now += extra_delay_penalty;
+            if (m_r_partition_queues == 0 || (m_r_partition_queues > 0 && page_hw_access_latency + page_compression_latency + page_datamovement_delay <= cacheline_hw_access_latency + cacheline_compression_latency + datamovement_delay))
+                t_now += extra_delay_penalty;  // page movement was the critical path, add extra delay
             m_inflight_pages_extra[phys_page] = SubsecondTime::max(global_time, page_arrival_time + extra_delay_penalty);
+            m_inflight_redundant[phys_page] = 0;
             ++m_datamovement_queue_full_page_still_moved;
             if (m_inflight_pages_extra.size() > m_max_inflight_extra_bufferspace)
                 m_max_inflight_extra_bufferspace++;
@@ -1740,6 +1747,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
     
     for (i = m_inflight_pages_extra.begin(); i != m_inflight_pages_extra.end();) {
         if (i->second <= current_time) {
+            m_inflight_redundant.erase(i->first);
             m_inflight_pages_extra.erase(i++);
         } else {
             ++i;
