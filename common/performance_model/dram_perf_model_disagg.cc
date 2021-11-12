@@ -1506,7 +1506,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         } else {
             // m_inflight_pages.erase(phys_page);
             m_inflight_pages[phys_page] = SubsecondTime::max(global_time, page_arrival_time);
-            m_inflight_redundant[phys_page] = 0; 
+            m_inflight_redundant[phys_page] = 0;
             if (m_inflight_pages.size() > m_max_inflight_bufferspace)
                 m_max_inflight_bufferspace++;
             if (m_inflight_pages.size() + m_inflightevicted_pages.size() > m_max_total_bufferspace)
@@ -1572,6 +1572,18 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         } else {
             // partition queues off, but move_page = false so actually put the cacheline request on the queue
             cacheline_queue_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + cacheline_compression_latency, m_r_bus_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, requester);
+        }
+
+        // Track number of cacheline moves for each phys_page
+        auto it = m_inflight_redundant.find(phys_page);
+        if (it == m_inflight_redundant.end()) {
+            m_inflight_redundant[phys_page] = 0;
+        } else {
+            m_inflight_redundant[phys_page] += 1;
+        }
+        if (m_auto_turn_off_partition_queues && m_inflight_redundant[phys_page] >= m_r_limit_redundant_moves) {
+            m_r_partition_queues = 0;
+            std::cout << "Partition queues turned off due to >= type 1 redundant moves limit of " << m_r_limit_redundant_moves << " at " << m_num_accesses << " accesses" << std::endl;
         }
     } 
 
@@ -2135,7 +2147,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                             ++m_redundant_moves_type2;
                             --m_num_recent_local_accesses;
                             ++m_num_recent_remote_additional_accesses;  // this is now an additional remote access
-                            m_inflight_redundant[phys_page] = m_inflight_redundant[phys_page] + 1;
+                            m_inflight_redundant[phys_page] += 1;
                             // LOG_PRINT("getAccessLatency (local dram) inflight page saving of %lu ns", (access_latency-(t_remote_queue_request + cacheline_compression_latency + datamov_delay - pkt_time)).getNS());
                             m_redundant_moves_type2_time_savings += (access_latency - (add_cacheline_request_time + datamov_delay - pkt_time));
                             access_latency = add_cacheline_request_time + datamov_delay - pkt_time;
@@ -2185,7 +2197,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                         ++m_redundant_moves_type2;
                         --m_num_recent_local_accesses;
                         ++m_num_recent_remote_additional_accesses;  // this is now an additional remote access
-                        m_inflight_redundant[phys_page] = m_inflight_redundant[phys_page] + 1;
+                        m_inflight_redundant[phys_page] += 1;
 
                         if (m_track_inflight_cachelines) {
                             // Track inflight cachelines
@@ -2213,6 +2225,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                     }
                 } else if (m_auto_turn_off_partition_queues) {
                     m_r_partition_queues = 0;  // turn off partition queues when limit redundant moves is exceeded
+                    std::cout << "Partition queues turned off due to >= type 2 redundant moves limit of " << m_r_limit_redundant_moves << " at " << m_num_accesses << " accesses" << std::endl;
                 } else {
                     ++m_redundant_moves_type2_cancelled_limit_redundant_moves;
                     // std::cout << "Inflight page " << phys_page << " redundant moves > limit, = " << m_inflight_redundant[phys_page] << std::endl;
