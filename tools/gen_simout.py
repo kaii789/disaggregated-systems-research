@@ -394,6 +394,7 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
       template.append(('  bw utilization % decile {}'.format(i), "dram.bw-utilization-decile-percentage-{}".format(i), str))
 
   results['dram.avg-bw-utilization'] =  map(lambda (a,b): (a/100000)/b if b else float('inf'), zip(results['dram.total-bw-utilization-sum'], results['dram.accesses']))
+  template.append(('avg bw utilization', 'dram.avg-bw-utilization', str))
 
   # Compression
   if bytes_saved != 0:
