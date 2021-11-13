@@ -307,6 +307,11 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_sum_inflight_cachelines_writes_size;
         UInt64 m_sum_inflight_cachelines_total_size;
 
+        // BW utilization stats
+        UInt64 cacheline_bw_utilization_sum = 0;
+        UInt64 page_bw_utilization_sum = 0;
+        UInt64 total_bw_utilization_sum = 0;
+
         SubsecondTime getDramAccessCost(SubsecondTime start_time, UInt64 size, core_id_t requester, IntPtr address, ShmemPerf *perf, bool is_remote, bool is_exclude_cacheline, bool is_page);
         SubsecondTime getDramWriteCost(SubsecondTime start_time, UInt64 size, core_id_t requester, IntPtr address, ShmemPerf *perf, bool is_exclude_cacheline, bool is_page);
         void parseDeviceAddress(IntPtr address, UInt32 &channel, UInt32 &rank, UInt32 &bank_group, UInt32 &bank, UInt32 &column, UInt64 &dram_page);

@@ -78,22 +78,7 @@ config_list = [
             automation.ConfigEntry("perf_model/dram", "r_cacheline_hw_no_queue_delay", "true"),
         ]
     ),
-    # 4 PQ On (80%)
-    automation.ExperimentRunConfig(
-        [
-            automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
-            automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
-            automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "4"),
-            automation.ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.8"),
-            automation.ConfigEntry("perf_model/dram", "use_dynamic_cacheline_queue_fraction_adjustment", "false"),
-            automation.ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
-            automation.ConfigEntry("perf_model/dram", "remote_memory_mode", "1"),
-            automation.ConfigEntry("perf_model/dram", "remote_init", "true"),
-            automation.ConfigEntry("perf_model/dram", "speed_up_disagg_simulation", "true"),
-            automation.ConfigEntry("perf_model/dram", "r_cacheline_hw_no_queue_delay", "true"),
-        ]
-    ),
-    # 5 PQ On, Compression On: Deflate (25%)
+    # 4 PQ On, Compression On: Deflate (25%)
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
@@ -103,24 +88,6 @@ config_list = [
             automation.ConfigEntry("perf_model/dram/compression_model/zlib", "decompression_latency", "15"),
             automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "4"),
             automation.ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.25"),
-            automation.ConfigEntry("perf_model/dram", "use_dynamic_cacheline_queue_fraction_adjustment", "false"),
-            automation.ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
-            automation.ConfigEntry("perf_model/dram", "remote_memory_mode", "1"),
-            automation.ConfigEntry("perf_model/dram", "remote_init", "true"),
-            automation.ConfigEntry("perf_model/dram", "speed_up_disagg_simulation", "true"),
-            automation.ConfigEntry("perf_model/dram", "r_cacheline_hw_no_queue_delay", "true"),
-        ]
-    ),
-    # 6 PQ On, Compression On: Deflate (80%)
-    automation.ExperimentRunConfig(
-        [
-            automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
-            automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
-            automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "zlib"),
-            automation.ConfigEntry("perf_model/dram/compression_model/zlib", "compression_latency", "15"),
-            automation.ConfigEntry("perf_model/dram/compression_model/zlib", "decompression_latency", "15"),
-            automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "4"),
-            automation.ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.8"),
             automation.ConfigEntry("perf_model/dram", "use_dynamic_cacheline_queue_fraction_adjustment", "false"),
             automation.ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
             automation.ConfigEntry("perf_model/dram", "remote_memory_mode", "1"),
@@ -1244,30 +1211,30 @@ def run_particle_filter():
 experiments = []
 
 # Swift-067
-# experiments.extend(run_darknet("resnet50"))
-# experiments.extend(run_darknet("darknet19"))
+experiments.extend(run_darknet("resnet50"))
+experiments.extend(run_darknet("darknet19"))
 # experiments.extend(run_darknet("vgg-16"))
-# experiments.extend(run_spmv("pkustk14.mtx"))
-# experiments.extend(run_ligra_nonsym("MIS"))
-# experiments.extend(run_ligra_nonsym("Radii"))
-# experiments.extend(run_ligra_sym("KCore"))
+experiments.extend(run_spmv("pkustk14.mtx"))
+experiments.extend(run_ligra_nonsym("MIS"))
+experiments.extend(run_ligra_nonsym("Radii"))
+experiments.extend(run_ligra_sym("KCore"))
 
 # Swift-068
-# experiments.extend(run_ligra_sym("Triangle"))
-# experiments.extend(run_ligra_nonsym("Components"))
-# experiments.extend(run_ligra_nonsym("BFS"))
-# experiments.extend(run_ligra_nonsym("BC"))
-# experiments.extend(run_nw("4096"))
-# experiments.extend(run_ligra_nonsym("PageRank"))
+experiments.extend(run_ligra_sym("Triangle"))
+experiments.extend(run_ligra_nonsym("Components"))
+experiments.extend(run_ligra_nonsym("BFS"))
+experiments.extend(run_ligra_nonsym("BC"))
+experiments.extend(run_nw("4096"))
+experiments.extend(run_ligra_nonsym("PageRank"))
 
 # experiments.extend(run_sls())
 # experiments.extend(run_hpcg())
 # experiments.extend(run_sql("5"))  # TPCH
 # experiments.extend(run_stream("3"))  # Stream?
 
-experiments.extend(run_timeseries("randomSerie262144.txt"))
-experiments.extend(run_particle_filter())
-experiments.extend(run_srad())
+# experiments.extend(run_timeseries("randomSerie262144.txt"))
+# experiments.extend(run_particle_filter())
+# experiments.extend(run_srad())
 
 # experiments.extend(run_lavaMD())
 # experiments.extend(run_darknet("yolov3"))
