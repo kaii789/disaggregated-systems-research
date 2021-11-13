@@ -18,7 +18,7 @@ no_remote_memory_list = [
         [
             # automation.ConfigEntry("general", "magic", "false"),
             automation.ConfigEntry("general", "total_cores", "4"),
-            automation.ConfigEntry("perf_model/dram/ddr", "data_bus_width", "256"),
+            # automation.ConfigEntry("perf_model/dram/ddr", "data_bus_width", "256"),
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
             automation.ConfigEntry("perf_model/dram", "enable_remote_mem", "false"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
@@ -38,7 +38,7 @@ config_list = [
         [
             # automation.ConfigEntry("general", "magic", "false"),
             automation.ConfigEntry("general", "total_cores", "4"),
-            automation.ConfigEntry("perf_model/dram/ddr", "data_bus_width", "256"),
+            # automation.ConfigEntry("perf_model/dram/ddr", "data_bus_width", "256"),
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
             automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
@@ -55,7 +55,7 @@ config_list = [
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("general", "total_cores", "4"),
-            automation.ConfigEntry("perf_model/dram/ddr", "data_bus_width", "256"),
+            # automation.ConfigEntry("perf_model/dram/ddr", "data_bus_width", "256"),
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
             automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "zlib"),
@@ -73,7 +73,7 @@ config_list = [
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("general", "total_cores", "4"),
-            automation.ConfigEntry("perf_model/dram/ddr", "data_bus_width", "256"),
+            # automation.ConfigEntry("perf_model/dram/ddr", "data_bus_width", "256"),
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
             automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "4"),
@@ -86,28 +86,11 @@ config_list = [
             automation.ConfigEntry("perf_model/dram", "r_cacheline_hw_no_queue_delay", "true"),
         ]
     ),
-    # 4 PQ On (80%)
+    # 4 PQ On, Compression On: Deflate (25%)
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("general", "total_cores", "4"),
-            automation.ConfigEntry("perf_model/dram/ddr", "data_bus_width", "256"),
-            automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
-            automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
-            automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "4"),
-            automation.ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.8"),
-            automation.ConfigEntry("perf_model/dram", "use_dynamic_cacheline_queue_fraction_adjustment", "false"),
-            automation.ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
-            automation.ConfigEntry("perf_model/dram", "remote_memory_mode", "1"),
-            automation.ConfigEntry("perf_model/dram", "remote_init", "true"),
-            automation.ConfigEntry("perf_model/dram", "speed_up_disagg_simulation", "true"),
-            automation.ConfigEntry("perf_model/dram", "r_cacheline_hw_no_queue_delay", "true"),
-        ]
-    ),
-    # 5 PQ On, Compression On: Deflate (25%)
-    automation.ExperimentRunConfig(
-        [
-            automation.ConfigEntry("general", "total_cores", "4"),
-            automation.ConfigEntry("perf_model/dram/ddr", "data_bus_width", "256"),
+            # automation.ConfigEntry("perf_model/dram/ddr", "data_bus_width", "256"),
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
             automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "zlib"),
@@ -115,26 +98,6 @@ config_list = [
             automation.ConfigEntry("perf_model/dram/compression_model/zlib", "decompression_latency", "15"),
             automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "4"),
             automation.ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.25"),
-            automation.ConfigEntry("perf_model/dram", "use_dynamic_cacheline_queue_fraction_adjustment", "false"),
-            automation.ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
-            automation.ConfigEntry("perf_model/dram", "remote_memory_mode", "1"),
-            automation.ConfigEntry("perf_model/dram", "remote_init", "true"),
-            automation.ConfigEntry("perf_model/dram", "speed_up_disagg_simulation", "true"),
-            automation.ConfigEntry("perf_model/dram", "r_cacheline_hw_no_queue_delay", "true"),
-        ]
-    ),
-    # 6 PQ On, Compression On: Deflate (80%)
-    automation.ExperimentRunConfig(
-        [
-            automation.ConfigEntry("general", "total_cores", "4"),
-            automation.ConfigEntry("perf_model/dram/ddr", "data_bus_width", "256"),
-            automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
-            automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
-            automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "zlib"),
-            automation.ConfigEntry("perf_model/dram/compression_model/zlib", "compression_latency", "15"),
-            automation.ConfigEntry("perf_model/dram/compression_model/zlib", "decompression_latency", "15"),
-            automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "4"),
-            automation.ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.8"),
             automation.ConfigEntry("perf_model/dram", "use_dynamic_cacheline_queue_fraction_adjustment", "false"),
             automation.ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
             automation.ConfigEntry("perf_model/dram", "remote_memory_mode", "1"),
@@ -246,7 +209,7 @@ ligra_input_to_file = {
 # bw_scalefactor_list = [1.536, 4, 16]
 # netlat_list = [120, 400, 880, 1000, 1600]
 page_size_list = [4096]
-bw_scalefactor_list = [2 * 4, 4 * 4, 8 * 4]
+bw_scalefactor_list = [2, 4, 8]
 netlat_list = [100, 400] # 120
 
 def input_file_checker(experiments):
@@ -299,12 +262,12 @@ def run_ligra_nonsym(application_name):
     experiments = []
     ligra_input_file = ligra_input_to_file[ligra_input_selection]
     app_to_local_dram_size = {
-        "BFS": [20 * 4],
-        "BC": [29 * 4],
-        "Components": [26 * 4],
-        "PageRank": [16 * 4],
-        "MIS": [20 * 4],
-        "Radii": [30 * 4],
+        "BFS": [20],
+        "BC": [29],
+        "Components": [26],
+        "PageRank": [16],
+        "MIS": [20],
+        "Radii": [30],
     }
     # Remote memory off case
     num_MB = 8
@@ -384,8 +347,8 @@ def run_ligra_sym(application_name):
     experiments = []
     ligra_input_file = ligra_input_to_file[ligra_input_selection]
     app_to_local_dram_size = {
-        "Triangle": [30 * 4],
-        "KCore": [12 * 4],
+        "Triangle": [30],
+        "KCore": [12],
     }
     # Remote memory off case
     num_MB = 8
@@ -493,11 +456,11 @@ def run_darknet(model_type):
 
     # Everything else
     model_to_local_dram_size = {
-        "darknet19": [11 * 4],
-        "resnet50": [8 * 4],
-        "resnet152": [8 * 4],
-        "vgg-16": [24 * 4],
-        "yolov3": [27 * 4]
+        "darknet19": [11],
+        "resnet50": [8],
+        "resnet152": [8],
+        "vgg-16": [24],
+        "yolov3": [27]
     }
     for num_MB in model_to_local_dram_size[model_type]:
         for page_size in page_size_list:
@@ -534,9 +497,9 @@ def run_darknet(model_type):
 def run_nw(dimension):
     experiments = []
     dimension_to_local_dram_size = {
-        "2048": [6 * 4],
-        "4096": [26 * 4],
-        "6144": [58 * 4],
+        "2048": [6],
+        "4096": [26],
+        "6144": [58],
     }
 
     # Remote memory off case
@@ -601,8 +564,8 @@ def run_nw(dimension):
 def run_spmv(matrix):
     experiments = []
     matrix_to_local_dram_size = {
-        "pkustk14.mtx": [23 * 4],
-        "socPokec.mtx": [51 * 4],
+        "pkustk14.mtx": [23],
+        "socPokec.mtx": [51],
     }
     # Remote memory off case
     num_MB = 8
