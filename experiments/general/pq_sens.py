@@ -65,7 +65,7 @@ config_list = [
             automation.ConfigEntry("perf_model/dram", "r_cacheline_hw_no_queue_delay", "true"),
         ]
     ),
-    # 2 PQ On (25%)
+    # 3 PQ On (25%)
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
@@ -80,7 +80,7 @@ config_list = [
             automation.ConfigEntry("perf_model/dram", "r_cacheline_hw_no_queue_delay", "true"),
         ]
     ),
-    # 3 PQ On (50%)
+    # 4 PQ On (50%)
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
@@ -95,7 +95,7 @@ config_list = [
             automation.ConfigEntry("perf_model/dram", "r_cacheline_hw_no_queue_delay", "true"),
         ]
     ),
-    # 4 PQ On (80%)
+    # 5 PQ On (80%)
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
@@ -111,7 +111,7 @@ config_list = [
         ]
     ),
 
-    # 5 PQ On, Compression (10%)
+    # 6 PQ On, Compression (10%)
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
@@ -129,7 +129,7 @@ config_list = [
             automation.ConfigEntry("perf_model/dram", "r_cacheline_hw_no_queue_delay", "true"),
         ]
     ),
-    # 6 PQ On, Compression (25%)
+    # 7 PQ On, Compression (25%)
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
@@ -147,7 +147,7 @@ config_list = [
             automation.ConfigEntry("perf_model/dram", "r_cacheline_hw_no_queue_delay", "true"),
         ]
     ),
-    # 7 PQ On, Compression (50%)
+    # 8 PQ On, Compression (50%)
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
@@ -165,7 +165,7 @@ config_list = [
             automation.ConfigEntry("perf_model/dram", "r_cacheline_hw_no_queue_delay", "true"),
         ]
     ),
-    # 8 PQ On, Compression (80%)
+    # 9 PQ On, Compression (80%)
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
