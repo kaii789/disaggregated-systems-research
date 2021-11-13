@@ -184,6 +184,9 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_sum_inflight_cachelines_reads_size(0)
     , m_sum_inflight_cachelines_writes_size(0)
     , m_sum_inflight_cachelines_total_size(0)
+    , m_total_access_latency_no_outlier(SubsecondTime::Zero())
+    , m_access_latency_outlier_threshold(SubsecondTime::NS() * 20000)
+    , m_access_latency_outlier_count(0)
 {
     String name("dram"); 
     if (Sim()->getCfg()->getBool("perf_model/dram/queue_model/enabled"))
@@ -381,6 +384,9 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     registerStatsMetric("dram", core_id, "cacheline-bw-utilization-sum", &cacheline_bw_utilization_sum);
     registerStatsMetric("dram", core_id, "page-bw-utilization-sum", &page_bw_utilization_sum);
     registerStatsMetric("dram", core_id, "total-bw-utilization-sum", &total_bw_utilization_sum);
+
+    registerStatsMetric("dram", core_id, "total-access-latency-no-outlier", &m_total_access_latency_no_outlier);
+    registerStatsMetric("dram", core_id, "access-latency-outlier-count", &m_access_latency_outlier_count);
 
     // Stats for partition_queues experiments
     if (m_r_partition_queues) {
@@ -1636,6 +1642,12 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     SubsecondTime access_latency = t_now - pkt_time;
     m_total_remote_access_latency += access_latency;
     m_total_access_latency += access_latency;
+
+    if (access_latency < m_access_latency_outlier_threshold)
+        m_total_access_latency_no_outlier += access_latency;
+    else
+        m_access_latency_outlier_count += 1;
+
     update_local_remote_latency_stat(access_latency);
     return access_latency;
 }
@@ -2041,6 +2053,12 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
         SubsecondTime access_latency = t_now - pkt_time;
         m_total_local_access_latency += access_latency;
         m_total_access_latency += access_latency;
+
+        if (access_latency < m_access_latency_outlier_threshold)
+            m_total_access_latency_no_outlier += access_latency;
+        else
+            m_access_latency_outlier_count += 1;
+
         // LOG_PRINT("getAccessLatency branch 1: %lu ns", access_latency.getNS());
         return access_latency;
     } else {
@@ -2279,6 +2297,12 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
         }
         m_total_local_access_latency += access_latency;
         m_total_access_latency += access_latency;
+
+        if (access_latency < m_access_latency_outlier_threshold)
+            m_total_access_latency_no_outlier += access_latency;
+        else
+            m_access_latency_outlier_count += 1;
+
         // LOG_PRINT("getAccessLatency branch 2: %lu ns", access_latency.getNS());
         return access_latency;  
     }
