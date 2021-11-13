@@ -105,6 +105,8 @@ class DramPerfModelDisagg : public DramPerfModel
         bool m_r_pq_cacheline_hw_no_queue_delay;  // When this is true, remove HW access queue delay from PQ=on cacheline requests' critical path to simulate prioritized cachelines
         bool m_track_inflight_cachelines;  // Whether to track simultaneous inflight cachelines (slows down simulation)
         bool m_auto_turn_off_partition_queues;
+        double m_cancel_pq_inflight_buffer_threshold;
+        bool m_keep_space_in_cacheline_queue;
 
         // Local Memory
         QueueModel* m_dram_queue_model_single;
@@ -138,6 +140,7 @@ class DramPerfModelDisagg : public DramPerfModel
         std::unordered_set<UInt64> m_dirty_pages; // Dirty pages of local memory
         std::map<UInt64, SubsecondTime> m_inflight_pages; // Inflight pages that are being transferred from remote memory to local memory
         std::map<UInt64, UInt32> m_inflight_redundant;    // Count the number of redundant moves that occur for each inflight page while it is being transferred
+        std::unordered_set<UInt64> m_pages_cacheline_request_limit_exceeded;  // Remote/inflight pages with cacheline queues requests >= m_r_limit_redundant_moves
         std::map<UInt64, SubsecondTime> m_inflightevicted_pages; // Inflight pages that are being transferred from local memory to remote memory
         std::map<UInt64, SubsecondTime> m_inflight_pages_extra; // Inflight pages that are being transferred from remote memory to local memory, that exceed the limit from inflight buffer size or network bw (track arrival time while not counting it in the normal data structures)
 
@@ -230,7 +233,8 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_move_page_cancelled_datamovement_queue_full;  // the number of times moving a remote page to local was cancelled due to the network bandwidth queue for pages being full
         UInt64 m_move_page_cancelled_rmode5;                   // the number of times a remote page was not moved to local due to rmode5
         UInt64 m_bufferspace_full_page_still_moved;            // localdram bufferspace was full, but page was still moved with an additional estimated penalty (currently only when PQ=off)
-        UInt64 m_datamovement_queue_full_page_still_moved;     // network bandwidth queue for pages was full, but page was still moved with an additional estimated penalty (currently only when PQ=off)
+        UInt64 m_datamovement_queue_full_page_still_moved;     // network bandwidth queue for pages was full, but page was still moved with an additional estimated penalty
+        UInt64 m_datamovement_queue_full_cacheline_still_moved;// network bandwidth queue for cachelines was full, but cacheline was still moved with an additional estimated penalty (only when PQ=on)
         UInt64 m_rmode5_page_moved_due_to_threshold;           // the number of time when in rmode5 and acting according to rmode2, a page was moved because the threshold number of accesses was reached
         UInt64 m_unique_pages_accessed;             // track number of unique pages accessed
         UInt64 m_ideal_page_throttling_swaps_inflight;         // number of times the ideal page throttling algorithm swaps a throttled page with a previously moved page that was inflight

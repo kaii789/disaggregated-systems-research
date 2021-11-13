@@ -91,7 +91,9 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_speed_up_simulation    (Sim()->getCfg()->getBool("perf_model/dram/speed_up_disagg_simulation"))  // When this is true, some optional stats aren't calculated
     , m_r_pq_cacheline_hw_no_queue_delay    (Sim()->getCfg()->getBool("perf_model/dram/r_cacheline_hw_no_queue_delay"))  // When this is true, remove HW access queue delay from PQ=on cacheline requests' critical path to simulate prioritized cachelines
     , m_track_inflight_cachelines    (Sim()->getCfg()->getBool("perf_model/dram/track_inflight_cachelines"))  // Whether to track simultaneous inflight cachelines (slows down simulation)
-    , m_auto_turn_off_partition_queues    (Sim()->getCfg()->getBool("perf_model/dram/auto_turn_off_partition_queues"))
+    , m_auto_turn_off_partition_queues    (Sim()->getCfg()->getBool("perf_model/dram/auto_turn_off_partition_queues"))  // Whether to enable automatic detection of conditions to turn off partition queues
+    , m_cancel_pq_inflight_buffer_threshold    (Sim()->getCfg()->getFloat("perf_model/dram/cancel_pq_inflight_buffer_threshold"))  // Fraction of inflight_pages size at which to cancel partition queues
+    , m_keep_space_in_cacheline_queue     (Sim()->getCfg()->getBool("perf_model/dram/keep_space_in_cacheline_queue"))  // Try to keep more free bandwidth in cacheline queues
     , m_banks               (m_total_banks)
     , m_r_banks               (m_total_banks)
     , m_inflight_page_delayed(0)
@@ -138,6 +140,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_move_page_cancelled_rmode5(0)
     , m_bufferspace_full_page_still_moved(0)
     , m_datamovement_queue_full_page_still_moved(0)
+    , m_datamovement_queue_full_cacheline_still_moved(0)
     , m_rmode5_page_moved_due_to_threshold(0)
     , m_unique_pages_accessed      (0)
     , m_ideal_page_throttling_swaps_inflight(0)
@@ -345,6 +348,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     registerStatsMetric("dram", core_id, "queue-full-move-page-cancelled", &m_move_page_cancelled_datamovement_queue_full);
     registerStatsMetric("dram", core_id, "bufferspace-full-page-still-moved", &m_bufferspace_full_page_still_moved);
     registerStatsMetric("dram", core_id, "queue-full-page-still-moved", &m_datamovement_queue_full_page_still_moved);    
+    registerStatsMetric("dram", core_id, "queue-full-cacheline-still-moved", &m_datamovement_queue_full_cacheline_still_moved);    
     registerStatsMetric("dram", core_id, "inflight-hits", &m_inflight_hits);
     registerStatsMetric("dram", core_id, "writeback-pages", &m_writeback_pages);
     registerStatsMetric("dram", core_id, "local-evictions", &m_local_evictions);
@@ -1239,7 +1243,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         cacheline_queue_utilization_percentage = m_data_movement_2->getCachelineQueueUtilizationPercentage(t_now);
     }
     // Cancel moving the page if the queue used to move the page is already full AND there is space in the cacheline queue
-    if (m_r_partition_queues != 0 && move_page && page_queue_utilization_percentage > m_r_page_queue_utilization_threshold && cacheline_queue_utilization_percentage <= m_r_cacheline_queue_utilization_threshold) {  // save 5% for evicted pages?
+    if (m_r_partition_queues != 0 && move_page && page_queue_utilization_percentage > m_r_page_queue_utilization_threshold && ((m_keep_space_in_cacheline_queue && cacheline_queue_utilization_percentage <= m_r_cacheline_queue_utilization_threshold) || page_queue_utilization_percentage > cacheline_queue_utilization_percentage)) {  // save 5% for evicted pages?
         move_page = false;
         ++m_move_page_cancelled_datamovement_queue_full;
 
@@ -1507,6 +1511,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
                 t_now += extra_delay_penalty;  // page movement was the critical path, add extra delay
             m_inflight_pages_extra[phys_page] = SubsecondTime::max(global_time, page_arrival_time + extra_delay_penalty);
             m_inflight_redundant[phys_page] = 0;
+            m_pages_cacheline_request_limit_exceeded.erase(phys_page);
             ++m_datamovement_queue_full_page_still_moved;
             if (m_inflight_pages_extra.size() > m_max_inflight_extra_bufferspace)
                 m_max_inflight_extra_bufferspace++;
@@ -1514,6 +1519,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             // m_inflight_pages.erase(phys_page);
             m_inflight_pages[phys_page] = SubsecondTime::max(global_time, page_arrival_time);
             m_inflight_redundant[phys_page] = 0;
+            m_pages_cacheline_request_limit_exceeded.erase(phys_page);
             if (m_inflight_pages.size() > m_max_inflight_bufferspace)
                 m_max_inflight_bufferspace++;
             if (m_inflight_pages.size() + m_inflightevicted_pages.size() > m_max_total_bufferspace)
@@ -1540,6 +1546,12 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             m_total_remote_dram_hardware_latency_cachelines += cacheline_hw_access_latency;
             m_total_remote_dram_hardware_latency_cachelines_count++;
             t_now += cacheline_hw_access_latency;
+        } else {
+            if (cacheline_queue_utilization_percentage > m_r_cacheline_queue_utilization_threshold) {
+                SubsecondTime extra_delay_penalty = SubsecondTime::NS() * 5000;
+                t_now += extra_delay_penalty;
+                ++m_datamovement_queue_full_cacheline_still_moved;
+            }
         }
 
         if (m_track_inflight_cachelines) {
@@ -1585,10 +1597,13 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         auto it = m_inflight_redundant.find(phys_page);
         if (it == m_inflight_redundant.end()) {
             m_inflight_redundant[phys_page] = 0;
+            m_pages_cacheline_request_limit_exceeded.erase(phys_page);
         } else {
             m_inflight_redundant[phys_page] += 1;
+            if (m_inflight_redundant[phys_page] >= m_r_limit_redundant_moves)
+                m_pages_cacheline_request_limit_exceeded.insert(phys_page);
         }
-        if (m_auto_turn_off_partition_queues && m_inflight_redundant[phys_page] >= m_r_limit_redundant_moves) {
+        if (m_auto_turn_off_partition_queues && m_pages_cacheline_request_limit_exceeded.size() > m_cancel_pq_inflight_buffer_threshold * (m_inflight_pages.size() + m_inflight_pages_extra.size())) {
             m_r_partition_queues = 0;
             std::cout << "Partition queues turned off due to >= type 1 redundant moves limit of " << m_r_limit_redundant_moves << " at " << m_num_accesses << " accesses" << std::endl;
         }
@@ -1728,6 +1743,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
     for (i = m_inflight_pages.begin(); i != m_inflight_pages.end();) {
         if (i->second <= current_time) {
             m_inflight_redundant.erase(i->first);
+            m_pages_cacheline_request_limit_exceeded.erase(i->first);
             m_data_movement->removeInflightPage(i->first);
             m_inflight_pages.erase(i++);
 
@@ -1748,6 +1764,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
     for (i = m_inflight_pages_extra.begin(); i != m_inflight_pages_extra.end();) {
         if (i->second <= current_time) {
             m_inflight_redundant.erase(i->first);
+            m_pages_cacheline_request_limit_exceeded.erase(i->first);
             m_inflight_pages_extra.erase(i++);
         } else {
             ++i;
@@ -2027,22 +2044,6 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
             m_inflight_hits++; 
 
             if (m_r_partition_queues != 0) {
-                // Update dirty write buffer
-                if (access_type == DramCntlrInterface::WRITE) {
-                    UInt64 dirty_write_count = 0;
-                    if (m_inflight_page_to_dirty_write_count.find(phys_page) != m_inflight_page_to_dirty_write_count.end())
-                        dirty_write_count = m_inflight_page_to_dirty_write_count[phys_page];
-                    dirty_write_count += 1;
-                    // if (std::find(m_inflight_page_to_dirty_write_count.begin(), m_inflight_page_to_dirty_write_count.end(), phys_page) != m_inflight_page_to_dirty_write_count.end()) {
-                    //     m_inflight_page_to_dirty_write_count[phys_page] = dirty_write_count;
-                    // } else {
-                    //     m_inflight_page_to_dirty_write_count.insert(phys_page, dirty_write_count);
-                    // }
-                    m_inflight_page_to_dirty_write_count[phys_page] = dirty_write_count;
-
-                    m_dirty_write_buffer_size += 1;
-                }
-
                 double cacheline_queue_utilization_percentage;
                 if (m_r_partition_queues == 1)
                     cacheline_queue_utilization_percentage = m_data_movement_2->getCachelineQueueUtilizationPercentage(t_now);
@@ -2052,10 +2053,29 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                     // This cacheline read was already inflight, wait for to arrive
                     access_latency = SubsecondTime::min(access_latency, m_inflight_cachelines_reads[cacheline] - pkt_time);
                     ++m_redundant_moves_type2_cancelled_already_inflight;
-                } else if (cacheline_queue_utilization_percentage > m_r_cacheline_queue_utilization_threshold) {
+                } else if ((!m_keep_space_in_cacheline_queue && cacheline_queue_utilization_percentage > m_r_cacheline_queue_utilization_threshold) || (m_keep_space_in_cacheline_queue && cacheline_queue_utilization_percentage + 0.03 > m_r_cacheline_queue_utilization_threshold)) {
+                    // If m_keep_space_in_cacheline_queue is true, don't make redundant requests of type 2 at 3% slower than m_r_cacheline_queue_utilization_threshold
                     // Can't make additional cacheline request
                     ++m_redundant_moves_type2_cancelled_datamovement_queue_full;
+                    if (m_auto_turn_off_partition_queues)
+                        m_inflight_redundant[phys_page] += 1;  // track this as a redundant request even though it wasn't actually made
                 } else if (m_inflight_redundant[phys_page] < m_r_limit_redundant_moves) {
+                    // Update dirty write buffer
+                    if (access_type == DramCntlrInterface::WRITE) {
+                        UInt64 dirty_write_count = 0;
+                        if (m_inflight_page_to_dirty_write_count.find(phys_page) != m_inflight_page_to_dirty_write_count.end())
+                            dirty_write_count = m_inflight_page_to_dirty_write_count[phys_page];
+                        dirty_write_count += 1;
+                        // if (std::find(m_inflight_page_to_dirty_write_count.begin(), m_inflight_page_to_dirty_write_count.end(), phys_page) != m_inflight_page_to_dirty_write_count.end()) {
+                        //     m_inflight_page_to_dirty_write_count[phys_page] = dirty_write_count;
+                        // } else {
+                        //     m_inflight_page_to_dirty_write_count.insert(phys_page, dirty_write_count);
+                        // }
+                        m_inflight_page_to_dirty_write_count[phys_page] = dirty_write_count;
+
+                        m_dirty_write_buffer_size += 1;
+                    }
+
                     SubsecondTime add_cacheline_hw_access_latency = getDramAccessCost(t_now, pkt_size, requester, address, perf, true, false, false);
                     m_total_remote_dram_hardware_latency_cachelines += add_cacheline_hw_access_latency;
                     m_total_remote_dram_hardware_latency_cachelines_count++;
@@ -2231,12 +2251,15 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                             access_latency = add_cacheline_request_time + datamov_delay - pkt_time;
                         }
                     }
-                } else if (m_auto_turn_off_partition_queues) {
-                    m_r_partition_queues = 0;  // turn off partition queues when limit redundant moves is exceeded
-                    std::cout << "Partition queues turned off due to >= type 2 redundant moves limit of " << m_r_limit_redundant_moves << " at " << m_num_accesses << " accesses" << std::endl;
                 } else {
                     ++m_redundant_moves_type2_cancelled_limit_redundant_moves;
                     // std::cout << "Inflight page " << phys_page << " redundant moves > limit, = " << m_inflight_redundant[phys_page] << std::endl;
+
+                    m_pages_cacheline_request_limit_exceeded.insert(phys_page);
+                    if (m_auto_turn_off_partition_queues && m_pages_cacheline_request_limit_exceeded.size() > m_cancel_pq_inflight_buffer_threshold * (m_inflight_pages.size() + m_inflight_pages_extra.size())) {
+                        m_r_partition_queues = 0;
+                        std::cout << "Partition queues turned off due to >= type 2 redundant moves limit of " << m_r_limit_redundant_moves << " at " << m_num_accesses << " accesses" << std::endl;
+                    }
                 }
             }
         }

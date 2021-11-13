@@ -367,6 +367,7 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     ('    remote page move full queue yet moved with penalty', 'dram.queue-full-page-still-moved', str),
     ('  remote page move cancelled due to rmode5', 'dram.rmode5-move-page-cancelled', str),
     ('  remote page moved due to exceeding threshold in rmode5', 'dram.rmode5-page-moved-due-to-threshold', str),
+  ('    remote cacheline move full queue, moved with penalty', 'dram.queue-full-cacheline-still-moved', str),
   ]
 
 
