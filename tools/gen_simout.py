@@ -367,7 +367,6 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     ('    remote page move full queue yet moved with penalty', 'dram.queue-full-page-still-moved', str),
     ('  remote page move cancelled due to rmode5', 'dram.rmode5-move-page-cancelled', str),
     ('  remote page moved due to exceeding threshold in rmode5', 'dram.rmode5-page-moved-due-to-threshold', str),
-  ('    remote cacheline move full queue, moved with penalty', 'dram.queue-full-cacheline-still-moved', str),
   ]
 
 
@@ -394,8 +393,14 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
       results["dram.bw-utilization-decile-percentage-{}".format(i)] = [percentage] + [0]*(ncores - 1)
       template.append(('  bw utilization % decile {}'.format(i), "dram.bw-utilization-decile-percentage-{}".format(i), str))
 
-  results['dram.avg-bw-utilization'] =  map(lambda (a,b): (a/100000)/b if b else float('inf'), zip(results['dram.total-bw-utilization-sum'], results['dram.accesses']))
-  template.append(('avg bw utilization', 'dram.avg-bw-utilization', str))
+  results['dram.avg-bw-utilization'] = map(lambda (a,b): (a/100000)/b if b else float('inf'), zip(results['dram.total-bw-utilization-sum'], results['dram.accesses']))
+  results['dram.avg-page-bw-utilization'] = map(lambda (a,b): (a/100000)/b if b else float('inf'), zip(results['dram.cacheline-bw-utilization-sum'], results['dram.accesses']))
+  results['dram.avg-page-bw-utilization'] = map(lambda (a,b): (a/100000)/b if b else float('inf'), zip(results['dram.page-bw-utilization-sum'], results['dram.accesses']))
+  template += [
+      ('avg total bw utilization', 'dram.avg-bw-utilization', str),
+      ('avg page queue bw utilization', 'dram.avg-page-bw-utilization', str),
+      ('avg cacheline queue bw utilization', 'dram.avg-cacheline-bw-utilization', str),
+  ]
 
   # Compression
   if bytes_saved != 0:
