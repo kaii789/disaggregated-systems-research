@@ -90,16 +90,64 @@ def get_average_bw(res_dir):
     res = sniper_lib.get_results(resultsdir=res_dir)
     results = res['results']
 
-    weighted_average = 0
-    results['dram.accesses'] = list(map(sum, zip(results['dram.reads'], results['dram.writes'])))
-    total_count = results['dram.accesses'][0]
-    for i in range(10):
-        decile_count = results["dram.bw-utilization-decile-{}".format(i)][0]
-        decile_ratio = ((float)(decile_count) / (float)(total_count))
-        weighted_average += decile_ratio * (float(i + (i + 1))/2/10)  # use the midpoint of the decile "bucket"
+    # weighted_average = 0
+    # results['dram.accesses'] = list(map(sum, zip(results['dram.reads'], results['dram.writes'])))
+    # total_count = results['dram.accesses'][0]
+    # for i in range(10):
+    #     decile_count = results["dram.bw-utilization-decile-{}".format(i)][0]
+    #     decile_ratio = ((float)(decile_count) / (float)(total_count))
+    #     weighted_average += decile_ratio * (float(i + (i + 1))/2/10)  # use the midpoint of the decile "bucket"
 
-    print(weighted_average)
-    return weighted_average
+    # print(weighted_average)
+    # return weighted_average
+
+    results['dram.remote-accesses'] = map(sum, zip(results['dram.remote-reads'], results['dram.remote-writes']))
+    results['dram.avg-bw-utilization'] = map(lambda a: (float(a[0])/100000)/a[1] if a[1] else float('inf'), zip(results['dram.total-bw-utilization-sum'], results['dram.remote-accesses']))
+    results['dram.avg-page-bw-utilization'] = map(lambda a: (float(a[0])/100000)/a[1] if a[1] else float('inf'), zip(results['dram.cacheline-bw-utilization-sum'], results['dram.remote-accesses']))
+    results['dram.avg-page-bw-utilization'] = map(lambda a: (float(a[0])/100000)/a[1] if a[1] else float('inf'), zip(results['dram.page-bw-utilization-sum'], results['dram.remote-accesses']))
+
+    return list(results['dram.avg-bw-utilization'])[0] * 100
+
+def get_average_bw_queueing_delay(res_dir):
+    res = sniper_lib.get_results(resultsdir=res_dir)
+    results = res['results']
+    if 'dram-datamovement-queue.num-cacheline-requests' in results and sum(results['dram-datamovement-queue.num-requests']) > 0:
+        avg_queue1_delay = (0.25 * results['dram-datamovement-queue.total-cacheline-queue-delay'][0] + 0.75 * results['dram-datamovement-queue.total-page-queue-delay'][0]) / (results['dram-datamovement-queue.num-cacheline-requests'][0] + results['dram-datamovement-queue.num-page-requests'][0])
+    elif 'dram-datamovement-queue.num-requests' in results and results['dram-datamovement-queue.num-requests'][0] > 0:
+        avg_queue1_delay = results['dram-datamovement-queue.total-queue-delay'][0] / results['dram-datamovement-queue.num-requests'][0]
+    else:
+        avg_queue1_delay = 0
+
+    return avg_queue1_delay
+
+def get_local_dram_hit_rate(res_dir):
+    res = sniper_lib.get_results(resultsdir=res_dir)
+    results = res['results']
+
+    results['dram.accesses'] = results['dram.reads'][0] + results['dram.writes'][0]
+    if 'dram.remote-reads' in results:
+        results['dram.local-reads'] = results['dram.reads'][0] - results['dram.remote-reads'][0]
+    if 'dram.remote-writes' in results:
+        results['dram.local-writes'] = results['dram.writes'][0] - results['dram.remote-writes'][0]
+
+    return ((results['dram.local-reads'] + results['dram.local-writes']) /  float(results['dram.accesses'])) * 100
+
+def get_weighted_dram_latency(res_dir):
+    res = sniper_lib.get_results(resultsdir=res_dir)
+    results = res['results']
+
+    results['dram.accesses'] = [results['dram.reads'][0] + results['dram.writes'][0]]
+    results['dram.remote-accesses'] = [results['dram.remote-reads'][0] + results['dram.remote-writes'][0]]
+    results['dram.local-accesses'] = [results['dram.accesses'][0] - results['dram.remote-accesses'][0]]
+
+    local_dram_avg_lat = results['dram.total-local-access-latency'][0] / results['dram.local-accesses'][0] / 10**6
+    remote_dram_avg_lat = results['dram.total-remote-access-latency'][0] / results['dram.remote-accesses'][0] / 10**6
+
+    local_dram_hit_ratio = get_local_dram_hit_rate(res_dir) / 100
+    weighted_local_lat = local_dram_avg_lat * local_dram_hit_ratio
+    weighted_remote_lat = remote_dram_avg_lat * (1 - local_dram_hit_ratio)
+
+    return weighted_local_lat, weighted_remote_lat
 
 def get_inflight_page_stats(res_dir):
     res = sniper_lib.get_results(resultsdir=res_dir)
