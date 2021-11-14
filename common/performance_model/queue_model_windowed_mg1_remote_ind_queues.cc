@@ -27,6 +27,8 @@ QueueModelWindowedMG1RemoteIndQueues::QueueModelWindowedMG1RemoteIndQueues(Strin
    , m_r_added_latency(SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/remote_mem_add_lat"))) // Network latency for remote DRAM access 
    , m_r_partition_queues(Sim()->getCfg()->getInt("perf_model/dram/remote_partitioned_queues")) // Whether partitioned queues is enabled
    , m_r_cacheline_queue_fraction(Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_fraction"))
+   , m_page_inject_delay_when_queue_full(Sim()->getCfg()->getBool("queue_model/windowed_mg1_remote_ind_queues/page_inject_delay_when_queue_full"))
+   , m_cacheline_inject_delay_when_queue_full(Sim()->getCfg()->getBool("queue_model/windowed_mg1_remote_ind_queues/cacheline_inject_delay_when_queue_full"))
    , m_name(name)
    , m_specified_bw_GB_per_s((double)bw_bits_per_us / 8 / 1000)  // convert bits/us to GB/s
    , m_max_bandwidth_allowable_excess_ratio(Sim()->getCfg()->getFloat("queue_model/windowed_mg1_remote_ind_queues/bandwidth_allowable_excess_ratio"))
@@ -57,6 +59,8 @@ QueueModelWindowedMG1RemoteIndQueues::QueueModelWindowedMG1RemoteIndQueues(Strin
    , m_total_queue_delay(SubsecondTime::Zero())
    , m_total_page_queue_delay(SubsecondTime::Zero())
    , m_total_cacheline_queue_delay(SubsecondTime::Zero())
+   , m_page_utilization_full_injected_delay(SubsecondTime::Zero())
+   , m_cacheline_utilization_full_injected_delay(SubsecondTime::Zero())
 {  
    if (m_use_separate_queue_delay_cap) {
       m_queue_delay_cap = SubsecondTime::NS(Sim()->getCfg()->getInt("queue_model/windowed_mg1_remote_ind_queues/queue_delay_cap"));
@@ -82,6 +86,8 @@ QueueModelWindowedMG1RemoteIndQueues::QueueModelWindowedMG1RemoteIndQueues(Strin
    registerStatsMetric(name, id, "num-cacheline-requests-queue-full", &m_total_cacheline_requests_queue_full);
    registerStatsMetric(name, id, "num-cacheline-requests-capped-by-window-size", &m_total_cacheline_requests_capped_by_window_size);
    // registerStatsMetric(name, id, "num-requests-capped-by-custom-cap", &m_total_requests_capped_by_queue_delay_cap);
+   registerStatsMetric(name, id, "page-requests-queue-full-injected-delay", &m_page_utilization_full_injected_delay);
+   registerStatsMetric(name, id, "cacheline-requests-queue-full-injected-delay", &m_cacheline_utilization_full_injected_delay);
 
    registerStatsMetric(name, id, "num-requests-page-queue-overflowed-to-cacheline-queue", &m_page_queue_overflowed_to_cacheline_queue);
    registerStatsMetric(name, id, "num-requests-cacheline-queue-overflowed-to-page-queue", &m_cacheline_queue_overflowed_to_page_queue);
@@ -164,13 +170,13 @@ QueueModelWindowedMG1RemoteIndQueues::~QueueModelWindowedMG1RemoteIndQueues()
    // std::cout << "CDF X values (bandwidth), in GB/s:\n" << cdf_buffer.str() << std::endl;
    // std::cout << "CDF Y values (probability):\n" << percentages_buffer.str() << std::endl;
 
-   if ((double) m_effective_bandwidth_exceeded_allowable_max / m_total_requests > 0.01) {
+   if ((double) m_effective_bandwidth_exceeded_allowable_max / m_total_requests > 0.0001) {
       std::cout << "Queue " << m_name << " overall had " << 100 * (double)m_effective_bandwidth_exceeded_allowable_max / m_total_requests;
       std::cout << "% of windows with effective bandwidth that exceeded the allowable max bandwidth of " << m_specified_bw_GB_per_s * m_max_bandwidth_allowable_excess_ratio << "GB/s" << std::endl;
    }
 
    if (m_total_page_requests > 0) {
-      if ((double) m_page_effective_bandwidth_exceeded_allowable_max / m_total_page_requests > 0.01) {
+      if ((double) m_page_effective_bandwidth_exceeded_allowable_max / m_total_page_requests > 0.0001) {
          std::cout << "Queue " << m_name << " page portion had " << 100 * (double)m_page_effective_bandwidth_exceeded_allowable_max / m_total_page_requests;
          std::cout << "% of windows with effective bandwidth that exceeded the allowable max bandwidth of " << m_specified_bw_GB_per_s * (1 - m_r_cacheline_queue_fraction) * m_max_bandwidth_allowable_excess_ratio << "GB/s" << std::endl;
       }
@@ -178,7 +184,7 @@ QueueModelWindowedMG1RemoteIndQueues::~QueueModelWindowedMG1RemoteIndQueues()
    }
 
    if (m_total_cacheline_requests > 0) {
-      if ((double) m_cacheline_effective_bandwidth_exceeded_allowable_max / m_total_cacheline_requests > 0.01) {
+      if ((double) m_cacheline_effective_bandwidth_exceeded_allowable_max / m_total_cacheline_requests > 0.0001) {
          std::cout << "Queue " << m_name << " cacheline portion had " << 100 * (double)m_cacheline_effective_bandwidth_exceeded_allowable_max / m_total_cacheline_requests;
          std::cout << "% of windows with effective bandwidth that exceeded the allowable max bandwidth of " << m_specified_bw_GB_per_s * m_r_cacheline_queue_fraction * m_max_bandwidth_allowable_excess_ratio << "GB/s" << std::endl;
       }
@@ -191,6 +197,11 @@ QueueModelWindowedMG1RemoteIndQueues::~QueueModelWindowedMG1RemoteIndQueues()
    if (m_total_no_effect_cacheline_requests > 0) {
       std::cout << "Avg page queue utilization during cacheline No Effect requests: " << 100 * m_total_page_queue_utilization_during_cacheline_no_effect / m_total_no_effect_cacheline_requests << "%" << std::endl;
    }
+
+   if (m_total_page_requests_queue_full > 0)
+      std::cout << "page utilization full avg injected delay = " << (double)(m_page_utilization_full_injected_delay.getNS()) / m_total_page_requests_queue_full << " ns" << std::endl;
+   if (m_total_cacheline_requests_queue_full > 0)
+      std::cout << "page utilization full avg injected delay = " << (double)(m_cacheline_utilization_full_injected_delay.getNS()) / m_total_cacheline_requests_queue_full << " ns" << std::endl;
 }
 
 void QueueModelWindowedMG1RemoteIndQueues::finalizeStats() {
@@ -274,6 +285,7 @@ SubsecondTime
 QueueModelWindowedMG1RemoteIndQueues::computeQueueDelayNoEffect(SubsecondTime pkt_time, SubsecondTime processing_time, request_t request_type, core_id_t requester)
 {
    SubsecondTime t_queue = SubsecondTime::Zero();
+   SubsecondTime utilization_overflow_wait_time = SubsecondTime::Zero();
    if (!m_r_partition_queues) {
       request_type = QueueModel::PAGE;
    }
@@ -305,7 +317,7 @@ QueueModelWindowedMG1RemoteIndQueues::computeQueueDelayNoEffect(SubsecondTime pk
          service_time_sum2 = m_cacheline_service_time_sum2;
          num_arrivals = m_num_cacheline_arrivals;
       }
-      t_queue = applySingleWindowSizeFormula(request_type, service_time_sum, service_time_sum2, num_arrivals, false);
+      t_queue = applySingleWindowSizeFormula(request_type, service_time_sum, service_time_sum2, num_arrivals, false, pkt_time, utilization_overflow_wait_time);
    }
    // Add additional network latency
    t_queue += m_r_added_latency;  // is it ok for t_queue to potentially be larger than m_window_size?
@@ -317,19 +329,24 @@ QueueModelWindowedMG1RemoteIndQueues::computeQueueDelayNoEffect(SubsecondTime pk
       ++m_total_no_effect_page_requests;
       m_total_cacheline_queue_utilization_during_page_no_effect += cacheline_queue_utilization_percentage;
       m_total_cacheline_queue_utilization_during_page_no_effect_numerator = (UInt64)(m_total_cacheline_queue_utilization_during_page_no_effect * m_total_cacheline_queue_utilization_during_page_no_effect_denominator);
+      if (m_total_no_effect_page_requests % 1000000 == 0)
+         std::cout << "computeQueueDelayNoEffect page utilization_overflow_wait_time (ns) =" << utilization_overflow_wait_time.getNS() << std::endl;
    } else {  // request_type == QueueModel::CACHELINE
       ++m_total_no_effect_cacheline_requests;
       m_total_page_queue_utilization_during_cacheline_no_effect += page_queue_utilization_percentage;
       m_total_page_queue_utilization_during_cacheline_no_effect_numerator = (UInt64)(m_total_page_queue_utilization_during_cacheline_no_effect * m_total_page_queue_utilization_during_cacheline_no_effect_denominator);
+      if (m_total_no_effect_cacheline_requests % 1000000 == 0)
+         std::cout << "computeQueueDelayNoEffect cacheline utilization_overflow_wait_time (ns) =" << utilization_overflow_wait_time.getNS() << std::endl;
    }
 
-   return t_queue;
+   return t_queue + utilization_overflow_wait_time;
 }
 
 SubsecondTime
 QueueModelWindowedMG1RemoteIndQueues::computeQueueDelayTrackBytes(SubsecondTime pkt_time, SubsecondTime processing_time, UInt64 num_bytes, request_t request_type, core_id_t requester, bool is_inflight_page, UInt64 phys_page)
 {
    SubsecondTime t_queue = SubsecondTime::Zero();
+   SubsecondTime utilization_overflow_wait_time = SubsecondTime::Zero();
    if (!m_r_partition_queues) {
       request_type = QueueModel::PAGE;
    }
@@ -361,58 +378,104 @@ QueueModelWindowedMG1RemoteIndQueues::computeQueueDelayTrackBytes(SubsecondTime 
          service_time_sum2 = m_cacheline_service_time_sum2;
          num_arrivals = m_num_cacheline_arrivals;
       }
-      t_queue = applySingleWindowSizeFormula(request_type, service_time_sum, service_time_sum2, num_arrivals, true);
+      t_queue = applySingleWindowSizeFormula(request_type, service_time_sum, service_time_sum2, num_arrivals, true, pkt_time, utilization_overflow_wait_time);
    }
    // Add additional network latency
    t_queue += m_r_added_latency;  // is it ok for t_queue to potentially be larger than m_window_size?
+
+   if (m_total_requests % 100000 == 0)
+      std::cout << "computeQueueDelayTrackBytes utilization_overflow_wait_time (ns) =" << utilization_overflow_wait_time.getNS() << std::endl;
 
    // If one queue's utilization is high, add it to the other queue if the other queue has space
    // TODO: need to modify processing time to be based off of the other queue's bandwidth?
    if (m_use_utilization_overflow && request_type == QueueModel::PAGE && page_queue_utilization_percentage > m_utilization_overflow_threshold && cacheline_queue_utilization_percentage < m_utilization_overflow_threshold - 0.1) {
       // Add to cacheline queue instead (fills its utilization)
-      addItem(pkt_time, processing_time, QueueModel::CACHELINE);
-      addItemUpdateBytes(pkt_time, num_bytes, t_queue, QueueModel::CACHELINE);
+      addItem(pkt_time + utilization_overflow_wait_time, processing_time, QueueModel::CACHELINE);
+      addItemUpdateBytes(pkt_time + utilization_overflow_wait_time, num_bytes, t_queue, QueueModel::CACHELINE);
       ++m_page_queue_overflowed_to_cacheline_queue;
    } else if (m_use_utilization_overflow && request_type == QueueModel::CACHELINE && cacheline_queue_utilization_percentage > m_utilization_overflow_threshold && page_queue_utilization_percentage < m_utilization_overflow_threshold - 0.1) {
       // Add to page queue instead (fills its utilization)
-      addItem(pkt_time, processing_time, QueueModel::PAGE);
-      addItemUpdateBytes(pkt_time, num_bytes, t_queue, QueueModel::PAGE);
+      addItem(pkt_time + utilization_overflow_wait_time, processing_time, QueueModel::PAGE);
+      addItemUpdateBytes(pkt_time + utilization_overflow_wait_time, num_bytes, t_queue, QueueModel::PAGE);
       ++m_cacheline_queue_overflowed_to_page_queue;
    } else {
-      addItem(pkt_time, processing_time, request_type);
-      addItemUpdateBytes(pkt_time, num_bytes, t_queue, request_type);
+      addItem(pkt_time + utilization_overflow_wait_time, processing_time, request_type);
+      addItemUpdateBytes(pkt_time + utilization_overflow_wait_time, num_bytes, t_queue, request_type);
    }
 
 
    m_total_utilized_time += processing_time;
    ++m_total_requests;
-   m_total_queue_delay += t_queue;
+   m_total_queue_delay += t_queue + utilization_overflow_wait_time;
    if (request_type == QueueModel::PAGE) {
       ++m_total_page_requests;
-      m_total_page_queue_delay += t_queue;
+      m_total_page_queue_delay += t_queue + utilization_overflow_wait_time;
       m_total_cacheline_queue_utilization_during_page_requests += cacheline_queue_utilization_percentage;
       m_total_cacheline_queue_utilization_during_page_requests_numerator = (UInt64)(m_total_cacheline_queue_utilization_during_page_requests * m_total_cacheline_queue_utilization_during_page_requests_denominator);
    } else {  // request_type == QueueModel::CACHELINE
       ++m_total_cacheline_requests;
-      m_total_cacheline_queue_delay += t_queue;
+      m_total_cacheline_queue_delay += t_queue + utilization_overflow_wait_time;
       m_total_page_queue_utilization_during_cacheline_requests += page_queue_utilization_percentage;
       m_total_page_queue_utilization_during_cacheline_requests_numerator = (UInt64)(m_total_page_queue_utilization_during_cacheline_requests * m_total_page_queue_utilization_during_cacheline_requests_denominator);
    }
 
-   return t_queue;
+   return t_queue + utilization_overflow_wait_time;
 }
 
 // total_service_time is in ps, total_service_time2 is in ps^2, utilization_window_size is in ps
 SubsecondTime
-QueueModelWindowedMG1RemoteIndQueues::applyQueueDelayFormula(request_t request_type, UInt64 total_service_time, UInt64 total_service_time2, UInt64 num_arrivals, UInt64 utilization_window_size, bool update_stats)
+QueueModelWindowedMG1RemoteIndQueues::applyQueueDelayFormula(request_t request_type, UInt64 total_service_time, UInt64 total_service_time2, UInt64 num_arrivals, UInt64 utilization_window_size, bool update_stats, SubsecondTime pkt_time, SubsecondTime &utilization_overflow_wait_time)
 {
+   const double max_utilization = 0.9999;  // number here changed from .99 to .9999; still needed?
+   // See if we need to make the request at a future time (for queue delay correctness)
+   // SubsecondTime utilization_overflow_wait_time = SubsecondTime::Zero();
+   // Assume utilization_overflow_wait_time is passed in with an initialized value
+   UInt64 max_total_service_time = max_utilization * utilization_window_size;
+   if (((request_type == QueueModel::PAGE && m_page_inject_delay_when_queue_full) || (request_type == QueueModel::CACHELINE && m_cacheline_inject_delay_when_queue_full)) &&total_service_time > max_total_service_time) {
+      SubsecondTime earliest_time = pkt_time > m_window_size ? pkt_time - m_window_size : SubsecondTime::Zero();
+      if (request_type == QueueModel::PAGE) {
+         std::multimap<SubsecondTime, SubsecondTime>::iterator entry = m_window_page_requests.begin();
+         // See how long we need to wait for the utilization to drop to max_utilization or lower
+         while(entry != m_window_page_requests.end() && total_service_time > max_total_service_time)
+         {
+            earliest_time = entry->first;
+            total_service_time -= entry->second.getPS();
+            total_service_time2 -= entry->second.getPS() * entry->second.getPS();
+            num_arrivals --;
+            entry++;
+         }
+      } else {  // request_type == QueueModel::CACHELINE
+         std::multimap<SubsecondTime, SubsecondTime>::iterator entry = m_window_cacheline_requests.begin();
+         // See how long we need to wait for the utilization to drop to max_utilization or lower
+         while(entry != m_window_cacheline_requests.end() && total_service_time > max_total_service_time)
+         {
+            earliest_time = entry->first;
+            total_service_time -= entry->second.getPS();
+            total_service_time2 -= entry->second.getPS() * entry->second.getPS();
+            num_arrivals --;
+            entry++;
+         }
+      }
+      utilization_overflow_wait_time += earliest_time + (pkt_time > m_window_size ? m_window_size - pkt_time : SubsecondTime::Zero());  // technically would need to wait until after earliest_time passes
+
+      if (update_stats && request_type == QueueModel::PAGE) {
+         ++m_total_page_requests_queue_full;
+         m_page_utilization_full_injected_delay += utilization_overflow_wait_time;
+      }
+      else if (update_stats) {  // request_type == QueueModel::CACHELINE
+         ++m_total_cacheline_requests_queue_full;
+         m_cacheline_utilization_full_injected_delay += utilization_overflow_wait_time;
+      }
+   }
+
    double utilization = (double)total_service_time / utilization_window_size;
    double service_time_Es2 = total_service_time2 / num_arrivals;
    double arrival_rate = (double)num_arrivals / utilization_window_size;
 
-   // If requesters do not throttle based on returned latency, it's their problem, not ours
-   if (utilization > .9999) { // number here changed from .99 to .9999; still needed?
-      utilization = .9999;
+   // When not injecting delay when the queue is full, have a cap on the utilization value input into the formula
+   if (((request_type == QueueModel::PAGE && !m_page_inject_delay_when_queue_full) || (request_type == QueueModel::CACHELINE && !m_cacheline_inject_delay_when_queue_full)) && utilization > max_utilization) {
+      // If requesters do not throttle based on returned latency, it's their problem, not ours
+      utilization = max_utilization;
       if (update_stats && request_type == QueueModel::PAGE)
          ++m_total_page_requests_queue_full;
       else if (update_stats)  // request_type == QueueModel::CACHELINE
@@ -447,21 +510,22 @@ QueueModelWindowedMG1RemoteIndQueues::applyQueueDelayFormula(request_t request_t
       }
    }
    // Note: network additional latency is NOT added here, needs to be added separately
-   return t_queue;
+   // return t_queue + utilization_overflow_wait_time;  // utilization_overflow_wait_time is 0 if there was no waiting
+   return t_queue;  // caller should add utilization_overflow_wait_time as appropriate
 }
 
 // total_service_time is in ps, total_service_time2 is in ps^2
 SubsecondTime
-QueueModelWindowedMG1RemoteIndQueues::applySingleWindowSizeFormula(request_t request_type, UInt64 total_service_time, UInt64 total_service_time2, UInt64 num_arrivals, bool update_stats)
+QueueModelWindowedMG1RemoteIndQueues::applySingleWindowSizeFormula(request_t request_type, UInt64 total_service_time, UInt64 total_service_time2, UInt64 num_arrivals, bool update_stats, SubsecondTime pkt_time, SubsecondTime &utilization_overflow_wait_time)
 {
-   return applyQueueDelayFormula(request_type, total_service_time, total_service_time2, num_arrivals, m_window_size.getPS(), update_stats);
+   return applyQueueDelayFormula(request_type, total_service_time, total_service_time2, num_arrivals, m_window_size.getPS(), update_stats, pkt_time, utilization_overflow_wait_time);
 }
 
 // total_service_time is in ps, total_service_time2 is in ps^2
 // SubsecondTime
-// QueueModelWindowedMG1RemoteIndQueues::applyDoubleWindowSizeFormula(request_t request_type, UInt64 total_service_time, UInt64 total_service_time2, UInt64 num_arrivals, bool update_stats)
+// QueueModelWindowedMG1RemoteIndQueues::applyDoubleWindowSizeFormula(request_t request_type, UInt64 total_service_time, UInt64 total_service_time2, UInt64 num_arrivals, bool update_stats, SubsecondTime pkt_time, SubsecondTime &utilization_overflow_wait_time)
 // {
-//    return applyQueueDelayFormula(request_type, total_service_time, total_service_time2, num_arrivals, 2 * m_window_size.getPS(), update_stats);
+//    return applyQueueDelayFormula(request_type, total_service_time, total_service_time2, num_arrivals, 2 * m_window_size.getPS(), update_stats, pkt_time, utilization_overflow_wait_time);
 // }
 
 void

@@ -1534,7 +1534,8 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         } else if (page_queue_utilization_percentage > m_r_page_queue_utilization_threshold) {
             // PQ=off, page movement would exceed network bandwidth
             // Estimate how long it would take to send packet if inflight page buffer is full
-            SubsecondTime extra_delay_penalty = SubsecondTime::NS() * 10000;
+            // SubsecondTime extra_delay_penalty = SubsecondTime::NS() * 10000;
+            SubsecondTime extra_delay_penalty = SubsecondTime::Zero();
             if (m_r_partition_queues == 0 || (m_r_partition_queues > 0 && page_hw_access_latency + page_compression_latency + page_datamovement_delay <= cacheline_hw_access_latency + cacheline_compression_latency + datamovement_delay))
                 t_now += extra_delay_penalty;  // page movement was the critical path, add extra delay
             m_inflight_pages_extra[phys_page] = SubsecondTime::max(global_time, page_arrival_time + extra_delay_penalty);
