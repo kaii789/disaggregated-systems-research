@@ -59,6 +59,8 @@ private:
    const SubsecondTime m_r_added_latency; // Additional network latency from remote access
    const UInt32 m_r_partition_queues;     // Whether partitioned queues is enabled
    double m_r_cacheline_queue_fraction;   // The fraction of remote bandwidth used for the cacheline queue (decimal between 0 and 1) 
+   bool m_page_inject_delay_when_queue_full;       // When page queue full, have new page requests wait until it's not full
+   bool m_cacheline_inject_delay_when_queue_full;  // When cacheline queue full, have new cacheline requests wait until it's not full
 
    String m_name;  // temporary, for debugging
    
@@ -101,6 +103,9 @@ private:
    SubsecondTime m_total_queue_delay;
    SubsecondTime m_total_page_queue_delay;
    SubsecondTime m_total_cacheline_queue_delay;
+
+   SubsecondTime m_page_utilization_full_injected_delay;
+   SubsecondTime m_cacheline_utilization_full_injected_delay;
    
    double m_total_page_queue_utilization_during_cacheline_requests = 0;
    double m_total_cacheline_queue_utilization_during_page_requests = 0;
@@ -125,10 +130,10 @@ private:
    void addItemUpdateBytes(SubsecondTime pkt_time, UInt64 num_bytes, SubsecondTime pkt_queue_delay, request_t request_type);
    void removeItemsUpdateBytes(SubsecondTime earliest_time, SubsecondTime pkt_time, bool track_effective_bandwidth, request_t request_type = QueueModel::PAGE);
 
-   SubsecondTime applyQueueDelayFormula(request_t request_type, UInt64 total_service_time, UInt64 total_service_time2, UInt64 num_arrivals, UInt64 utilization_window_size, bool update_stats);
+   SubsecondTime applyQueueDelayFormula(request_t request_type, UInt64 total_service_time, UInt64 total_service_time2, UInt64 num_arrivals, UInt64 utilization_window_size, bool update_stats, SubsecondTime pkt_time, SubsecondTime &utilization_overflow_wait_time);
    // Wrappers for two commonly used configurations
-   SubsecondTime applySingleWindowSizeFormula(request_t request_type, UInt64 total_service_time, UInt64 total_service_time2, UInt64 num_arrivals, bool update_stats);
-   // SubsecondTime applyDoubleWindowSizeFormula(request_t request_type, UInt64 total_service_time, UInt64 total_service_time2, UInt64 num_arrivals, bool update_stats);
+   SubsecondTime applySingleWindowSizeFormula(request_t request_type, UInt64 total_service_time, UInt64 total_service_time2, UInt64 num_arrivals, bool update_stats, SubsecondTime pkt_time, SubsecondTime &utilization_overflow_wait_time);
+   // SubsecondTime applyDoubleWindowSizeFormula(request_t request_type, UInt64 total_service_time, UInt64 total_service_time2, UInt64 num_arrivals, bool update_stats, SubsecondTime pkt_time, SubsecondTime &utilization_overflow_wait_time);
 };
 
 #endif /* __QUEUE_MODEL_WINDOWED_MG1_REMOTE_IND_QUEUES_H__ */
