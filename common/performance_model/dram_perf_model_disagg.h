@@ -105,6 +105,7 @@ class DramPerfModelDisagg : public DramPerfModel
         bool m_r_pq_cacheline_hw_no_queue_delay;  // When this is true, remove HW access queue delay from PQ=on cacheline requests' critical path to simulate prioritized cachelines
         bool m_track_inflight_cachelines;  // Whether to track simultaneous inflight cachelines (slows down simulation)
         bool m_auto_turn_off_partition_queues;
+        double m_turn_off_pq_cacheline_queue_utilization_threshold;
         double m_cancel_pq_inflight_buffer_threshold;
         bool m_keep_space_in_cacheline_queue;
 

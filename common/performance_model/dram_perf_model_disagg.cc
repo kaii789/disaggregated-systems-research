@@ -92,6 +92,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_r_pq_cacheline_hw_no_queue_delay    (Sim()->getCfg()->getBool("perf_model/dram/r_cacheline_hw_no_queue_delay"))  // When this is true, remove HW access queue delay from PQ=on cacheline requests' critical path to simulate prioritized cachelines
     , m_track_inflight_cachelines    (Sim()->getCfg()->getBool("perf_model/dram/track_inflight_cachelines"))  // Whether to track simultaneous inflight cachelines (slows down simulation)
     , m_auto_turn_off_partition_queues    (Sim()->getCfg()->getBool("perf_model/dram/auto_turn_off_partition_queues"))  // Whether to enable automatic detection of conditions to turn off partition queues
+    , m_turn_off_pq_cacheline_queue_utilization_threshold    (Sim()->getCfg()->getFloat("perf_model/dram/turn_off_pq_cacheline_queue_utilization_threshold"))  // Only consider turning off partition queues when cacheline queue utilization is above this threshold
     , m_cancel_pq_inflight_buffer_threshold    (Sim()->getCfg()->getFloat("perf_model/dram/cancel_pq_inflight_buffer_threshold"))  // Fraction of inflight_pages size at which to cancel partition queues
     , m_keep_space_in_cacheline_queue     (Sim()->getCfg()->getBool("perf_model/dram/keep_space_in_cacheline_queue"))  // Try to keep more free bandwidth in cacheline queues
     , m_banks               (m_total_banks)
@@ -1617,7 +1618,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             if (m_inflight_redundant[phys_page] >= m_r_limit_redundant_moves)
                 m_pages_cacheline_request_limit_exceeded.insert(phys_page);
         }
-        if (m_auto_turn_off_partition_queues && m_pages_cacheline_request_limit_exceeded.size() > m_cancel_pq_inflight_buffer_threshold * (m_inflight_pages.size() + m_inflight_pages_extra.size())) {
+        if (m_auto_turn_off_partition_queues && cacheline_queue_utilization_percentage > m_turn_off_pq_cacheline_queue_utilization_threshold && m_pages_cacheline_request_limit_exceeded.size() > m_cancel_pq_inflight_buffer_threshold * (m_inflight_pages.size() + m_inflight_pages_extra.size())) {
             m_r_partition_queues = 0;
             std::cout << "Partition queues turned off due to >= type 1 redundant moves limit of " << m_r_limit_redundant_moves << " at " << m_num_accesses << " accesses" << std::endl;
         }
@@ -2270,7 +2271,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                     // std::cout << "Inflight page " << phys_page << " redundant moves > limit, = " << m_inflight_redundant[phys_page] << std::endl;
 
                     m_pages_cacheline_request_limit_exceeded.insert(phys_page);
-                    if (m_auto_turn_off_partition_queues && m_pages_cacheline_request_limit_exceeded.size() > m_cancel_pq_inflight_buffer_threshold * (m_inflight_pages.size() + m_inflight_pages_extra.size())) {
+                    if (m_auto_turn_off_partition_queues && cacheline_queue_utilization_percentage > m_turn_off_pq_cacheline_queue_utilization_threshold && m_pages_cacheline_request_limit_exceeded.size() > m_cancel_pq_inflight_buffer_threshold * (m_inflight_pages.size() + m_inflight_pages_extra.size())) {
                         m_r_partition_queues = 0;
                         std::cout << "Partition queues turned off due to >= type 2 redundant moves limit of " << m_r_limit_redundant_moves << " at " << m_num_accesses << " accesses" << std::endl;
                     }
