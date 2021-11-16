@@ -124,6 +124,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_writeback_pages     (0)
     , m_local_evictions     (0)
     , m_extra_pages         (0)
+    , m_extra_cachelines    (0)
     , m_redundant_moves     (0)
     , m_redundant_moves_type1  (0)
     , partition_queues_cacheline_slower_than_page (0)  // with the new change, these situations no longer result in redundant moves
@@ -188,10 +189,10 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_access_latency_outlier_threshold(SubsecondTime::NS() * 20000)
     , m_total_access_latency_no_outlier(SubsecondTime::Zero())
     , m_access_latency_outlier_count(0)
-    , m_total_remote_access_latency_no_outlier(SubsecondTime::Zero())
-    , m_remote_access_latency_outlier_count(0)
     , m_total_local_access_latency_no_outlier(SubsecondTime::Zero())
     , m_local_access_latency_outlier_count(0)
+    , m_total_remote_access_latency_no_outlier(SubsecondTime::Zero())
+    , m_remote_access_latency_outlier_count(0)
 {
     String name("dram"); 
     if (Sim()->getCfg()->getBool("perf_model/dram/queue_model/enabled"))
@@ -360,7 +361,8 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     registerStatsMetric("dram", core_id, "inflight-hits", &m_inflight_hits);
     registerStatsMetric("dram", core_id, "writeback-pages", &m_writeback_pages);
     registerStatsMetric("dram", core_id, "local-evictions", &m_local_evictions);
-    registerStatsMetric("dram", core_id, "extra-traffic", &m_extra_pages);
+    registerStatsMetric("dram", core_id, "extra-pages", &m_extra_pages);
+    registerStatsMetric("dram", core_id, "extra-cachelines", &m_extra_cachelines);
     registerStatsMetric("dram", core_id, "redundant-moves", &m_redundant_moves);
     registerStatsMetric("dram", core_id, "max-simultaneous-inflight-cachelines-reads", &m_max_inflight_cachelines_reads);
     registerStatsMetric("dram", core_id, "max-simultaneous-inflight-cachelines-writes", &m_max_inflight_cachelines_writes);
@@ -1317,6 +1319,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     SubsecondTime page_datamovement_delay = SubsecondTime::Zero();
     if (move_page) {
         ++m_page_moves;
+
         SubsecondTime page_compression_latency = SubsecondTime::Zero();  // when page compression is not enabled, this is always 0
         SubsecondTime page_hw_access_latency = SubsecondTime::Zero();
         SubsecondTime local_page_hw_write_latency = SubsecondTime::Zero();
@@ -1357,6 +1360,21 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
                     m_total_compression_latency += page_compression_latency;
                     t_now += page_compression_latency;
                 }
+            }
+
+            // Other systems using the remote memory and creating disturbance
+            if (m_r_disturbance_factor > 0 && (unsigned int)(rand() % 100) < m_r_disturbance_factor) {
+                if (m_r_partition_queues == 1)
+                    /* SubsecondTime page_datamovement_delay = */ m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request, m_r_part_bandwidth.getRoundedLatency(8*page_size), page_size, QueueModel::PAGE, requester);
+                else if (m_r_partition_queues == 2)
+                    /* SubsecondTime page_datamovement_delay = */ m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request, m_r_bus_bandwidth.getRoundedLatency(8*page_size), page_size, QueueModel::PAGE, requester);
+                else if (m_r_partition_queues == 3)
+                    /* SubsecondTime page_datamovement_delay = */ m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request, m_r_part_bandwidth.getRoundedLatency(8*page_size), page_size, QueueModel::PAGE, requester);
+                else if (m_r_partition_queues == 4)
+                    /* SubsecondTime page_datamovement_delay = */ m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request, m_r_part_bandwidth.getRoundedLatency(8*page_size), page_size, QueueModel::PAGE, requester);
+                else
+                    /* SubsecondTime page_datamovement_delay = */ m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request, m_r_bus_bandwidth.getRoundedLatency(8*page_size), page_size, QueueModel::PAGE, requester);
+                m_extra_pages++;
             }
 
             // Round page size for dram up to the nearest multiple of m_cache_line_size
@@ -1582,6 +1600,21 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
                 t_now += extra_delay_penalty;
                 ++m_datamovement_queue_full_cacheline_still_moved;
             }
+        }
+
+        // Other systems using the remote memory and creating disturbance
+        if (m_r_disturbance_factor > 0 && (unsigned int)(rand() % 100) < m_r_disturbance_factor) {
+            if (m_r_partition_queues == 1)
+                /* SubsecondTime page_datamovement_delay = */ m_data_movement_2->computeQueueDelayTrackBytes(t_remote_queue_request, m_r_part2_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, requester);
+            else if (m_r_partition_queues == 2)
+                /* SubsecondTime page_datamovement_delay = */ m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request, m_r_bus_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, requester);
+            else if (m_r_partition_queues == 3)
+                /* SubsecondTime page_datamovement_delay = */ m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request, m_r_part2_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, requester);
+            else if (m_r_partition_queues == 4)
+                /* SubsecondTime page_datamovement_delay = */ m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request, m_r_part2_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, requester);
+            else
+                /* SubsecondTime page_datamovement_delay = */ m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request, m_r_bus_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, requester);
+            m_extra_cachelines++;
         }
 
         if (m_track_inflight_cachelines) {
@@ -1837,24 +1870,6 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
         m_sum_inflight_cachelines_reads_size += m_inflight_cachelines_reads.size();
         m_sum_inflight_cachelines_writes_size += m_inflight_cachelines_writes.size();
         m_sum_inflight_cachelines_total_size += m_inflight_cachelines_reads.size() + m_inflight_cachelines_writes.size();
-    }
-
-    // Other systems using the remote memory and creating disturbance
-    if (m_r_disturbance_factor > 0) {
-        if ( (unsigned int)(rand() % 100) < m_r_disturbance_factor) {
-            SubsecondTime delay(SubsecondTime::NS() * 1000);
-            if (m_r_partition_queues == 1)  
-                /* SubsecondTime page_datamovement_delay = */ m_data_movement->computeQueueDelayTrackBytes(pkt_time + delay, m_r_part_bandwidth.getRoundedLatency(8*m_page_size), m_page_size, QueueModel::PAGE, requester);
-            else if (m_r_partition_queues == 2)
-                /* SubsecondTime page_datamovement_delay = */ m_data_movement->computeQueueDelayTrackBytes(pkt_time + delay, m_r_bus_bandwidth.getRoundedLatency(8*m_page_size), m_page_size, QueueModel::PAGE, requester);
-            else if (m_r_partition_queues == 3)
-                /* SubsecondTime page_datamovement_delay = */ m_data_movement->computeQueueDelayTrackBytes(pkt_time + delay, m_r_part_bandwidth.getRoundedLatency(8*m_page_size), m_page_size, QueueModel::PAGE, requester);
-            else if (m_r_partition_queues == 4)
-                /* SubsecondTime page_datamovement_delay = */ m_data_movement->computeQueueDelayTrackBytes(pkt_time + delay, m_r_part_bandwidth.getRoundedLatency(8*m_page_size), m_page_size, QueueModel::PAGE, requester);
-            else	
-                /* SubsecondTime page_datamovement_delay = */ m_data_movement->computeQueueDelayTrackBytes(pkt_time + delay, m_r_bus_bandwidth.getRoundedLatency(8*m_page_size), m_page_size, QueueModel::PAGE, requester);
-            m_extra_pages++;	
-        } 
     }
 
     // Every 1000 cacheline requests, update page locality stats and determine whether to adjust cacheline queue ratio

@@ -218,6 +218,7 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_writeback_pages;
         UInt64 m_local_evictions;
         UInt64 m_extra_pages;
+        UInt64 m_extra_cachelines;
         UInt64 m_redundant_moves;                   // number of times both a cacheline and its containing page are requested together
         UInt64 m_redundant_moves_type1;
         UInt64 partition_queues_cacheline_slower_than_page;  // with the new change, these situations no longer result in redundant moves
