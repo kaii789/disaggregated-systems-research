@@ -1423,14 +1423,15 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
 
             // Update t_now after page_datamovement_delay includes the decompression latency
             if (m_r_partition_queues != 0) {
+                m_page_network_processing_time += page_network_processing_time;
+                m_page_network_queue_delay += page_datamovement_delay - page_decompression_latency;
+                m_remote_to_local_page_move_count++;
+
                 if (page_hw_access_latency + page_compression_latency + page_datamovement_delay <= cacheline_hw_access_latency + cacheline_compression_latency + datamovement_delay) {
                     // If the page arrival time via the page queue is faster than the cacheline via the cacheline queue, use the page queue arrival time
                     // (and the cacheline request is not sent)
                     t_now += (page_datamovement_delay + page_network_processing_time);  // if nonzero, compression latency was earlier added to t_now already
                     m_total_remote_datamovement_latency += (page_datamovement_delay + page_network_processing_time);
-                    m_page_network_processing_time += page_network_processing_time;
-                    m_page_network_queue_delay += page_datamovement_delay - page_decompression_latency;
-                    m_remote_to_local_page_move_count++;
                     // m_total_remote_dram_hardware_latency_cachelines -= cacheline_hw_access_latency;  // remove previously added latency
                     t_now -= cacheline_hw_access_latency;  // remove previously added latency
                     t_now += page_hw_access_latency;
