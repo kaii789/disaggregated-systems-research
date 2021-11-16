@@ -94,7 +94,8 @@ class DramPerfModelDisagg : public DramPerfModel
         const bool m_r_throttle_redundant_moves;
         const bool m_r_use_separate_queue_model;  // Whether to use the separate remote queue model
         double m_r_page_queue_utilization_threshold;  // When the datamovement queue for pages has percentage utilization above this, remote pages aren't moved to local
-        double m_r_cacheline_queue_utilization_threshold;  // When the datamovement queue for cachelines has percentage utilization above this, cacheline requests on inflight pages aren't made
+        double m_r_cacheline_queue_type1_utilization_threshold;
+        double m_r_cacheline_queue_type2_utilization_threshold;
         double m_r_mode_5_limit_moves_threshold;  // When m_r_mode == 5, operate according to m_r_mode 2 when the page queue utilization is >= this value, otherwise operate according to m_r_mode 1
         SubsecondTime m_r_mode_5_remote_access_history_window_size;  // When m_r_mode == 5, and operating according to m_r_mode, track page accesses using the most recent window size number of ns
         bool m_use_throttled_pages_tracker;  // Whether to update m_throttled_pages_tracker. Must be true to use the ideal page throttler or print stats of throttled pages

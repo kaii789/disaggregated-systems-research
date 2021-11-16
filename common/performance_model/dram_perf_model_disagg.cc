@@ -83,7 +83,8 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_r_throttle_redundant_moves      (Sim()->getCfg()->getBool("perf_model/dram/remote_throttle_redundant_moves"))
     , m_r_use_separate_queue_model      (Sim()->getCfg()->getBool("perf_model/dram/queue_model/use_separate_remote_queue_model")) // Whether to use the separate remote queue model
     , m_r_page_queue_utilization_threshold   (Sim()->getCfg()->getFloat("perf_model/dram/remote_page_queue_utilization_threshold")) // When the datamovement queue for pages has percentage utilization above this, remote pages aren't moved to local
-    , m_r_cacheline_queue_utilization_threshold   (Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_utilization_threshold")) // When the datamovement queue for cachelines has percentage utilization above this, cacheline requests on inflight pages aren't made
+    , m_r_cacheline_queue_type1_utilization_threshold   (Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_type1_utilization_threshold")) // When the datamovement queue for cachelines has percentage utilization above this, the first cacheline request on a remote page isn't made
+    , m_r_cacheline_queue_type2_utilization_threshold   (Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_type2_utilization_threshold")) // When the datamovement queue for cachelines has percentage utilization above this, additional cacheline requests on inflight pages aren't made
     , m_use_throttled_pages_tracker    (Sim()->getCfg()->getBool("perf_model/dram/use_throttled_pages_tracker"))  // Whether to use and update m_use_throttled_pages_tracker
     , m_use_ideal_page_throttling    (Sim()->getCfg()->getBool("perf_model/dram/r_use_ideal_page_throttling"))  // Whether to use ideal page throttling (alternative currently is FCFS throttling)
     , m_r_ideal_pagethrottle_remote_access_history_window_size   (SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/r_ideal_pagethrottle_access_history_window_size")))
@@ -1274,7 +1275,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         cacheline_queue_utilization_percentage = m_data_movement_2->getCachelineQueueUtilizationPercentage(t_now);
     }
     // Cancel moving the page if the queue used to move the page is already full AND there is space in the cacheline queue
-    if (m_r_partition_queues != 0 && move_page && page_queue_utilization_percentage > m_r_page_queue_utilization_threshold && ((m_keep_space_in_cacheline_queue && cacheline_queue_utilization_percentage <= m_r_cacheline_queue_utilization_threshold) || page_queue_utilization_percentage > cacheline_queue_utilization_percentage)) {  // save 5% for evicted pages?
+    if (m_r_partition_queues != 0 && move_page && page_queue_utilization_percentage > m_r_page_queue_utilization_threshold && ((m_keep_space_in_cacheline_queue && cacheline_queue_utilization_percentage <= m_r_cacheline_queue_type1_utilization_threshold) || page_queue_utilization_percentage > cacheline_queue_utilization_percentage)) {  // save 5% for evicted pages?
         move_page = false;
         ++m_move_page_cancelled_datamovement_queue_full;
 
@@ -1596,8 +1597,9 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             m_total_remote_dram_hardware_latency_cachelines_count++;
             t_now += cacheline_hw_access_latency;
         } else {
-            if (cacheline_queue_utilization_percentage > m_r_cacheline_queue_utilization_threshold) {
-                SubsecondTime extra_delay_penalty = SubsecondTime::NS() * 5000;
+            if (cacheline_queue_utilization_percentage > m_r_cacheline_queue_type1_utilization_threshold) {
+                // SubsecondTime extra_delay_penalty = SubsecondTime::NS() * 5000;
+                SubsecondTime extra_delay_penalty = SubsecondTime::Zero();
                 t_now += extra_delay_penalty;
                 ++m_datamovement_queue_full_cacheline_still_moved;
             }
@@ -2121,8 +2123,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                     // This cacheline read was already inflight, wait for to arrive
                     access_latency = SubsecondTime::min(access_latency, m_inflight_cachelines_reads[cacheline] - pkt_time);
                     ++m_redundant_moves_type2_cancelled_already_inflight;
-                } else if ((!m_keep_space_in_cacheline_queue && cacheline_queue_utilization_percentage > m_r_cacheline_queue_utilization_threshold) || (m_keep_space_in_cacheline_queue && cacheline_queue_utilization_percentage + 0.03 > m_r_cacheline_queue_utilization_threshold)) {
-                    // If m_keep_space_in_cacheline_queue is true, don't make redundant requests of type 2 at 3% slower than m_r_cacheline_queue_utilization_threshold
+                } else if (cacheline_queue_utilization_percentage > m_r_cacheline_queue_type2_utilization_threshold) {
                     // Can't make additional cacheline request
                     ++m_redundant_moves_type2_cancelled_datamovement_queue_full;
                     if (m_auto_turn_off_partition_queues)
