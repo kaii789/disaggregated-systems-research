@@ -22,10 +22,11 @@ no_remote_memory_list = [
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
             automation.ConfigEntry("perf_model/dram/compression_model/cacheline", "use_cacheline_compression", "false"),
             automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+            automation.ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.0"),
+            automation.ConfigEntry("perf_model/dram/queue_model", "remote_queue_model_type", "windowed_mg1_remote_ind_queues"),
             automation.ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
             automation.ConfigEntry("perf_model/dram", "remote_memory_mode", "1"),
             automation.ConfigEntry("perf_model/dram", "remote_init", "true"),
-            automation.ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.0"),
             # automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
         ]
     ),
@@ -39,6 +40,8 @@ config_list = [
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
             automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+            automation.ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.0"),
+            automation.ConfigEntry("perf_model/dram/queue_model", "remote_queue_model_type", "windowed_mg1_remote_ind_queues"),
             automation.ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
             automation.ConfigEntry("perf_model/dram", "remote_memory_mode", "1"),
             automation.ConfigEntry("perf_model/dram", "remote_init", "true"),
@@ -46,7 +49,6 @@ config_list = [
             # automation.ConfigEntry("perf_model/dram", "use_dynamic_bandwidth", "true"),
             automation.ConfigEntry("perf_model/dram", "speed_up_disagg_simulation", "true"),
             automation.ConfigEntry("perf_model/dram", "r_cacheline_hw_no_queue_delay", "true"),
-            automation.ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.0"),
         ]
     ),
     # 2 LZBDI
@@ -56,12 +58,13 @@ config_list = [
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
             automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "lzbdi"),
             automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+            automation.ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.0"),
+            automation.ConfigEntry("perf_model/dram/queue_model", "remote_queue_model_type", "windowed_mg1_remote_ind_queues"),
             automation.ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
             automation.ConfigEntry("perf_model/dram", "remote_memory_mode", "1"),
             automation.ConfigEntry("perf_model/dram", "remote_init", "true"),
             automation.ConfigEntry("perf_model/dram", "speed_up_disagg_simulation", "true"),
             automation.ConfigEntry("perf_model/dram", "r_cacheline_hw_no_queue_delay", "true"),
-            automation.ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.0"),
         ]
     ),
     # 3 FVE
@@ -71,12 +74,13 @@ config_list = [
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
             automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "fve"),
             automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+            automation.ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.0"),
+            automation.ConfigEntry("perf_model/dram/queue_model", "remote_queue_model_type", "windowed_mg1_remote_ind_queues"),
             automation.ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
             automation.ConfigEntry("perf_model/dram", "remote_memory_mode", "1"),
             automation.ConfigEntry("perf_model/dram", "remote_init", "true"),
             automation.ConfigEntry("perf_model/dram", "speed_up_disagg_simulation", "true"),
             automation.ConfigEntry("perf_model/dram", "r_cacheline_hw_no_queue_delay", "true"),
-            automation.ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.0"),
         ]
     ),
     # 4 Deflate
@@ -88,12 +92,13 @@ config_list = [
             automation.ConfigEntry("perf_model/dram/compression_model/zlib", "compression_latency", "15"),
             automation.ConfigEntry("perf_model/dram/compression_model/zlib", "decompression_latency", "15"),
             automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
+            automation.ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.0"),
+            automation.ConfigEntry("perf_model/dram/queue_model", "remote_queue_model_type", "windowed_mg1_remote_ind_queues"),
             automation.ConfigEntry("perf_model/dram", "r_use_ideal_page_throttling", "false"),
             automation.ConfigEntry("perf_model/dram", "remote_memory_mode", "1"),
             automation.ConfigEntry("perf_model/dram", "remote_init", "true"),
             automation.ConfigEntry("perf_model/dram", "speed_up_disagg_simulation", "true"),
             automation.ConfigEntry("perf_model/dram", "r_cacheline_hw_no_queue_delay", "true"),
-            automation.ConfigEntry("perf_model/dram", "remote_cacheline_queue_fraction", "0.0"),
         ]
     ),
 ]
