@@ -61,6 +61,8 @@ QueueModelWindowedMG1RemoteIndQueues::QueueModelWindowedMG1RemoteIndQueues(Strin
    , m_total_cacheline_queue_delay(SubsecondTime::Zero())
    , m_page_utilization_full_injected_delay(SubsecondTime::Zero())
    , m_cacheline_utilization_full_injected_delay(SubsecondTime::Zero())
+   , m_page_utilization_full_injected_delay_max(SubsecondTime::Zero())
+   , m_cacheline_utilization_full_injected_delay_max(SubsecondTime::Zero())
 {  
    if (m_use_separate_queue_delay_cap) {
       m_queue_delay_cap = SubsecondTime::NS(Sim()->getCfg()->getInt("queue_model/windowed_mg1_remote_ind_queues/queue_delay_cap"));
@@ -124,6 +126,7 @@ QueueModelWindowedMG1RemoteIndQueues::QueueModelWindowedMG1RemoteIndQueues(Strin
       std::cout << ", utilization overflow threshold=" << m_utilization_overflow_threshold;
    }
    std::cout << std::endl;
+   std::cout << "m_page_inject_delay_when_queue_full=" << m_page_inject_delay_when_queue_full << ", m_cacheline_inject_delay_when_queue_full=" << m_cacheline_inject_delay_when_queue_full << std::endl;
 }
 
 QueueModelWindowedMG1RemoteIndQueues::~QueueModelWindowedMG1RemoteIndQueues()
@@ -201,7 +204,12 @@ QueueModelWindowedMG1RemoteIndQueues::~QueueModelWindowedMG1RemoteIndQueues()
    if (m_total_page_requests_queue_full > 0)
       std::cout << "page utilization full avg injected delay = " << (double)(m_page_utilization_full_injected_delay.getNS()) / m_total_page_requests_queue_full << " ns" << std::endl;
    if (m_total_cacheline_requests_queue_full > 0)
-      std::cout << "page utilization full avg injected delay = " << (double)(m_cacheline_utilization_full_injected_delay.getNS()) / m_total_cacheline_requests_queue_full << " ns" << std::endl;
+      std::cout << "cacheline utilization full avg injected delay = " << (double)(m_cacheline_utilization_full_injected_delay.getNS()) / m_total_cacheline_requests_queue_full << " ns" << std::endl;
+
+   if (m_page_inject_delay_when_queue_full)
+      std::cout << "Max page queue full injected delay (ns)=" << m_page_utilization_full_injected_delay_max.getNS() << std::endl;
+   if (m_cacheline_inject_delay_when_queue_full)
+      std::cout << "Max cacheline queue full injected delay (ns)=" << m_cacheline_utilization_full_injected_delay_max.getNS() << std::endl;
 }
 
 void QueueModelWindowedMG1RemoteIndQueues::finalizeStats() {
@@ -329,14 +337,10 @@ QueueModelWindowedMG1RemoteIndQueues::computeQueueDelayNoEffect(SubsecondTime pk
       ++m_total_no_effect_page_requests;
       m_total_cacheline_queue_utilization_during_page_no_effect += cacheline_queue_utilization_percentage;
       m_total_cacheline_queue_utilization_during_page_no_effect_numerator = (UInt64)(m_total_cacheline_queue_utilization_during_page_no_effect * m_total_cacheline_queue_utilization_during_page_no_effect_denominator);
-      if (m_total_no_effect_page_requests % 1000000 == 0)
-         std::cout << "computeQueueDelayNoEffect page utilization_overflow_wait_time (ns) =" << utilization_overflow_wait_time.getNS() << std::endl;
    } else {  // request_type == QueueModel::CACHELINE
       ++m_total_no_effect_cacheline_requests;
       m_total_page_queue_utilization_during_cacheline_no_effect += page_queue_utilization_percentage;
       m_total_page_queue_utilization_during_cacheline_no_effect_numerator = (UInt64)(m_total_page_queue_utilization_during_cacheline_no_effect * m_total_page_queue_utilization_during_cacheline_no_effect_denominator);
-      if (m_total_no_effect_cacheline_requests % 1000000 == 0)
-         std::cout << "computeQueueDelayNoEffect cacheline utilization_overflow_wait_time (ns) =" << utilization_overflow_wait_time.getNS() << std::endl;
    }
 
    return t_queue + utilization_overflow_wait_time;
@@ -383,9 +387,6 @@ QueueModelWindowedMG1RemoteIndQueues::computeQueueDelayTrackBytes(SubsecondTime 
    // Add additional network latency
    t_queue += m_r_added_latency;  // is it ok for t_queue to potentially be larger than m_window_size?
 
-   if (m_total_requests % 100000 == 0)
-      std::cout << "computeQueueDelayTrackBytes utilization_overflow_wait_time (ns) =" << utilization_overflow_wait_time.getNS() << std::endl;
-
    // If one queue's utilization is high, add it to the other queue if the other queue has space
    // TODO: need to modify processing time to be based off of the other queue's bandwidth?
    if (m_use_utilization_overflow && request_type == QueueModel::PAGE && page_queue_utilization_percentage > m_utilization_overflow_threshold && cacheline_queue_utilization_percentage < m_utilization_overflow_threshold - 0.1) {
@@ -428,17 +429,18 @@ QueueModelWindowedMG1RemoteIndQueues::applyQueueDelayFormula(request_t request_t
 {
    const double max_utilization = 0.9999;  // number here changed from .99 to .9999; still needed?
    // See if we need to make the request at a future time (for queue delay correctness)
-   // SubsecondTime utilization_overflow_wait_time = SubsecondTime::Zero();
    // Assume utilization_overflow_wait_time is passed in with an initialized value
    UInt64 max_total_service_time = max_utilization * utilization_window_size;
    if (((request_type == QueueModel::PAGE && m_page_inject_delay_when_queue_full) || (request_type == QueueModel::CACHELINE && m_cacheline_inject_delay_when_queue_full)) &&total_service_time > max_total_service_time) {
-      SubsecondTime earliest_time = pkt_time > m_window_size ? pkt_time - m_window_size : SubsecondTime::Zero();
+      // m_print_debugging_info = true;
+      SubsecondTime initial_time, moved_time;
       if (request_type == QueueModel::PAGE) {
          std::multimap<SubsecondTime, SubsecondTime>::iterator entry = m_window_page_requests.begin();
+         initial_time = entry->first;
          // See how long we need to wait for the utilization to drop to max_utilization or lower
          while(entry != m_window_page_requests.end() && total_service_time > max_total_service_time)
          {
-            earliest_time = entry->first;
+            moved_time = entry->first;
             total_service_time -= entry->second.getPS();
             total_service_time2 -= entry->second.getPS() * entry->second.getPS();
             num_arrivals --;
@@ -446,25 +448,36 @@ QueueModelWindowedMG1RemoteIndQueues::applyQueueDelayFormula(request_t request_t
          }
       } else {  // request_type == QueueModel::CACHELINE
          std::multimap<SubsecondTime, SubsecondTime>::iterator entry = m_window_cacheline_requests.begin();
+         initial_time = entry->first;
          // See how long we need to wait for the utilization to drop to max_utilization or lower
          while(entry != m_window_cacheline_requests.end() && total_service_time > max_total_service_time)
          {
-            earliest_time = entry->first;
+            moved_time = entry->first;
             total_service_time -= entry->second.getPS();
             total_service_time2 -= entry->second.getPS() * entry->second.getPS();
             num_arrivals --;
             entry++;
          }
       }
-      utilization_overflow_wait_time += earliest_time + (pkt_time > m_window_size ? m_window_size - pkt_time : SubsecondTime::Zero());  // technically would need to wait until after earliest_time passes
+
+      // if (m_print_debugging_info) {
+      //    LOG_PRINT("moved_time= %ld ns, initial_time= %ld ns, difference= %ld ns", moved_time.getNS(), initial_time.getNS(), (moved_time - initial_time).getNS());
+      // }
+      utilization_overflow_wait_time += (moved_time - initial_time);
 
       if (update_stats && request_type == QueueModel::PAGE) {
          ++m_total_page_requests_queue_full;
          m_page_utilization_full_injected_delay += utilization_overflow_wait_time;
+         if (utilization_overflow_wait_time > m_page_utilization_full_injected_delay_max) {
+            m_page_utilization_full_injected_delay_max = utilization_overflow_wait_time;
+         }
       }
       else if (update_stats) {  // request_type == QueueModel::CACHELINE
          ++m_total_cacheline_requests_queue_full;
          m_cacheline_utilization_full_injected_delay += utilization_overflow_wait_time;
+         if (utilization_overflow_wait_time > m_cacheline_utilization_full_injected_delay_max) {
+            m_cacheline_utilization_full_injected_delay_max = utilization_overflow_wait_time;
+         }
       }
    }
 

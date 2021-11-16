@@ -106,6 +106,8 @@ private:
 
    SubsecondTime m_page_utilization_full_injected_delay;
    SubsecondTime m_cacheline_utilization_full_injected_delay;
+   SubsecondTime m_page_utilization_full_injected_delay_max;
+   SubsecondTime m_cacheline_utilization_full_injected_delay_max;
    
    double m_total_page_queue_utilization_during_cacheline_requests = 0;
    double m_total_cacheline_queue_utilization_during_page_requests = 0;
@@ -123,6 +125,8 @@ private:
 
    UInt64 m_total_no_effect_page_requests = 0;
    UInt64 m_total_no_effect_cacheline_requests = 0;
+
+   bool m_print_debugging_info = false;
    
    void addItem(SubsecondTime pkt_time, SubsecondTime service_time, request_t request_type);
    void removeItems(SubsecondTime earliest_time);
