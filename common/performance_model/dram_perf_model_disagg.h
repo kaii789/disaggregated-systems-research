@@ -82,7 +82,7 @@ class DramPerfModelDisagg : public DramPerfModel
         const bool m_r_simulate_sw_pagereclaim_overhead; // Simulate tlb overhead
         const bool m_r_exclusive_cache; // Simulate tlb overhead
         const bool m_remote_init; // All pages are initially allocated to remote memory
-        const UInt32 m_r_disturbance_factor; // Other systems using the remote memory and creating disturbance
+        UInt32 m_r_disturbance_factor; // Other systems using the remote memory and creating disturbance
         const bool m_r_dontevictdirty; // Do not evict dirty data
         const bool m_r_enable_selective_moves; 
         UInt32 m_r_partition_queues; // Enable partitioned queues

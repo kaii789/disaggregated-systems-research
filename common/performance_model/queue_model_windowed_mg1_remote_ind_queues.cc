@@ -281,6 +281,10 @@ void QueueModelWindowedMG1RemoteIndQueues::updateBandwidth(UInt64 bw_bits_per_us
    m_r_cacheline_queue_fraction = r_cacheline_queue_fraction;
 }
 
+void QueueModelWindowedMG1RemoteIndQueues::updateAddedNetLat(int added_latency_ns) {
+   m_r_added_latency.setInternalDataForced(1000000UL * added_latency_ns);
+}
+
 // With computeQueueDelayTrackBytes(), computeQueueDelay() shouldn't be used anymore
 SubsecondTime
 QueueModelWindowedMG1RemoteIndQueues::computeQueueDelay(SubsecondTime pkt_time, SubsecondTime processing_time, core_id_t requester)

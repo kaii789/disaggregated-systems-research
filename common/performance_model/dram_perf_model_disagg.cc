@@ -1737,15 +1737,17 @@ DramPerfModelDisagg::updateBandwidth()
 {
     m_update_bandwidth_count += 1;
     if (m_use_dynamic_bandwidth && m_update_bandwidth_count % 20 == 0) {
-        m_r_bw_scalefactor = (int)(m_r_bw_scalefactor + 1) % 17;
-        if (m_r_bw_scalefactor == 0)
-            m_r_bw_scalefactor = 4;
+        // Old way: change bw scalefactor
+        // m_r_bw_scalefactor = (int)(m_r_bw_scalefactor + 1) % 17;
+        // if (m_r_bw_scalefactor == 0)
+        //     m_r_bw_scalefactor = 4;
 
-        m_r_bus_bandwidth.changeBandwidth(m_dram_speed * m_data_bus_width / (1000 * m_r_bw_scalefactor)); // Remote memory
-        m_r_part_bandwidth.changeBandwidth(m_dram_speed * m_data_bus_width / (1000 * m_r_bw_scalefactor / (1 - m_r_cacheline_queue_fraction))); // Remote memory - Partitioned Queues => Page Queue
-        m_r_part2_bandwidth.changeBandwidth(m_dram_speed * m_data_bus_width / (1000 * m_r_bw_scalefactor / m_r_cacheline_queue_fraction)); // Remote memory - Partitioned Queues => Cacheline Queue
-        // Currently only windowed_mg1_remote_ind_queues QueueModel updates stats tracking based on updateBandwidth()
-        m_data_movement->updateBandwidth(m_r_bus_bandwidth.getBandwidthBitsPerUs(), m_r_cacheline_queue_fraction);
+        // m_r_bus_bandwidth.changeBandwidth(m_dram_speed * m_data_bus_width / (1000 * m_r_bw_scalefactor)); // Remote memory
+        // m_r_part_bandwidth.changeBandwidth(m_dram_speed * m_data_bus_width / (1000 * m_r_bw_scalefactor / (1 - m_r_cacheline_queue_fraction))); // Remote memory - Partitioned Queues => Page Queue
+        // m_r_part2_bandwidth.changeBandwidth(m_dram_speed * m_data_bus_width / (1000 * m_r_bw_scalefactor / m_r_cacheline_queue_fraction)); // Remote memory - Partitioned Queues => Cacheline Queue
+        // // Currently only windowed_mg1_remote_ind_queues QueueModel updates stats tracking based on updateBandwidth()
+        // m_data_movement->updateBandwidth(m_r_bus_bandwidth.getBandwidthBitsPerUs(), m_r_cacheline_queue_fraction);
+        m_r_disturbance_factor = rand() % 101;
     } else if (m_use_dynamic_cl_queue_fraction_adjustment) {
         // Same formulas here as in DramPerfModelDisagg constructor
         m_r_bus_bandwidth.changeBandwidth(m_dram_speed * m_data_bus_width / (1000 * m_r_bw_scalefactor)); // Remote memory
@@ -1761,10 +1763,12 @@ DramPerfModelDisagg::updateLatency()
 {
     m_update_latency_count += 1;
     if (m_use_dynamic_latency && m_update_latency_count % 20 == 0) {
-        m_r_added_latency_int = (m_r_added_latency_int + 100) % 1700;
-        if (m_r_added_latency_int == 0)
-            m_r_added_latency_int = 400;
-        m_r_added_latency.setInternalDataForced(1000000UL * m_r_added_latency_int);
+        // m_r_added_latency_int = (m_r_added_latency_int + 100) % 1700;
+        // if (m_r_added_latency_int == 0)
+        //     m_r_added_latency_int = 400;
+        // m_r_added_latency.setInternalDataForced(1000000UL * m_r_added_latency_int);
+        int added_netlat_ns = (rand() % 300) + 100;
+        m_data_movement->updateAddedNetLat(added_netlat_ns);
     }
 }
 

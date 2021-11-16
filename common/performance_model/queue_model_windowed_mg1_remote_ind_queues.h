@@ -33,6 +33,7 @@ public:
    void finalizeStats();
 
    void updateBandwidth(UInt64 bw_bits_per_us, double r_cacheline_queue_fraction);
+   void updateAddedNetLat(int added_latency_ns);
 
 private:
    const SubsecondTime m_window_size;
@@ -56,7 +57,7 @@ private:
    UInt64 m_page_service_time_sum2; // In ps^2
    UInt64 m_cacheline_service_time_sum2; // In ps^2
 
-   const SubsecondTime m_r_added_latency; // Additional network latency from remote access
+   SubsecondTime m_r_added_latency; // Additional network latency from remote access
    const UInt32 m_r_partition_queues;     // Whether partitioned queues is enabled
    double m_r_cacheline_queue_fraction;   // The fraction of remote bandwidth used for the cacheline queue (decimal between 0 and 1) 
    bool m_page_inject_delay_when_queue_full;       // When page queue full, have new page requests wait until it's not full
