@@ -464,13 +464,14 @@ DramPerfModelDisagg::~DramPerfModelDisagg()
 {
     bool print_extra_stats = Sim()->getCfg()->getBool("perf_model/dram/track_extra_stats");
     if (print_extra_stats) {
-        // Remote Avg Latency Stats
-        std::cout << "\nAvg Remote DRAM Access Latencies:\n";
-        for (std::vector<SubsecondTime>::iterator it = m_local_total_remote_access_latency_avgs.begin(); it != m_local_total_remote_access_latency_avgs.end(); ++it) {
-            UInt64 local_remote_access_latency_avg = it->getNS();
-            std::cout << local_remote_access_latency_avg << ' ';
-        }
-        std::cout << "\n\n";
+        // TODO: temporarily disabled for now
+        // // Remote Avg Latency Stats
+        // std::cout << "\nAvg Remote DRAM Access Latencies:\n";
+        // for (std::vector<SubsecondTime>::iterator it = m_local_total_remote_access_latency_avgs.begin(); it != m_local_total_remote_access_latency_avgs.end(); ++it) {
+        //     UInt64 local_remote_access_latency_avg = it->getNS();
+        //     std::cout << local_remote_access_latency_avg << ' ';
+        // }
+        // std::cout << "\n\n";
 
         // Local IPC Stats
         std::cout << "\nLocal IPC:\n";
