@@ -194,6 +194,8 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_local_access_latency_outlier_count(0)
     , m_total_remote_access_latency_no_outlier(SubsecondTime::Zero())
     , m_remote_access_latency_outlier_count(0)
+    , IPC_window_capacity(Sim()->getCfg()->getInt("perf_model/dram/remote_disturbance_factor"))
+    , m_disturbance_bq_size(Sim()->getCfg()->getInt("perf_model/dram/disturbance_bq_size"))
 {
     String name("dram"); 
     if (Sim()->getCfg()->getBool("perf_model/dram/queue_model/enabled"))
@@ -1738,7 +1740,7 @@ void
 DramPerfModelDisagg::updateBandwidth()
 {
     m_update_bandwidth_count += 1;
-    if (m_use_dynamic_bandwidth && m_update_bandwidth_count % 20 == 0) {
+    if (m_use_dynamic_bandwidth && m_update_bandwidth_count % m_disturbance_bq_size == 0) {
         // Old way: change bw scalefactor
         // m_r_bw_scalefactor = (int)(m_r_bw_scalefactor + 1) % 17;
         // if (m_r_bw_scalefactor == 0)
@@ -1764,7 +1766,7 @@ void
 DramPerfModelDisagg::updateLatency()
 {
     m_update_latency_count += 1;
-    if (m_use_dynamic_latency && m_update_latency_count % 20 == 0) {
+    if (m_use_dynamic_latency && m_update_latency_count % m_disturbance_bq_size == 0) {
         // m_r_added_latency_int = (m_r_added_latency_int + 100) % 1700;
         // if (m_r_added_latency_int == 0)
         //     m_r_added_latency_int = 400;

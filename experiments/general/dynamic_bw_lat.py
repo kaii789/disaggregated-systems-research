@@ -36,6 +36,7 @@ config_list = [
     automation.ExperimentRunConfig(
         [
             # automation.ConfigEntry("general", "magic", "false"),
+            automation.ConfigEntry("perf_model/dram", "track_extra_stats", "true"),
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
             automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
@@ -54,6 +55,7 @@ config_list = [
     # 2 Deflate
     automation.ExperimentRunConfig(
         [
+            automation.ConfigEntry("perf_model/dram", "track_extra_stats", "true"),
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
             automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "zlib"),
@@ -74,6 +76,7 @@ config_list = [
     # 3 PQ On (25%)
     automation.ExperimentRunConfig(
         [
+            automation.ConfigEntry("perf_model/dram", "track_extra_stats", "true"),
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
             automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "4"),
@@ -91,6 +94,7 @@ config_list = [
     # 4 PQ On, Compression On: Deflate (25%)
     automation.ExperimentRunConfig(
         [
+            automation.ConfigEntry("perf_model/dram", "track_extra_stats", "true"),
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
             automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "zlib"),
@@ -254,6 +258,13 @@ def run_ligra_nonsym(application_name):
         "MIS": [20],
         "Radii": [30],
     }
+    app_to_IPC_window_capacity = {
+        "PageRank": 540000
+    }
+    app_to_disturbance_bq_size = {
+        "PageRank": 5400000
+    }
+
     # Remote memory off case
     num_MB = 8
     page_size = 4096
@@ -297,7 +308,9 @@ def run_ligra_nonsym(application_name):
                     command_str = ligra_base_str_options_nonsym.format(
                         application_name,
                         ligra_input_file,
-                        sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+                        sniper_options="-g perf_model/dram/IPC_window_capacity={} -g perf_model/dram/disturbance_bq_size={} -g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+                            app_to_IPC_window_capacity[application_name],
+                            app_to_disturbance_bq_size[application_name],
                             page_size,
                             int(num_MB * ONE_MB_TO_BYTES),
                             int(net_lat),
@@ -335,6 +348,13 @@ def run_ligra_sym(application_name):
         "Triangle": [30],
         "KCore": [12],
     }
+    app_to_IPC_window_capacity = {
+        "Triangle": 48000
+    }
+    app_to_disturbance_bq_size = {
+        "Triangle": 480000
+    }
+
     # Remote memory off case
     num_MB = 8
     page_size = 4096
@@ -378,7 +398,9 @@ def run_ligra_sym(application_name):
                     command_str = ligra_base_str_options_sym.format(
                         application_name,
                         ligra_input_file,
-                        sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+                        sniper_options="-g perf_model/dram/IPC_window_capacity={} -g perf_model/dram/disturbance_bq_size={} -g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+                            app_to_IPC_window_capacity[application_name],
+                            app_to_disturbance_bq_size[application_name],
                             page_size,
                             int(num_MB * ONE_MB_TO_BYTES),
                             int(net_lat),
@@ -447,6 +469,12 @@ def run_darknet(model_type):
         "vgg-16": [24],
         "yolov3": [27]
     }
+    model_to_IPC_window_capacity = {
+        "darknet19": 33000
+    }
+    model_to_disturbance_bq_size = {
+        "darknet19": 330000
+    }
     for num_MB in model_to_local_dram_size[model_type]:
         for page_size in page_size_list:
             for net_lat in netlat_list:
@@ -454,7 +482,9 @@ def run_darknet(model_type):
                     localdram_size_str = "{}MB".format(num_MB)
                     command_str = darknet_base_str_options.format(
                         model_type,
-                        sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+                        sniper_options="-g perf_model/dram/IPC_window_capacity={} -g perf_model/dram/disturbance_bq_size={} -g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+                            model_to_IPC_window_capacity[model_type],
+                            model_to_disturbance_bq_size[model_type],
                             page_size,
                             int(num_MB * ONE_MB_TO_BYTES),
                             int(net_lat),
@@ -1219,22 +1249,21 @@ def run_particle_filter():
 # TODO: Experiment run
 experiments = []
 
-# Swift-067
-experiments.extend(run_darknet("resnet50"))
 experiments.extend(run_darknet("darknet19"))
-# experiments.extend(run_darknet("vgg-16"))
-experiments.extend(run_spmv("pkustk14.mtx"))
-experiments.extend(run_ligra_nonsym("MIS"))
-experiments.extend(run_ligra_nonsym("Radii"))
-experiments.extend(run_ligra_sym("KCore"))
-
-# Swift-068
 experiments.extend(run_ligra_sym("Triangle"))
-experiments.extend(run_ligra_nonsym("Components"))
-experiments.extend(run_ligra_nonsym("BFS"))
-experiments.extend(run_ligra_nonsym("BC"))
-experiments.extend(run_nw("4096"))
 experiments.extend(run_ligra_nonsym("PageRank"))
+
+# experiments.extend(run_darknet("resnet50"))
+# experiments.extend(run_darknet("vgg-16"))
+# experiments.extend(run_spmv("pkustk14.mtx"))
+# experiments.extend(run_ligra_nonsym("MIS"))
+# experiments.extend(run_ligra_nonsym("Radii"))
+# experiments.extend(run_ligra_sym("KCore"))
+
+# experiments.extend(run_ligra_nonsym("Components"))
+# experiments.extend(run_ligra_nonsym("BFS"))
+# experiments.extend(run_ligra_nonsym("BC"))
+# experiments.extend(run_nw("4096"))
 
 # experiments.extend(run_sls())
 # experiments.extend(run_hpcg())

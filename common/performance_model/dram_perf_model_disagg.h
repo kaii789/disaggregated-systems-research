@@ -292,7 +292,7 @@ class DramPerfModelDisagg : public DramPerfModel
         // For local IPC calculation
         UInt64 IPC_window_start_instr_count;
         UInt64 IPC_window_end_instr_count;
-        UInt64 IPC_window_capacity = 20;
+        UInt64 IPC_window_capacity;
         UInt64 IPC_window_cur_size = 0;
         std::vector<double> m_local_IPCs;
 
@@ -325,6 +325,8 @@ class DramPerfModelDisagg : public DramPerfModel
 
         SubsecondTime m_total_remote_access_latency_no_outlier;
         UInt64 m_remote_access_latency_outlier_count;
+
+        UInt64 m_disturbance_bq_size;
 
         SubsecondTime getDramAccessCost(SubsecondTime start_time, UInt64 size, core_id_t requester, IntPtr address, ShmemPerf *perf, bool is_remote, bool is_exclude_cacheline, bool is_page);
         SubsecondTime getDramWriteCost(SubsecondTime start_time, UInt64 size, core_id_t requester, IntPtr address, ShmemPerf *perf, bool is_exclude_cacheline, bool is_page);
