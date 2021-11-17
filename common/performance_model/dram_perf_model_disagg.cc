@@ -194,7 +194,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_local_access_latency_outlier_count(0)
     , m_total_remote_access_latency_no_outlier(SubsecondTime::Zero())
     , m_remote_access_latency_outlier_count(0)
-    , IPC_window_capacity(Sim()->getCfg()->getInt("perf_model/dram/remote_disturbance_factor"))
+    , IPC_window_capacity(Sim()->getCfg()->getInt("perf_model/dram/IPC_window_capacity"))
     , m_disturbance_bq_size(Sim()->getCfg()->getInt("perf_model/dram/disturbance_bq_size"))
 {
     String name("dram"); 
