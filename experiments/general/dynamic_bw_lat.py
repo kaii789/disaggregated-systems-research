@@ -259,10 +259,10 @@ def run_ligra_nonsym(application_name):
         "Radii": [30],
     }
     app_to_IPC_window_capacity = {
-        "PageRank": 540000
+        "PageRank": 104476
     }
     app_to_disturbance_bq_size = {
-        "PageRank": 5400000
+        "PageRank": 1044760
     }
 
     # Remote memory off case
@@ -349,10 +349,10 @@ def run_ligra_sym(application_name):
         "KCore": [12],
     }
     app_to_IPC_window_capacity = {
-        "Triangle": 48000
+        "Triangle": 10750
     }
     app_to_disturbance_bq_size = {
-        "Triangle": 480000
+        "Triangle": 107500
     }
 
     # Remote memory off case
@@ -470,10 +470,10 @@ def run_darknet(model_type):
         "yolov3": [27]
     }
     model_to_IPC_window_capacity = {
-        "darknet19": 33000
+        "darknet19": 8298
     }
     model_to_disturbance_bq_size = {
-        "darknet19": 330000
+        "darknet19": 82980
     }
     for num_MB in model_to_local_dram_size[model_type]:
         for page_size in page_size_list:
