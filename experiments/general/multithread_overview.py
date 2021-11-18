@@ -18,7 +18,7 @@ no_remote_memory_list = [
         [
             # automation.ConfigEntry("general", "magic", "false"),
             automation.ConfigEntry("general", "total_cores", "4"),
-            # automation.ConfigEntry("perf_model/dram/ddr", "data_bus_width", "256"),
+            automation.ConfigEntry("perf_model/dram/ddr", "data_bus_width", "256"),
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
             automation.ConfigEntry("perf_model/dram", "enable_remote_mem", "false"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
@@ -40,7 +40,7 @@ config_list = [
         [
             # automation.ConfigEntry("general", "magic", "false"),
             automation.ConfigEntry("general", "total_cores", "4"),
-            # automation.ConfigEntry("perf_model/dram/ddr", "data_bus_width", "256"),
+            automation.ConfigEntry("perf_model/dram/ddr", "data_bus_width", "256"),
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
             automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
@@ -59,7 +59,7 @@ config_list = [
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("general", "total_cores", "4"),
-            # automation.ConfigEntry("perf_model/dram/ddr", "data_bus_width", "256"),
+            automation.ConfigEntry("perf_model/dram/ddr", "data_bus_width", "256"),
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
             automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "zlib"),
@@ -79,7 +79,7 @@ config_list = [
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("general", "total_cores", "4"),
-            # automation.ConfigEntry("perf_model/dram/ddr", "data_bus_width", "256"),
+            automation.ConfigEntry("perf_model/dram/ddr", "data_bus_width", "256"),
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
             automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "4"),
@@ -96,7 +96,7 @@ config_list = [
     automation.ExperimentRunConfig(
         [
             automation.ConfigEntry("general", "total_cores", "4"),
-            # automation.ConfigEntry("perf_model/dram/ddr", "data_bus_width", "256"),
+            automation.ConfigEntry("perf_model/dram/ddr", "data_bus_width", "256"),
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
             automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "zlib"),
@@ -1264,15 +1264,17 @@ experiments = []
 # experiments.extend(run_ligra_nonsym("Components"))
 # experiments.extend(run_ligra_nonsym("BFS"))
 # experiments.extend(run_ligra_nonsym("BC"))
+
+# Mel-15
+# experiments.extend(run_sls())
+
+# Swift-068
 # experiments.extend(run_ligra_nonsym("PageRank"))
 # experiments.extend(run_spmv("pkustk14.mtx"))
 # experiments.extend(run_nw("4096"))
-
-# experiments.extend(run_sls())
-
-experiments.extend(run_stream("3"))  # Stream?
-experiments.extend(run_timeseries("randomSerie262144.txt"))
-experiments.extend(run_srad())
+# experiments.extend(run_srad())
+# experiments.extend(run_stream("3"))  # Stream?
+# experiments.extend(run_timeseries("randomSerie262144.txt"))
 
 
 # experiments.extend(run_hpcg())
