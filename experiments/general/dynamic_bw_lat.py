@@ -564,8 +564,8 @@ def run_nw(dimension):
                     command_str = nw_base_options.format(
                         dimension,
                         sniper_options="-g perf_model/dram/IPC_window_capacity={} -g perf_model/dram/disturbance_bq_size={} -g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
-                            dimension_to_IPC_window_capacity[input],
-                            dimension_to_disturbance_bq_size[input],
+                            dimension_to_IPC_window_capacity[dimension],
+                            dimension_to_disturbance_bq_size[dimension],
                             page_size,
                             int(num_MB * ONE_MB_TO_BYTES),
                             int(net_lat),
