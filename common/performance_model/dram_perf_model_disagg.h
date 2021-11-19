@@ -295,6 +295,7 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 IPC_window_capacity;
         UInt64 IPC_window_cur_size = 0;
         std::vector<double> m_local_IPCs;
+        std::vector<UInt64> m_instruction_count_x_axis;
 
         std::unordered_map<UInt64, UInt64> m_inflight_page_to_dirty_write_count;
         UInt64 m_dirty_write_buffer_size = 0;
