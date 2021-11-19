@@ -48,9 +48,3 @@ DramPerfModel* DramPerfModel::createDramPerfModel(core_id_t core_id, UInt32 cach
       LOG_PRINT_ERROR("Invalid DRAM model type %s", type.c_str());
    }
 }
-
-void DramPerfModel::updateLatency() {
-}
-
-void DramPerfModel::updateLocalIPCStat() {
-}

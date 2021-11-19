@@ -260,11 +260,11 @@ def run_ligra_nonsym(application_name):
     }
     app_to_IPC_window_capacity = {
         "PageRank": 10447,
-        "BFS": 2000
+        "BFS": 780
     }
     app_to_disturbance_bq_size = {
         "PageRank": 104470,
-        "BFS": 20000
+        "BFS": 7800
     }
 
     # Remote memory off case
@@ -1019,10 +1019,10 @@ def run_timeseries(input):
     }
 
     input_to_IPC_window_capacity = {
-        "randomSerie262144.txt": 5629
+        "randomSerie262144.txt": 9700
     }
     input_to_disturbance_bq_size = {
-        "randomSerie262144.txt": 56290
+        "randomSerie262144.txt": 97000
     }
 
     # Everything else

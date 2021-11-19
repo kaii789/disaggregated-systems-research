@@ -41,8 +41,8 @@ class DramPerfModel
 
       virtual void finalizeStats() = 0;
       virtual void updateBandwidth() = 0;
-      virtual void updateLatency();
-      virtual void updateLocalIPCStat();
+      virtual void updateLatency() {};
+      virtual void updateLocalIPCStat(UInt64 instr_count) {};
 
       UInt64 getTotalAccesses() { return m_num_accesses; }
 };

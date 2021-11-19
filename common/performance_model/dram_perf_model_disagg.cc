@@ -1722,16 +1722,16 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
 }
 
 void
-DramPerfModelDisagg::updateLocalIPCStat()
+DramPerfModelDisagg::updateLocalIPCStat(UInt64 instr_count)
 {
     if (IPC_window_cur_size == 0)
-        IPC_window_start_instr_count = Sim()->getCoreManager()->getCoreFromID(0)->getInstructionCount();
+        IPC_window_start_instr_count = instr_count;
     IPC_window_cur_size += 1;
     if (IPC_window_cur_size == IPC_window_capacity) {
         ComponentPeriod cp = ComponentPeriod::fromFreqHz(1000000000 * Sim()->getCfg()->getFloat("perf_model/core/frequency"));
         SubsecondTimeCycleConverter converter = SubsecondTimeCycleConverter(&cp);
 
-        IPC_window_end_instr_count = Sim()->getCoreManager()->getCoreFromID(0)->getInstructionCount();
+        IPC_window_end_instr_count = instr_count;
         UInt64 instructions = IPC_window_end_instr_count - IPC_window_start_instr_count;
         UInt64 cycles = converter.subsecondTimeToCycles(SubsecondTime::NS(1000) * IPC_window_capacity);
         double IPC = instructions / (double) cycles;
