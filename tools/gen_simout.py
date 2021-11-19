@@ -396,9 +396,13 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
       results["dram.bw-utilization-decile-percentage-{}".format(i)] = [percentage] + [0]*(ncores - 1)
       template.append(('  bw utilization % decile {}'.format(i), "dram.bw-utilization-decile-percentage-{}".format(i), str))
 
-  results['dram.avg-bw-utilization'] = map(lambda (a,b): (a/100000)/b if b else float('inf'), zip(results['dram.total-bw-utilization-sum'], results['dram.accesses']))
-  results['dram.avg-page-bw-utilization'] = map(lambda (a,b): (a/100000)/b if b else float('inf'), zip(results['dram.cacheline-bw-utilization-sum'], results['dram.accesses']))
-  results['dram.avg-page-bw-utilization'] = map(lambda (a,b): (a/100000)/b if b else float('inf'), zip(results['dram.page-bw-utilization-sum'], results['dram.accesses']))
+  
+  if 'dram.total-bw-utilization-sum' in results:
+    results['dram.avg-bw-utilization'] = map(lambda (a,b): (a/100000)/b if b else float('inf'), zip(results['dram.total-bw-utilization-sum'], results['dram.accesses']))
+  if 'dram.avg-page-bw-utilization' in results:
+    results['dram.avg-page-bw-utilization'] = map(lambda (a,b): (a/100000)/b if b else float('inf'), zip(results['dram.page-bw-utilization-sum'], results['dram.accesses']))
+  if 'dram.avg-cacheline-bw-utilization' in results:
+    results['dram.avg-cacheline-bw-utilization'] = map(lambda (a,b): (a/100000)/b if b else float('inf'), zip(results['dram.cacheline-bw-utilization-sum'], results['dram.accesses']))
   template += [
       ('avg total bw utilization', 'dram.avg-bw-utilization', str),
       ('avg page queue bw utilization', 'dram.avg-page-bw-utilization', str),

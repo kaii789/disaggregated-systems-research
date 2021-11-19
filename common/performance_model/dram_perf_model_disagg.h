@@ -312,9 +312,9 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_sum_inflight_cachelines_total_size;
 
         // BW utilization stats
-        UInt64 cacheline_bw_utilization_sum = 0;
-        UInt64 page_bw_utilization_sum = 0;
-        UInt64 total_bw_utilization_sum = 0;
+        UInt64 m_cacheline_bw_utilization_sum = 0;
+        UInt64 m_page_bw_utilization_sum = 0;
+        UInt64 m_total_bw_utilization_sum = 0;
 
         // Handle dram access latency outliers
         SubsecondTime m_access_latency_outlier_threshold;

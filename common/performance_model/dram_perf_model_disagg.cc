@@ -391,9 +391,9 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     registerStatsMetric("dram", core_id, "local-dram-sum-dirty-write-buffer-size", &m_sum_write_buffer_size);
     registerStatsMetric("dram", core_id, "local-dram-max-dirty-write-buffer-size", &m_max_dirty_write_buffer_size);
 
-    registerStatsMetric("dram", core_id, "cacheline-bw-utilization-sum", &cacheline_bw_utilization_sum);
-    registerStatsMetric("dram", core_id, "page-bw-utilization-sum", &page_bw_utilization_sum);
-    registerStatsMetric("dram", core_id, "total-bw-utilization-sum", &total_bw_utilization_sum);
+    registerStatsMetric("dram", core_id, "cacheline-bw-utilization-sum", &m_cacheline_bw_utilization_sum);
+    registerStatsMetric("dram", core_id, "page-bw-utilization-sum", &m_page_bw_utilization_sum);
+    registerStatsMetric("dram", core_id, "total-bw-utilization-sum", &m_total_bw_utilization_sum);
 
     registerStatsMetric("dram", core_id, "total-access-latency-no-outlier", &m_total_access_latency_no_outlier);
     registerStatsMetric("dram", core_id, "access-latency-outlier-count", &m_access_latency_outlier_count);
@@ -1110,16 +1110,6 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     // pkt_size is in 'Bytes'
     // m_dram_bandwidth is in 'Bits per clock cycle'
 
-    // Update BW utilization stat
-    // 5 decimal precision
-    if (m_r_partition_queues) {
-        cacheline_bw_utilization_sum += m_data_movement->getCachelineQueueUtilizationPercentage(pkt_time) * m_r_cacheline_queue_fraction * 100000;
-        page_bw_utilization_sum += m_data_movement->getPageQueueUtilizationPercentage(pkt_time) * (1. - m_r_cacheline_queue_fraction) * 100000;
-        total_bw_utilization_sum += m_data_movement->getCachelineQueueUtilizationPercentage(pkt_time) * m_r_cacheline_queue_fraction + m_data_movement->getPageQueueUtilizationPercentage(pkt_time) * (1. - m_r_cacheline_queue_fraction) * 100000;
-    } else {
-        total_bw_utilization_sum += m_data_movement->getPageQueueUtilizationPercentage(pkt_time) * 100000;
-    }
-
     // When partition queues is off: don't get cacheline when moving the page
     SubsecondTime cacheline_hw_access_latency = SubsecondTime::Zero();
     if (m_r_partition_queues) {
@@ -1829,6 +1819,15 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
     if (m_track_page_bw_utilization_stats) {
         // Update BW utilization count
         update_bw_utilization_count(pkt_time);
+    }
+    // Update BW utilization stat
+    // 5 decimal precision
+    if (m_r_partition_queues) {
+        m_cacheline_bw_utilization_sum += m_data_movement->getCachelineQueueUtilizationPercentage(pkt_time) * m_r_cacheline_queue_fraction * 100000;
+        m_page_bw_utilization_sum += m_data_movement->getPageQueueUtilizationPercentage(pkt_time) * (1. - m_r_cacheline_queue_fraction) * 100000;
+        m_total_bw_utilization_sum += m_data_movement->getCachelineQueueUtilizationPercentage(pkt_time) * m_r_cacheline_queue_fraction + m_data_movement->getPageQueueUtilizationPercentage(pkt_time) * (1. - m_r_cacheline_queue_fraction) * 100000;
+    } else {
+        m_total_bw_utilization_sum += m_data_movement->getPageQueueUtilizationPercentage(pkt_time) * 100000;
     }
 
     UInt64 phys_page = address & ~((UInt64(1) << floorLog2(m_page_size)) - 1);
