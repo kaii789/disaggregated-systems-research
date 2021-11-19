@@ -83,7 +83,8 @@ DramPerfModelDisaggPageMoveFree::DramPerfModelDisaggPageMoveFree(core_id_t core_
     , m_r_throttle_redundant_moves      (Sim()->getCfg()->getBool("perf_model/dram/remote_throttle_redundant_moves"))
     , m_r_use_separate_queue_model      (Sim()->getCfg()->getBool("perf_model/dram/queue_model/use_separate_remote_queue_model")) // Whether to use the separate remote queue model
     , m_r_page_queue_utilization_threshold   (Sim()->getCfg()->getFloat("perf_model/dram/remote_page_queue_utilization_threshold")) // When the datamovement queue for pages has percentage utilization above this, remote pages aren't moved to local
-    , m_r_cacheline_queue_utilization_threshold   (Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_utilization_threshold")) // When the datamovement queue for cachelines has percentage utilization above this, cacheline requests on inflight pages aren't made
+    // , m_r_cacheline_queue_utilization_threshold   (Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_utilization_threshold")) // When the datamovement queue for cachelines has percentage utilization above this, cacheline requests on inflight pages aren't made
+    , m_r_cacheline_queue_utilization_threshold(0.99)
     , m_use_throttled_pages_tracker    (Sim()->getCfg()->getBool("perf_model/dram/use_throttled_pages_tracker"))  // Whether to use and update m_use_throttled_pages_tracker
     , m_use_ideal_page_throttling    (Sim()->getCfg()->getBool("perf_model/dram/r_use_ideal_page_throttling"))  // Whether to use ideal page throttling (alternative currently is FCFS throttling)
     , m_r_ideal_pagethrottle_remote_access_history_window_size   (SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/r_ideal_pagethrottle_access_history_window_size")))
@@ -358,6 +359,10 @@ DramPerfModelDisaggPageMoveFree::DramPerfModelDisaggPageMoveFree(core_id_t core_
 
     registerStatsMetric("dram", core_id, "local-dram-sum-dirty-write-buffer-size", &m_sum_write_buffer_size);
     registerStatsMetric("dram", core_id, "local-dram-max-dirty-write-buffer-size", &m_max_dirty_write_buffer_size);
+
+    registerStatsMetric("dram", core_id, "cacheline-bw-utilization-sum", &m_cacheline_bw_utilization_sum);
+    registerStatsMetric("dram", core_id, "page-bw-utilization-sum", &m_page_bw_utilization_sum);
+    registerStatsMetric("dram", core_id, "total-bw-utilization-sum", &m_total_bw_utilization_sum);
 
     // Stats for partition_queues experiments
     if (m_r_partition_queues) {
@@ -1649,6 +1654,15 @@ DramPerfModelDisaggPageMoveFree::getAccessLatency(SubsecondTime pkt_time, UInt64
     if (m_track_page_bw_utilization_stats) {
         // Update BW utilization count
         update_bw_utilization_count(pkt_time);
+    }
+    // Update BW utilization stat
+    // 5 decimal precision
+    if (m_r_partition_queues) {
+        m_cacheline_bw_utilization_sum += m_data_movement->getCachelineQueueUtilizationPercentage(pkt_time) * m_r_cacheline_queue_fraction * 100000;
+        m_page_bw_utilization_sum += m_data_movement->getPageQueueUtilizationPercentage(pkt_time) * (1. - m_r_cacheline_queue_fraction) * 100000;
+        m_total_bw_utilization_sum += m_data_movement->getCachelineQueueUtilizationPercentage(pkt_time) * m_r_cacheline_queue_fraction + m_data_movement->getPageQueueUtilizationPercentage(pkt_time) * (1. - m_r_cacheline_queue_fraction) * 100000;
+    } else {
+        m_total_bw_utilization_sum += m_data_movement->getPageQueueUtilizationPercentage(pkt_time) * 100000;
     }
 
     UInt64 phys_page = address & ~((UInt64(1) << floorLog2(m_page_size)) - 1);
