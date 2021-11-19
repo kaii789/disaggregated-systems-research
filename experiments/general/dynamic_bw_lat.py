@@ -260,11 +260,13 @@ def run_ligra_nonsym(application_name):
     }
     app_to_IPC_window_capacity = {
         "PageRank": 10447,
-        "BFS": 780
+        "BFS": 780,
+        "BC": 780
     }
     app_to_disturbance_bq_size = {
         "PageRank": 104470,
-        "BFS": 7800
+        "BFS": 7800,
+        "BC": 7800
     }
 
     # Remote memory off case
@@ -519,6 +521,13 @@ def run_nw(dimension):
         "6144": [58],
     }
 
+    dimension_to_IPC_window_capacity = {
+        "4096": 10447,
+    }
+    dimension_to_disturbance_bq_size = {
+        "4096": 104470,
+    }
+
     # Remote memory off case
     num_MB = 8
     page_size = 4096
@@ -554,7 +563,9 @@ def run_nw(dimension):
                     localdram_size_str = "{}MB".format(num_MB)
                     command_str = nw_base_options.format(
                         dimension,
-                        sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+                        sniper_options="-g perf_model/dram/IPC_window_capacity={} -g perf_model/dram/disturbance_bq_size={} -g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+                            dimension_to_IPC_window_capacity[input],
+                            dimension_to_disturbance_bq_size[input],
                             page_size,
                             int(num_MB * ONE_MB_TO_BYTES),
                             int(net_lat),
@@ -1260,10 +1271,12 @@ def run_particle_filter():
 # TODO: Experiment run
 experiments = []
 
-experiments.extend(run_ligra_sym("Triangle"))
-experiments.extend(run_ligra_nonsym("PageRank"))
-experiments.extend(run_ligra_nonsym("BFS"))
-experiments.extend(run_timeseries("randomSerie262144.txt"))
+# experiments.extend(run_ligra_sym("Triangle"))
+# experiments.extend(run_ligra_nonsym("PageRank"))
+# experiments.extend(run_ligra_nonsym("BFS"))
+# experiments.extend(run_timeseries("randomSerie262144.txt"))
+experiments.extend(run_ligra_nonsym("BC"))
+experiments.extend(run_nw("4096"))
 
 # experiments.extend(run_darknet("resnet50"))
 # experiments.extend(run_darknet("vgg-16"))
@@ -1274,8 +1287,6 @@ experiments.extend(run_timeseries("randomSerie262144.txt"))
 # experiments.extend(run_ligra_sym("KCore"))
 
 # experiments.extend(run_ligra_nonsym("Components"))
-# experiments.extend(run_ligra_nonsym("BC"))
-# experiments.extend(run_nw("4096"))
 
 # experiments.extend(run_sls())
 # experiments.extend(run_hpcg())
