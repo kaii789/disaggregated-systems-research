@@ -198,7 +198,7 @@ srad_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {s
 
 # TODO:
 page_size_list = [4096]
-bw_scalefactor_list = [4]
+bw_scalefactor_list = [2]
 netlat_list = [100]
 
 def input_file_checker(experiments):
@@ -259,10 +259,12 @@ def run_ligra_nonsym(application_name):
         "Radii": [30],
     }
     app_to_IPC_window_capacity = {
-        "PageRank": 104476
+        "PageRank": 10447,
+        "BFS": 2000
     }
     app_to_disturbance_bq_size = {
-        "PageRank": 1044760
+        "PageRank": 104470,
+        "BFS": 20000
     }
 
     # Remote memory off case
@@ -349,10 +351,10 @@ def run_ligra_sym(application_name):
         "KCore": [12],
     }
     app_to_IPC_window_capacity = {
-        "Triangle": 10750
+        "Triangle": 2150
     }
     app_to_disturbance_bq_size = {
-        "Triangle": 107500
+        "Triangle": 21500
     }
 
     # Remote memory off case
@@ -1016,6 +1018,13 @@ def run_timeseries(input):
         "randomSerie262144.txt": [16],
     }
 
+    input_to_IPC_window_capacity = {
+        "randomSerie262144.txt": 5629
+    }
+    input_to_disturbance_bq_size = {
+        "randomSerie262144.txt": 56290
+    }
+
     # Everything else
     for num_MB in input_to_local_dram_size[input]:
         for page_size in page_size_list:
@@ -1024,7 +1033,9 @@ def run_timeseries(input):
                     localdram_size_str = "{}MB".format(num_MB)
                     command_str = timeseries_base_options.format(
                         input,
-                        sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+                        sniper_options="-g perf_model/dram/IPC_window_capacity={} -g perf_model/dram/disturbance_bq_size={} -g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+                            input_to_IPC_window_capacity[input],
+                            input_to_disturbance_bq_size[input],
                             page_size,
                             int(num_MB * ONE_MB_TO_BYTES),
                             int(net_lat),
@@ -1249,19 +1260,20 @@ def run_particle_filter():
 # TODO: Experiment run
 experiments = []
 
-experiments.extend(run_darknet("darknet19"))
 experiments.extend(run_ligra_sym("Triangle"))
 experiments.extend(run_ligra_nonsym("PageRank"))
+experiments.extend(run_ligra_nonsym("BFS"))
+experiments.extend(run_timeseries("randomSerie262144.txt"))
 
 # experiments.extend(run_darknet("resnet50"))
 # experiments.extend(run_darknet("vgg-16"))
+# experiments.extend(run_darknet("darknet19"))
 # experiments.extend(run_spmv("pkustk14.mtx"))
 # experiments.extend(run_ligra_nonsym("MIS"))
 # experiments.extend(run_ligra_nonsym("Radii"))
 # experiments.extend(run_ligra_sym("KCore"))
 
 # experiments.extend(run_ligra_nonsym("Components"))
-# experiments.extend(run_ligra_nonsym("BFS"))
 # experiments.extend(run_ligra_nonsym("BC"))
 # experiments.extend(run_nw("4096"))
 
@@ -1270,7 +1282,6 @@ experiments.extend(run_ligra_nonsym("PageRank"))
 # experiments.extend(run_sql("5"))  # TPCH
 # experiments.extend(run_stream("3"))  # Stream?
 
-# experiments.extend(run_timeseries("randomSerie262144.txt"))
 # experiments.extend(run_particle_filter())
 # experiments.extend(run_srad())
 

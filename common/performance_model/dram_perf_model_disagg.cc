@@ -480,6 +480,14 @@ DramPerfModelDisagg::~DramPerfModelDisagg()
             std::cout << local_IPC << ' ';
         }
         std::cout << "\n\n";
+
+        // Instruction Count X Axis
+        std::cout << "\nInstruction Count X Axis:\n";
+        for (std::vector<UInt64>::iterator it = m_instruction_count_x_axis.begin(); it != m_instruction_count_x_axis.end(); ++it) {
+            UInt64 instruction_count = *it;
+            std::cout << instruction_count << ' ';
+        }
+        std::cout << "\n\n";
     }
 
     if (m_queue_model.size())
@@ -1720,6 +1728,7 @@ DramPerfModelDisagg::updateLocalIPCStat()
         double IPC = instructions / (double) cycles;
         std::round(IPC * 100000.0) / 100000.0;
         m_local_IPCs.push_back(IPC);
+        m_instruction_count_x_axis.push_back(IPC_window_end_instr_count);
 
         IPC_window_cur_size = 0;
     }
