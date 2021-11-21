@@ -198,7 +198,7 @@ srad_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {s
 
 # TODO:
 page_size_list = [4096]
-bw_scalefactor_list = [2]
+bw_scalefactor_list = [2, 4]
 netlat_list = [100]
 
 def input_file_checker(experiments):
@@ -261,12 +261,12 @@ def run_ligra_nonsym(application_name):
     app_to_IPC_window_capacity = {
         "PageRank": 10447,
         "BFS": 780,
-        "BC": 780
+        "BC": 1920
     }
     app_to_disturbance_bq_size = {
         "PageRank": 104470,
         "BFS": 7800,
-        "BC": 7800
+        "BC": 19200
     }
 
     # Remote memory off case
@@ -522,10 +522,10 @@ def run_nw(dimension):
     }
 
     dimension_to_IPC_window_capacity = {
-        "4096": 10447,
+        "4096": 730,
     }
     dimension_to_disturbance_bq_size = {
-        "4096": 104470,
+        "4096": 7300,
     }
 
     # Remote memory off case
@@ -1275,7 +1275,7 @@ experiments = []
 # experiments.extend(run_ligra_nonsym("PageRank"))
 # experiments.extend(run_ligra_nonsym("BFS"))
 # experiments.extend(run_timeseries("randomSerie262144.txt"))
-experiments.extend(run_ligra_nonsym("BC"))
+# experiments.extend(run_ligra_nonsym("BC"))
 experiments.extend(run_nw("4096"))
 
 # experiments.extend(run_darknet("resnet50"))
