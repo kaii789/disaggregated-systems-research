@@ -249,10 +249,6 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
         m_data_movement = QueueModel::create(
                 name + "-datamovement-queue", core_id, data_movement_queue_model_type,
                 m_r_bus_bandwidth.getRoundedLatency(8), m_r_bus_bandwidth.getBandwidthBitsPerUs()); // bytes to bits
-        // Note: currently m_data_movement_2 is not used anywhere when m_r_partition_queues == 0
-        // m_data_movement_2 = QueueModel::create(
-        //         name + "-datamovement-queue-2", core_id, data_movement_queue_model_type,
-        //         m_r_bus_bandwidth.getRoundedLatency(8), m_r_bus_bandwidth.getBandwidthBitsPerUs()); // bytes to bits	
     }
 
     for(UInt32 rank = 0; rank < m_total_ranks; ++rank) {
@@ -592,8 +588,8 @@ DramPerfModelDisagg::finalizeStats()
     // Compression Stats
     if (m_use_compression) {
         m_compression_model->finalizeStats();
-        if (m_use_cacheline_compression)
-            ;//m_cacheline_compression_model->finalizeStats();
+        // if (m_use_cacheline_compression)
+        //     m_cacheline_compression_model->finalizeStats();
     }
 
     std::cout << "dram_perf_model_disagg.cc finalizeStats():" << std::endl;
@@ -839,7 +835,6 @@ DramPerfModelDisagg::getDramWriteCost(SubsecondTime start_time, UInt64 size, cor
     perf->updateTime(t_now, ShmemPerf::DRAM_DEVICE);
 
     return t_now - start_time;  // Net increase of time, ie the pure hardware access cost
-    // return ddr_queue_delay + ddr_processing_time + dram_access_cost;
 }
 
 // DRAM hardware access cost
@@ -889,9 +884,6 @@ DramPerfModelDisagg::getDramAccessCost(SubsecondTime start_time, UInt64 size, co
     perf->updateTime(t_now, ShmemPerf::DRAM_DEVICE);
 
     return t_now - start_time;  // Net increase of time, ie the pure hardware access cost
-    // return ddr_queue_delay + ddr_processing_time + dram_access_cost;
-
-
 
     // UInt64 phys_page = address & ~((UInt64(1) << floorLog2(m_page_size)) - 1);
     // IntPtr cacheline_address = (size > m_cache_line_size) ? phys_page : address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1);
@@ -1108,7 +1100,6 @@ SubsecondTime
 DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_size, core_id_t requester, IntPtr address, DramCntlrInterface::access_t access_type, ShmemPerf *perf)
 {
     // pkt_size is in 'Bytes'
-    // m_dram_bandwidth is in 'Bits per clock cycle'
 
     // When partition queues is off: don't get cacheline when moving the page
     SubsecondTime cacheline_hw_access_latency = SubsecondTime::Zero();
@@ -1234,9 +1225,6 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             m_total_cacheline_decompression_latency += decompression_latency;
     }
 
-    // SubsecondTime ddr_processing_time = m_bus_bandwidth.getRoundedLatency(8 * pkt_size);
-    // t_now += ddr_processing_time;
-
     // Track access to page
     if (m_r_cacheline_gran)
         phys_page =  address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1); // Was << 6
@@ -1342,11 +1330,6 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         SubsecondTime local_page_hw_write_latency = SubsecondTime::Zero();
         std::vector<std::pair<UInt64, SubsecondTime>> updated_inflight_page_arrival_time_deltas;
         if (m_r_simulate_datamov_overhead && !m_r_cacheline_gran) {
-            //check if queue is full
-            //if it is... wait.
-            //to wait: t_remote_queue_request + some amount of time
-            //try again
-
             UInt32 page_size = m_page_size;
             if (m_r_partition_queues) {
                 page_size = m_page_size - m_cache_line_size;
@@ -1572,12 +1555,8 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
                 m_max_inflight_extra_bufferspace++;
         } else if (page_queue_utilization_percentage > m_r_page_queue_utilization_threshold) {
             // PQ=off, page movement would exceed network bandwidth
-            // Estimate how long it would take to send packet if inflight page buffer is full
-            // SubsecondTime extra_delay_penalty = SubsecondTime::NS() * 10000;
-            SubsecondTime extra_delay_penalty = SubsecondTime::Zero();
-            if (m_r_partition_queues == 0 || (m_r_partition_queues > 0 && page_hw_access_latency + page_compression_latency + page_datamovement_delay <= cacheline_hw_access_latency + cacheline_compression_latency + datamovement_delay))
-                t_now += extra_delay_penalty;  // page movement was the critical path, add extra delay
-            m_inflight_pages_extra[phys_page] = SubsecondTime::max(global_time, page_arrival_time + extra_delay_penalty);
+            // Queue model estimates how long it would take to send packet if inflight page buffer is full
+            m_inflight_pages_extra[phys_page] = SubsecondTime::max(global_time, page_arrival_time);
             m_inflight_redundant[phys_page] = 0;
             m_pages_cacheline_request_limit_exceeded.erase(phys_page);
             ++m_datamovement_queue_full_page_still_moved;
@@ -1695,14 +1674,10 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         }
     } 
 
-    if (move_page) { // Check if there's place in local DRAM and if not evict an older page to make space
+    if (move_page) {  // Check if there's place in local DRAM and if not evict an older page to make space
         t_now += possiblyEvict(phys_page, pkt_time, requester);
     }
 
-    // Update Memory Counters?
-    //queue_delay = ddr_queue_delay;
-
-    //std::cout << "Remote Latency: " << t_now - pkt_time << std::endl;
     possiblyPrefetch(phys_page, t_now, requester);
 
     SubsecondTime access_latency = t_now - pkt_time;
@@ -2002,113 +1977,11 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
     // }
     if (m_use_ideal_page_throttling || !m_speed_up_simulation)
         m_moved_pages_no_access_yet.remove(phys_page);  // there has been a local access to phys_page
-
-    // pkt_size is in 'Bytes'
-    // m_dram_bandwidth is in 'Bits per clock cycle'
-
-    // // Calculate address mapping inside the DIMM
-    // UInt32 channel, rank, bank_group, bank, column;
-    // UInt64 dram_page;
-    // parseDeviceAddress(address, channel, rank, bank_group, bank, column, dram_page);
-
-
-    // SubsecondTime t_now = pkt_time;
-    // perf->updateTime(t_now);
-
-    // // Add DDR controller pipeline delay
-    // t_now += m_controller_delay;
-    // perf->updateTime(t_now, ShmemPerf::DRAM_CNTLR);
-
-    // // Add DDR refresh delay if needed
-    // if (m_refresh_interval != SubsecondTime::Zero()) {
-    //     SubsecondTime refresh_base = (t_now.getPS() / m_refresh_interval.getPS()) * m_refresh_interval;
-    //     if (t_now - refresh_base < m_refresh_length) {
-    //         t_now = refresh_base + m_refresh_length;
-    //         perf->updateTime(t_now, ShmemPerf::DRAM_REFRESH);
-    //     }
-    // }
-
-
-    // UInt64 crb = (channel * m_num_ranks * m_num_banks) + (rank * m_num_banks) + bank; // Combine channel, rank, bank to index m_banks
-    // LOG_ASSERT_ERROR(crb < m_total_banks, "Bank index out of bounds");
-    // BankInfo &bank_info = m_banks[crb];
-
-    // //printf("[%2d] %s (%12lx, %4lu, %4lu), t_open = %lu, t_now = %lu, bank_info.t_avail = %lu\n", m_core_id, bank_info.open_page == dram_page && bank_info.t_avail + m_bank_keep_open >= t_now ? "Page Hit: " : "Page Miss:", address, crb, dram_page % 10000, t_now.getNS() - bank_info.t_avail.getNS(), t_now.getNS(), bank_info.t_avail.getNS());
-
-    // // DRAM page hit/miss
-    // if (bank_info.open_page == dram_page                       // Last access was to this row
-    //         && bank_info.t_avail + m_bank_keep_open >= t_now   // Bank hasn't been closed in the meantime
-    //    ) {
-    //     if (bank_info.t_avail > t_now) {
-    //         t_now = bank_info.t_avail;
-    //         perf->updateTime(t_now, ShmemPerf::DRAM_BANK_PENDING);
-    //     }
-    //     ++m_dram_page_hits;
-
-    // } else {
-    //     // Wait for bank to become available
-    //     if (bank_info.t_avail > t_now)
-    //         t_now = bank_info.t_avail;
-    //     // Close dram_page
-    //     if (bank_info.t_avail + m_bank_keep_open >= t_now) {
-    //         // We found the dram_page open and have to close it ourselves
-    //         t_now += m_bank_close_delay;
-    //         ++m_dram_page_misses;
-    //     } else if (bank_info.t_avail + m_bank_keep_open + m_bank_close_delay > t_now) {
-    //         // Bank was being closed, we have to wait for that to complete
-    //         t_now = bank_info.t_avail + m_bank_keep_open + m_bank_close_delay;
-    //         ++m_dram_page_closing;
-    //     } else {
-    //         // Bank was already closed, no delay.
-    //         ++m_dram_page_empty;
-    //     }
-
-    //     // Open dram_page
-    //     t_now += m_bank_open_delay;
-    //     perf->updateTime(t_now, ShmemPerf::DRAM_BANK_CONFLICT);
-
-    //     bank_info.open_page = dram_page;
-    // }
-
-    // // Add rank access time and availability
-    // UInt64 cr = (channel * m_num_ranks) + rank;
-    // LOG_ASSERT_ERROR(cr < m_total_ranks, "Rank index out of bounds");
-    // SubsecondTime rank_avail_request = (m_num_bank_groups > 1) ? m_intercommand_delay_short : m_intercommand_delay;
-    // SubsecondTime rank_avail_delay = m_rank_avail.size() ? m_rank_avail[cr]->computeQueueDelay(t_now, rank_avail_request, requester) : SubsecondTime::Zero();
-
-    // // Add bank group access time and availability
-    // UInt64 crbg = (channel * m_num_ranks * m_num_bank_groups) + (rank * m_num_bank_groups) + bank_group;
-    // LOG_ASSERT_ERROR(crbg < m_total_bank_groups, "Bank-group index out of bounds");
-    // SubsecondTime group_avail_delay = m_bank_group_avail.size() ? m_bank_group_avail[crbg]->computeQueueDelay(t_now, m_intercommand_delay_long, requester) : SubsecondTime::Zero();
-
-    // // Add device access time (tCAS)
-    // t_now += m_dram_access_cost;
-    // perf->updateTime(t_now, ShmemPerf::DRAM_DEVICE);
-
-    // // Mark bank as busy until it can receive its next command
-    // // Done before waiting for the bus to be free: sort of assumes best-case bus scheduling
-    // bank_info.t_avail = t_now;
-
-    // // Add the wait time for the larger of bank group and rank availability delay
-    // t_now += (rank_avail_delay > group_avail_delay) ? rank_avail_delay : group_avail_delay;
-    // perf->updateTime(t_now, ShmemPerf::DRAM_DEVICE);
-
-    // // DDR bus latency and queuing delay
-    // SubsecondTime ddr_processing_time = m_bus_bandwidth.getRoundedLatency(8 * pkt_size); // bytes to bits
-    // //std::cout << m_bus_bandwidth.getRoundedLatency(8*pkt_size) << std::endl;  
-    // SubsecondTime ddr_queue_delay = m_queue_model.size() ? m_queue_model[channel]->computeQueueDelay(t_now, ddr_processing_time, requester) : SubsecondTime::Zero();
-    // t_now += ddr_queue_delay;
-    // perf->updateTime(t_now, ShmemPerf::DRAM_QUEUE);
-    // t_now += ddr_processing_time;
-    // perf->updateTime(t_now, ShmemPerf::DRAM_BUS);
    
     SubsecondTime cacheline_hw_access_latency = getDramAccessCost(pkt_time, pkt_size, requester, address, perf, false, false, false);
     m_total_local_dram_hardware_latency += cacheline_hw_access_latency;
     m_total_local_dram_hardware_latency_count++;
     SubsecondTime t_now = pkt_time + cacheline_hw_access_latency;
-
-    // Update Memory Counters? 
-    //queue_delay = ddr_queue_delay;
 
     SubsecondTime t_remote_queue_request = t_now;  // time of making queue request (after DRAM hardware access cost added)
 
@@ -2126,8 +1999,6 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
             m_access_latency_outlier_count += 1;
             m_local_access_latency_outlier_count += 1;
         }
-
-        // LOG_PRINT("getAccessLatency branch 1: %lu ns", access_latency.getNS());
         return access_latency;
     } else {
         // The phys_page is an inflight page and m_r_enable_selective_moves is false
@@ -2352,7 +2223,6 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                     }
                 } else {
                     ++m_redundant_moves_type2_cancelled_limit_redundant_moves;
-                    // std::cout << "Inflight page " << phys_page << " redundant moves > limit, = " << m_inflight_redundant[phys_page] << std::endl;
 
                     m_pages_cacheline_request_limit_exceeded.insert(phys_page);
                     if (m_auto_turn_off_partition_queues && cacheline_queue_utilization_percentage > m_turn_off_pq_cacheline_queue_utilization_threshold && m_pages_cacheline_request_limit_exceeded.size() > m_cancel_pq_inflight_buffer_threshold * (m_inflight_pages.size() + m_inflight_pages_extra.size())) {
@@ -2373,7 +2243,6 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
             m_local_access_latency_outlier_count += 1;
         }
 
-        // LOG_PRINT("getAccessLatency branch 2: %lu ns", access_latency.getNS());
         return access_latency;  
     }
 }
@@ -2390,10 +2259,8 @@ DramPerfModelDisagg::isRemoteAccess(IntPtr address, core_id_t requester, DramCnt
         phys_page =  address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1);
 
     if (m_r_mode == 0 || m_r_mode == 4) { // Static partitioning: no data movement and m_r_partitioning_ratio decides how many go where
-        // if (std::find(m_local_pages.begin(), m_local_pages.end(), phys_page) != m_local_pages.end())
         if (m_local_pages.find(phys_page))
             return false;
-        // else if (std::find(m_remote_pages.begin(), m_remote_pages.end(), phys_page) != m_remote_pages.end())
         else if (m_remote_pages.count(phys_page))
             return true;
         else if ( (unsigned int)(rand() % 100) < m_r_partitioning_ratio) {
@@ -2406,7 +2273,6 @@ DramPerfModelDisagg::isRemoteAccess(IntPtr address, core_id_t requester, DramCnt
         }
     }
     else if (m_r_mode == 1 || m_r_mode == 2 || m_r_mode == 3 || m_r_mode == 5) {  // local DRAM as a cache 
-        // if (std::find(m_local_pages.begin(), m_local_pages.end(), phys_page) != m_local_pages.end()) { // Is it in local DRAM?
         if (m_local_pages.find(phys_page)) { // Is it in local DRAM?
             m_local_pages.remove(phys_page); // LRU
             m_local_pages.push_back(phys_page);
@@ -2415,9 +2281,7 @@ DramPerfModelDisagg::isRemoteAccess(IntPtr address, core_id_t requester, DramCnt
             }
             return false;
         }
-        // else if (std::find(m_remote_pages.begin(), m_remote_pages.end(), phys_page) != m_remote_pages.end()) {
         else if (m_remote_pages.count(phys_page)) {
-            // printf("Remote page found: %lx\n", phys_page);
             if (m_use_throttled_pages_tracker && m_use_ideal_page_throttling && m_throttled_pages_tracker.count(phys_page)) {
                 // This is a previously throttled page
                 if (m_moved_pages_no_access_yet.size() > 0) {
@@ -2462,9 +2326,8 @@ DramPerfModelDisagg::isRemoteAccess(IntPtr address, core_id_t requester, DramCnt
             return true;
         }
         else {
-            if (m_remote_init) { // Assuming all pages start off in remote memory
+            if (m_remote_init) {  // Assuming all pages start off in remote memory
                 m_remote_pages.insert(phys_page); 
-                //    printf("Remote page found: %lx\n", phys_page); 
                 return true;
             } else {
                 if (m_local_pages.size() < num_local_pages) {
@@ -2473,7 +2336,6 @@ DramPerfModelDisagg::isRemoteAccess(IntPtr address, core_id_t requester, DramCnt
                 } 
                 else {
                     m_remote_pages.insert(phys_page); 
-                    // printf("Remote page created: %lx\n", phys_page); 
                     return true;
 
                 }
