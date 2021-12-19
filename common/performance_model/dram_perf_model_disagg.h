@@ -338,6 +338,9 @@ class DramPerfModelDisagg : public DramPerfModel
         SubsecondTime possiblyEvict(UInt64 phys_page, SubsecondTime pkt_time, core_id_t requester);
         void possiblyPrefetch(UInt64 phys_page, SubsecondTime pkt_time, core_id_t requester);
 
+        // Compression wrapper function
+        SubsecondTime compress(CompressionModel *compression_model, bool is_cacheline_compression, UInt64 address, size_t size_to_compress, UInt32 *size);
+
         // Helper to print vector percentiles, for stats output
         template<typename T>
         void sortAndPrintVectorPercentiles(std::vector<T>& vec, std::ostringstream& percentages_buffer, std::ostringstream& counts_buffer, UInt32 num_bins = 40);
