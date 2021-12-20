@@ -92,22 +92,24 @@ CompressionModelAdaptive::compress(IntPtr addr, size_t data_size, core_id_t core
         use_low_compression = m_bandwidth_utilization >= m_lower_bandwidth_threshold && m_bandwidth_utilization < m_upper_bandwidth_threshold;
         use_high_compression = m_bandwidth_utilization >= m_upper_bandwidth_threshold;
     } else if (type == 1) {
+        // Note: No longer supported
+
         // Compression latency + queuing latency predictor
         // use_low_compression
         // use_high_compression
 
-        SubsecondTime estimate_low_compression_latency = SubsecondTime::NS((double)m_low_total_compression_latency.getNS() / (double)m_low_compression_count);
-        UInt32 estimate_low_compressed_size = (m_low_compression_count * m_page_size - m_low_bytes_saved) / m_low_compression_count;
-        SubsecondTime estimate_low_queuing_delay = m_queue_model->computeQueueDelayAfterAddNoEffect(m_t_now, m_r_bandwidth->getRoundedLatency(8*estimate_low_compressed_size), m_requester);
+        // SubsecondTime estimate_low_compression_latency = SubsecondTime::NS((double)m_low_total_compression_latency.getNS() / (double)m_low_compression_count);
+        // UInt32 estimate_low_compressed_size = (m_low_compression_count * m_page_size - m_low_bytes_saved) / m_low_compression_count;
+        // SubsecondTime estimate_low_queuing_delay = m_queue_model->computeQueueDelayAfterAddNoEffect(m_t_now, m_r_bandwidth->getRoundedLatency(8*estimate_low_compressed_size), m_requester);
 
-        SubsecondTime estimate_high_compression_latency = SubsecondTime::NS((double)m_high_total_compression_latency.getNS() / (double)m_high_compression_count);
-        UInt32 estimate_high_compressed_size = (m_high_compression_count * m_page_size - m_high_bytes_saved) / m_high_compression_count;
-        SubsecondTime estimate_high_queuing_delay = m_queue_model->computeQueueDelayAfterAddNoEffect(m_t_now, m_r_bandwidth->getRoundedLatency(8*estimate_high_compressed_size), m_requester);
+        // SubsecondTime estimate_high_compression_latency = SubsecondTime::NS((double)m_high_total_compression_latency.getNS() / (double)m_high_compression_count);
+        // UInt32 estimate_high_compressed_size = (m_high_compression_count * m_page_size - m_high_bytes_saved) / m_high_compression_count;
+        // SubsecondTime estimate_high_queuing_delay = m_queue_model->computeQueueDelayAfterAddNoEffect(m_t_now, m_r_bandwidth->getRoundedLatency(8*estimate_high_compressed_size), m_requester);
 
-        // printf("[Adaptive] lcl: %lu, lqd: %lu, hcl: %lu, hqd: %lu\n", estimate_low_compression_latency.getNS(), estimate_low_queuing_delay.getNS(), estimate_high_compression_latency.getNS(), estimate_high_queuing_delay.getNS());
+        // // printf("[Adaptive] lcl: %lu, lqd: %lu, hcl: %lu, hqd: %lu\n", estimate_low_compression_latency.getNS(), estimate_low_queuing_delay.getNS(), estimate_high_compression_latency.getNS(), estimate_high_queuing_delay.getNS());
 
-        use_low_compression = estimate_low_compression_latency + estimate_low_queuing_delay < estimate_high_compression_latency + estimate_high_queuing_delay;
-        use_high_compression = !use_low_compression;
+        // use_low_compression = estimate_low_compression_latency + estimate_low_queuing_delay < estimate_high_compression_latency + estimate_high_queuing_delay;
+        // use_high_compression = !use_low_compression;
     } else if (type == 2) {
         double dynamic_bw_threshold = 0.8;
         if (m_high_compression_rate >= 5) {

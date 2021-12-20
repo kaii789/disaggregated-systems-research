@@ -1037,15 +1037,12 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         if (m_r_cacheline_gran) {
             if (m_r_partition_queues == 1) {
                 m_compression_model->update_bandwidth_utilization(m_data_movement_2->getCachelineQueueUtilizationPercentage(t_now));
-                m_compression_model->update_queue_model(m_data_movement_2, t_now, &m_r_part2_bandwidth, requester);
             }
             else if (m_r_partition_queues == 3 || m_r_partition_queues == 4) {
                 m_compression_model->update_bandwidth_utilization(m_data_movement->getCachelineQueueUtilizationPercentage(t_now));
-                m_compression_model->update_queue_model(m_data_movement, t_now, &m_r_part2_bandwidth, requester);
             }
             else { // ie partition queues off
                 m_compression_model->update_bandwidth_utilization(m_data_movement->getTotalQueueUtilizationPercentage(t_now));
-                m_compression_model->update_queue_model(m_data_movement, t_now, &m_r_bus_bandwidth, requester);
             }
 
             cacheline_compression_latency = compress(m_compression_model, false, phys_page, m_cache_line_size, &size);
@@ -1241,10 +1238,6 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
                     page_size = address_to_compressed_size[phys_page];
                 } else {
                     m_compression_model->update_bandwidth_utilization(m_data_movement->getPageQueueUtilizationPercentage(t_now));
-                    if (m_r_partition_queues == 1 || m_r_partition_queues == 3 || m_r_partition_queues == 4)
-                        m_compression_model->update_queue_model(m_data_movement, t_now, &m_r_part_bandwidth, requester);
-                    else
-                        m_compression_model->update_queue_model(m_data_movement, t_now, &m_r_bus_bandwidth, requester);
 
                     size_t size_to_compress = (m_r_partition_queues) ? m_page_size - m_cache_line_size : m_page_size;
                     page_compression_latency = compress(m_compression_model, false, phys_page, size_to_compress, &page_size);
@@ -2262,11 +2255,6 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
             if (m_use_compression)
             {
                 m_compression_model->update_bandwidth_utilization(m_data_movement->getPageQueueUtilizationPercentage(t_now));
-                if (m_r_partition_queues == 1 || m_r_partition_queues == 3 || m_r_partition_queues == 4)
-                    m_compression_model->update_queue_model(m_data_movement, t_now, &m_r_part_bandwidth, requester);
-                else
-                    m_compression_model->update_queue_model(m_data_movement, t_now, &m_r_bus_bandwidth, requester);
-
                 evict_compression_latency += compress(m_compression_model, false, evicted_page, size, &size);
             }
 
@@ -2324,11 +2312,6 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
             if (m_use_compression)
             {
                 m_compression_model->update_bandwidth_utilization(m_data_movement->getPageQueueUtilizationPercentage(t_now));
-                if (m_r_partition_queues == 1 || m_r_partition_queues == 3 || m_r_partition_queues == 4)
-                    m_compression_model->update_queue_model(m_data_movement, t_now, &m_r_part_bandwidth, requester);
-                else
-                    m_compression_model->update_queue_model(m_data_movement, t_now, &m_r_bus_bandwidth, requester);
-
                 evict_compression_latency += compress(m_compression_model, false, evicted_page, size, &size);
             }
 
@@ -2428,11 +2411,6 @@ DramPerfModelDisagg::possiblyPrefetch(UInt64 phys_page, SubsecondTime t_now, cor
                 size = address_to_compressed_size[phys_page];
             } else {
                 m_compression_model->update_bandwidth_utilization(m_data_movement->getPageQueueUtilizationPercentage(t_now));
-                if (m_r_partition_queues == 1 || m_r_partition_queues == 3 || m_r_partition_queues == 4)
-                    m_compression_model->update_queue_model(m_data_movement, t_now, &m_r_part_bandwidth, requester);
-                else
-                    m_compression_model->update_queue_model(m_data_movement, t_now, &m_r_bus_bandwidth, requester);
-
                 page_compression_latency = compress(m_compression_model, false, pref_page, size, &size);
             }
         }
