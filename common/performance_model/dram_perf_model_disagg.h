@@ -3,7 +3,7 @@
 
 #include "dram_perf_model.h"
 #include "queue_model.h"
-#include "compression_model.h"
+#include "compression_cntlr.h"
 #include "prefetcher_model.h"
 #include "fixed_types.h"
 #include "subsecond_time.h"
@@ -159,22 +159,11 @@ class DramPerfModelDisagg : public DramPerfModel
         std::vector<std::pair<UInt64, UInt32>> m_throttled_pages_tracker_values;       // values to keep track of for stats
         HashedLinkedList m_moved_pages_no_access_yet;                                  // Pages moved from remote to local, but haven't been accessed yet
 
-        // TODO: Compression
+        // Compression
         bool m_use_compression;
-        CompressionModel *m_compression_model;
-        UInt64 bytes_saved = 0;
-        SubsecondTime m_total_compression_latency = SubsecondTime::Zero();
-        SubsecondTime m_total_decompression_latency = SubsecondTime::Zero();
-        std::map<IntPtr, UInt32> address_to_compressed_size;
-        std::map<IntPtr, UInt32> address_to_num_cache_lines;
-
         bool m_use_cacheline_compression;
-        CompressionModel *m_cacheline_compression_model;
-        UInt64 cacheline_bytes_saved = 0;
-        SubsecondTime m_total_cacheline_compression_latency = SubsecondTime::Zero();
-        SubsecondTime m_total_cacheline_decompression_latency = SubsecondTime::Zero();
-
         bool m_use_r_compressed_pages;
+        CompressionController m_compression_controller;
 
         // Prefetcher
         bool m_r_enable_nl_prefetcher;            // Enable prefetcher to prefetch pages from remote DRAM to local DRAM
@@ -337,9 +326,6 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 parseAddressBits(UInt64 address, UInt32 &data, UInt32 offset, UInt32 size, UInt64 base_address);
         SubsecondTime possiblyEvict(UInt64 phys_page, SubsecondTime pkt_time, core_id_t requester);
         void possiblyPrefetch(UInt64 phys_page, SubsecondTime pkt_time, core_id_t requester);
-
-        // Compression wrapper function
-        SubsecondTime compress(CompressionModel *compression_model, bool is_cacheline_compression, UInt64 address, size_t size_to_compress, UInt32 *size);
 
         // Helper to print vector percentiles, for stats output
         template<typename T>

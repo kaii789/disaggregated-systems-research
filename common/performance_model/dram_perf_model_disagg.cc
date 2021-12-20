@@ -196,6 +196,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_remote_access_latency_outlier_count(0)
     , IPC_window_capacity(Sim()->getCfg()->getInt("perf_model/dram/IPC_window_capacity"))
     , m_disturbance_bq_size(Sim()->getCfg()->getInt("perf_model/dram/disturbance_bq_size"))
+    , m_compression_controller(CompressionController(core_id, m_r_cacheline_gran, m_cache_line_size, m_page_size))
 {
     String name("dram"); 
     if (Sim()->getCfg()->getBool("perf_model/dram/queue_model/enabled"))
@@ -280,24 +281,6 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     m_use_compression = Sim()->getCfg()->getBool("perf_model/dram/compression_model/use_compression");
     m_use_cacheline_compression = Sim()->getCfg()->getBool("perf_model/dram/compression_model/cacheline/use_cacheline_compression");
     m_use_r_compressed_pages = Sim()->getCfg()->getBool("perf_model/dram/compression_model/use_r_compressed_pages");
-    if (m_use_compression) {
-        String compression_scheme = Sim()->getCfg()->getString("perf_model/dram/compression_model/compression_scheme");
-        UInt32 gran_size = m_r_cacheline_gran ? m_cache_line_size : m_page_size;
-
-        m_compression_model = CompressionModel::create("Link Compression Model", core_id, gran_size, m_cache_line_size, compression_scheme);
-        registerStatsMetric("compression", core_id, "bytes-saved", &bytes_saved);
-        registerStatsMetric("compression", core_id, "total-compression-latency", &m_total_compression_latency);
-        registerStatsMetric("compression", core_id, "total-decompression-latency", &m_total_decompression_latency);
-
-        // Cacheline Compression
-        if (m_use_cacheline_compression) {
-            String cacheline_compression_scheme = Sim()->getCfg()->getString("perf_model/dram/compression_model/cacheline/compression_scheme");
-            m_cacheline_compression_model = CompressionModel::create("Cacheline Link Compression Model", core_id, m_cache_line_size, m_cache_line_size, cacheline_compression_scheme);
-            registerStatsMetric("compression", core_id, "cacheline-bytes-saved", &cacheline_bytes_saved);
-            registerStatsMetric("compression", core_id, "total-cacheline-compression-latency", &m_total_cacheline_compression_latency);
-            registerStatsMetric("compression", core_id, "total-cacheline-decompression-latency", &m_total_cacheline_decompression_latency);
-        }
-    }
 
     // Prefetcher
     m_r_enable_nl_prefetcher = Sim()->getCfg()->getBool("perf_model/dram/enable_remote_prefetcher");  // Enable prefetcher to prefetch pages from remote DRAM to local DRAM
@@ -584,12 +567,6 @@ DramPerfModelDisagg::finalizeStats()
     m_data_movement->finalizeStats();
     if (m_r_partition_queues == 1) {
         m_data_movement_2->finalizeStats();
-    }
-    // Compression Stats
-    if (m_use_compression) {
-        m_compression_model->finalizeStats();
-        // if (m_use_cacheline_compression)
-        //     m_cacheline_compression_model->finalizeStats();
     }
 
     std::cout << "dram_perf_model_disagg.cc finalizeStats():" << std::endl;
@@ -1036,34 +1013,29 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     {
         if (m_r_cacheline_gran) {
             if (m_r_partition_queues == 1) {
-                m_compression_model->update_bandwidth_utilization(m_data_movement_2->getCachelineQueueUtilizationPercentage(t_now));
+                m_compression_controller.m_compression_model->update_bandwidth_utilization(m_data_movement_2->getCachelineQueueUtilizationPercentage(t_now));
             }
             else if (m_r_partition_queues == 3 || m_r_partition_queues == 4) {
-                m_compression_model->update_bandwidth_utilization(m_data_movement->getCachelineQueueUtilizationPercentage(t_now));
+                m_compression_controller.m_compression_model->update_bandwidth_utilization(m_data_movement->getCachelineQueueUtilizationPercentage(t_now));
             }
             else { // ie partition queues off
-                m_compression_model->update_bandwidth_utilization(m_data_movement->getTotalQueueUtilizationPercentage(t_now));
+                m_compression_controller.m_compression_model->update_bandwidth_utilization(m_data_movement->getTotalQueueUtilizationPercentage(t_now));
             }
 
-            cacheline_compression_latency = compress(m_compression_model, false, phys_page, m_cache_line_size, &size);
+            cacheline_compression_latency = m_compression_controller.compress(false, phys_page, m_cache_line_size, &size);
             t_now += cacheline_compression_latency;
         } else if (m_use_cacheline_compression) {
             if (m_r_partition_queues == 1) {
-                m_cacheline_compression_model->update_bandwidth_utilization(m_data_movement_2->getCachelineQueueUtilizationPercentage(t_now));
-                m_cacheline_compression_model->update_queue_model(m_data_movement_2, t_now, &m_r_part2_bandwidth, requester);
+                m_compression_controller.m_cacheline_compression_model->update_bandwidth_utilization(m_data_movement_2->getCachelineQueueUtilizationPercentage(t_now));
             }
             else if (m_r_partition_queues == 3 || m_r_partition_queues == 4) {
-                m_cacheline_compression_model->update_bandwidth_utilization(m_data_movement->getCachelineQueueUtilizationPercentage(t_now));
-                m_cacheline_compression_model->update_queue_model(m_data_movement, t_now, &m_r_part2_bandwidth, requester);
-
+                m_compression_controller.m_cacheline_compression_model->update_bandwidth_utilization(m_data_movement->getCachelineQueueUtilizationPercentage(t_now));
             }
             else { // ie partition queues off
-                m_cacheline_compression_model->update_bandwidth_utilization(m_data_movement->getTotalQueueUtilizationPercentage(t_now));
-                m_cacheline_compression_model->update_queue_model(m_data_movement, t_now, &m_r_bus_bandwidth, requester);
-
+                m_compression_controller.m_cacheline_compression_model->update_bandwidth_utilization(m_data_movement->getTotalQueueUtilizationPercentage(t_now));
             }
 
-            cacheline_compression_latency = compress(m_cacheline_compression_model, true, phys_page, m_cache_line_size, &size);
+            cacheline_compression_latency = m_compression_controller.compress(true, phys_page, m_cache_line_size, &size);
             t_now += cacheline_compression_latency;
         }
     }
@@ -1111,14 +1083,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     // TODO: Currently model decompression by adding decompression latency to inflight page time
     if (m_use_compression && (m_r_cacheline_gran || m_use_cacheline_compression))
     {
-        CompressionModel *compression_model = m_r_cacheline_gran ? m_compression_model : m_cacheline_compression_model;
-        SubsecondTime decompression_latency = compression_model->decompress(phys_page, address_to_num_cache_lines[phys_page], m_core_id);
-        datamovement_delay += decompression_latency;
-        if (m_r_cacheline_gran)
-            m_total_decompression_latency += decompression_latency;
-        else
-            m_total_cacheline_decompression_latency += decompression_latency;
-
+        datamovement_delay += m_compression_controller.decompress(!m_r_cacheline_gran, phys_page);
     }
 
     // Track access to page
@@ -1234,13 +1199,13 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             // Compress
             if (m_use_compression)
             {
-                if (m_use_r_compressed_pages && address_to_compressed_size.find(phys_page) != address_to_compressed_size.end()) {
-                    page_size = address_to_compressed_size[phys_page];
+                if (m_use_r_compressed_pages && m_compression_controller.address_to_compressed_size.find(phys_page) != m_compression_controller.address_to_compressed_size.end()) {
+                    page_size = m_compression_controller.address_to_compressed_size[phys_page];
                 } else {
-                    m_compression_model->update_bandwidth_utilization(m_data_movement->getPageQueueUtilizationPercentage(t_now));
+                    m_compression_controller.m_compression_model->update_bandwidth_utilization(m_data_movement->getPageQueueUtilizationPercentage(t_now));
 
                     size_t size_to_compress = (m_r_partition_queues) ? m_page_size - m_cache_line_size : m_page_size;
-                    page_compression_latency = compress(m_compression_model, false, phys_page, size_to_compress, &page_size);
+                    page_compression_latency = m_compression_controller.compress(false, phys_page, size_to_compress, &page_size);
                     t_now += page_compression_latency;
                 }
             }
@@ -1299,9 +1264,8 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             SubsecondTime page_decompression_latency = SubsecondTime::Zero();
             if (m_use_compression)
             {
-                page_decompression_latency = m_compression_model->decompress(phys_page, address_to_num_cache_lines[phys_page], m_core_id);
+                page_decompression_latency = m_compression_controller.decompress(false, phys_page);
                 page_datamovement_delay += page_decompression_latency;
-                m_total_decompression_latency += page_decompression_latency;
             }
 
             // Update t_now after page_datamovement_delay includes the decompression latency
@@ -1919,22 +1883,22 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                     {
                         if (m_r_cacheline_gran) {
                             if (m_r_partition_queues == 1)
-                                m_compression_model->update_bandwidth_utilization(m_data_movement_2->getCachelineQueueUtilizationPercentage(t_now));
+                                m_compression_controller.m_compression_model->update_bandwidth_utilization(m_data_movement_2->getCachelineQueueUtilizationPercentage(t_now));
                             else if (m_r_partition_queues > 1)
-                                m_compression_model->update_bandwidth_utilization(m_data_movement->getCachelineQueueUtilizationPercentage(t_now));
+                                m_compression_controller.m_compression_model->update_bandwidth_utilization(m_data_movement->getCachelineQueueUtilizationPercentage(t_now));
                             else  // ie partition queues off
-                                m_compression_model->update_bandwidth_utilization(m_data_movement->getTotalQueueUtilizationPercentage(t_now));
+                                m_compression_controller.m_compression_model->update_bandwidth_utilization(m_data_movement->getTotalQueueUtilizationPercentage(t_now));
 
-                            cacheline_compression_latency = compress(m_compression_model, false, phys_page, m_cache_line_size, &size);
+                            cacheline_compression_latency = m_compression_controller.compress(false, phys_page, m_cache_line_size, &size);
                         } else if (m_use_cacheline_compression) {
                             if (m_r_partition_queues == 1)
-                                m_cacheline_compression_model->update_bandwidth_utilization(m_data_movement_2->getCachelineQueueUtilizationPercentage(t_now));
+                                m_compression_controller.m_cacheline_compression_model->update_bandwidth_utilization(m_data_movement_2->getCachelineQueueUtilizationPercentage(t_now));
                             else if (m_r_partition_queues > 1)
-                                m_cacheline_compression_model->update_bandwidth_utilization(m_data_movement->getCachelineQueueUtilizationPercentage(t_now));
+                                m_compression_controller.m_cacheline_compression_model->update_bandwidth_utilization(m_data_movement->getCachelineQueueUtilizationPercentage(t_now));
                             else  // ie partition queues off
-                                m_cacheline_compression_model->update_bandwidth_utilization(m_data_movement->getTotalQueueUtilizationPercentage(t_now));
+                                m_compression_controller.m_cacheline_compression_model->update_bandwidth_utilization(m_data_movement->getTotalQueueUtilizationPercentage(t_now));
 
-                            cacheline_compression_latency = compress(m_cacheline_compression_model, true, phys_page, m_cache_line_size, &size);
+                            cacheline_compression_latency = m_compression_controller.compress(true, phys_page, m_cache_line_size, &size);
                         }
                     }
                     // For clearer code logic, calculate decompression latency (but not adding it to anything) before computing the queue delay
@@ -1942,12 +1906,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                     // TODO: Currently model decompression by adding decompression latency to inflight page time
                     if (m_use_compression && (m_r_cacheline_gran || m_use_cacheline_compression))
                     {
-                        CompressionModel *compression_model = m_r_cacheline_gran ? m_compression_model : m_cacheline_compression_model;
-                        cacheline_decompression_latency = compression_model->decompress(phys_page, address_to_num_cache_lines[phys_page], m_core_id);
-                        if (m_r_cacheline_gran)
-                            m_total_decompression_latency += cacheline_decompression_latency;
-                        else
-                            m_total_cacheline_decompression_latency += cacheline_decompression_latency;
+                        cacheline_decompression_latency = m_compression_controller.decompress(!m_r_cacheline_gran, phys_page);
                     }
 
                     // Network transmission cost
@@ -2254,8 +2213,8 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
             UInt32 size = m_r_cacheline_gran ? m_cache_line_size : m_page_size;
             if (m_use_compression)
             {
-                m_compression_model->update_bandwidth_utilization(m_data_movement->getPageQueueUtilizationPercentage(t_now));
-                evict_compression_latency += compress(m_compression_model, false, evicted_page, size, &size);
+                m_compression_controller.m_compression_model->update_bandwidth_utilization(m_data_movement->getPageQueueUtilizationPercentage(t_now));
+                evict_compression_latency += m_compression_controller.compress(false, evicted_page, size, &size);
             }
 
             SubsecondTime page_datamovement_delay = SubsecondTime::Zero();
@@ -2278,9 +2237,7 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
             // TODO: Currently model decompression by adding decompression latency to inflight page time
             if (m_use_compression)
             {
-                SubsecondTime decompression_latency = m_compression_model->decompress(evicted_page, address_to_num_cache_lines[evicted_page], m_core_id);
-                page_datamovement_delay += decompression_latency;
-                m_total_decompression_latency += decompression_latency;
+                page_datamovement_delay += m_compression_controller.decompress(false, evicted_page);
             }
 
             // if (std::find(m_remote_pages.begin(), m_remote_pages.end(), evicted_page) == m_remote_pages.end()) {
@@ -2311,8 +2268,8 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
             UInt32 size = m_r_cacheline_gran ? m_cache_line_size : m_page_size;
             if (m_use_compression)
             {
-                m_compression_model->update_bandwidth_utilization(m_data_movement->getPageQueueUtilizationPercentage(t_now));
-                evict_compression_latency += compress(m_compression_model, false, evicted_page, size, &size);
+                m_compression_controller.m_compression_model->update_bandwidth_utilization(m_data_movement->getPageQueueUtilizationPercentage(t_now));
+                evict_compression_latency += m_compression_controller.compress(false, evicted_page, size, &size);
             }
 
             SubsecondTime page_datamovement_delay = SubsecondTime::Zero();
@@ -2335,9 +2292,7 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
             // TODO: Currently model decompression by adding decompression latency to inflight page time
             if (m_use_compression)
             {
-                SubsecondTime decompression_latency = m_compression_model->decompress(evicted_page, address_to_num_cache_lines[evicted_page], m_core_id);
-                page_datamovement_delay += decompression_latency;
-                m_total_decompression_latency += decompression_latency;
+                page_datamovement_delay += m_compression_controller.decompress(false, evicted_page);
             }
 
             // Compute network transmission delay
@@ -2407,11 +2362,11 @@ DramPerfModelDisagg::possiblyPrefetch(UInt64 phys_page, SubsecondTime t_now, cor
         SubsecondTime page_compression_latency = SubsecondTime::Zero();  // when page compression is not enabled, this is always 0
         if (m_use_compression)
         {
-            if (m_use_r_compressed_pages && address_to_compressed_size.find(phys_page) != address_to_compressed_size.end()) {
-                size = address_to_compressed_size[phys_page];
+            if (m_use_r_compressed_pages && m_compression_controller.address_to_compressed_size.find(phys_page) != m_compression_controller.address_to_compressed_size.end()) {
+                size = m_compression_controller.address_to_compressed_size[phys_page];
             } else {
-                m_compression_model->update_bandwidth_utilization(m_data_movement->getPageQueueUtilizationPercentage(t_now));
-                page_compression_latency = compress(m_compression_model, false, pref_page, size, &size);
+                m_compression_controller.m_compression_model->update_bandwidth_utilization(m_data_movement->getPageQueueUtilizationPercentage(t_now));
+                page_compression_latency = m_compression_controller.compress(false, pref_page, size, &size);
             }
         }
 
@@ -2439,9 +2394,7 @@ DramPerfModelDisagg::possiblyPrefetch(UInt64 phys_page, SubsecondTime t_now, cor
         // TODO: Currently model decompression by adding decompression latency to inflight page time
         if (m_use_compression)
         {
-            SubsecondTime decompression_latency = m_compression_model->decompress(pref_page, address_to_num_cache_lines[pref_page], m_core_id);
-            page_datamovement_delay += decompression_latency;
-            m_total_decompression_latency += decompression_latency;
+            page_datamovement_delay += m_compression_controller.decompress(false, pref_page);
         }
 
         // assert(std::find(m_local_pages.begin(), m_local_pages.end(), pref_page) == m_local_pages.end()); 
@@ -2463,35 +2416,4 @@ DramPerfModelDisagg::possiblyPrefetch(UInt64 phys_page, SubsecondTime t_now, cor
             m_max_total_bufferspace++;  // update stat
         possiblyEvict(phys_page, t_remote_queue_request, requester);
     }
-}
-
-SubsecondTime
-DramPerfModelDisagg::compress(CompressionModel *compression_model, bool is_cacheline_compression, UInt64 address, size_t size_to_compress, UInt32 *size)
-{
-    UInt32 compressed_cache_lines;
-    SubsecondTime compression_latency = compression_model->compress(address, size_to_compress, m_core_id, size, &compressed_cache_lines);
-    UInt32 size_val = *size;
-    if (size_to_compress > size_val) {
-        if (!is_cacheline_compression)
-            bytes_saved += size_to_compress - size_val;
-        else
-            cacheline_bytes_saved += size_to_compress - size_val;
-    }
-    else {
-        if (!is_cacheline_compression)
-            bytes_saved -= size_val - size_to_compress;
-        else
-            cacheline_bytes_saved -= size_val - size_to_compress;
-    }
-
-    if (!is_cacheline_compression)
-        address_to_compressed_size[address] = size_val;
-    address_to_num_cache_lines[address] = compressed_cache_lines;
-
-    if (!is_cacheline_compression)
-        m_total_compression_latency += compression_latency;
-    else
-        m_total_cacheline_compression_latency += compression_latency;
-
-    return compression_latency;
 }
