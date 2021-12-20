@@ -2257,6 +2257,7 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
     // NOT the page to be evicted!
     // This function can only evict one page per function call
     SubsecondTime sw_overhead = SubsecondTime::Zero();
+    SubsecondTime evict_compression_latency = SubsecondTime::Zero();
     UInt64 evicted_page; 
 
     UInt64 num_local_pages = m_localdram_size/m_page_size;
@@ -2309,21 +2310,52 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
 
             // Compress
             UInt32 size = m_r_cacheline_gran ? m_cache_line_size : m_page_size;
+            if (m_use_compression)
+            {
+                m_compression_model->update_bandwidth_utilization(m_data_movement->getPageQueueUtilizationPercentage(t_now));
+                if (m_r_partition_queues == 1 || m_r_partition_queues == 3 || m_r_partition_queues == 4)
+                    m_compression_model->update_queue_model(m_data_movement, t_now, &m_r_part_bandwidth, requester);
+                else
+                    m_compression_model->update_queue_model(m_data_movement, t_now, &m_r_bus_bandwidth, requester);
+
+                // UInt32 gran_size = size;
+                // UInt32 compressed_cache_lines;
+                // SubsecondTime compression_latency = m_compression_model->compress(evicted_page, gran_size, m_core_id, &size, &compressed_cache_lines);
+                // if (gran_size > size)
+                //     bytes_saved += gran_size - size;
+                // else
+                //     bytes_saved -= size - gran_size;
+ 
+                // address_to_compressed_size[evicted_page] = size;
+                // address_to_num_cache_lines[evicted_page] = compressed_cache_lines;
+                // evict_compression_latency += compression_latency;
+                // m_total_compression_latency += compression_latency;
+                evict_compression_latency += compress(m_compression_model, false, evicted_page, size, &size);
+            }
+
             SubsecondTime page_datamovement_delay = SubsecondTime::Zero();
             if (m_r_simulate_datamov_overhead) { 
                 if (m_r_partition_queues == 1) {
-                    page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request, m_r_part_bandwidth.getRoundedLatency(8*size), size, queue_request_type, requester);
+                    page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + evict_compression_latency, m_r_part_bandwidth.getRoundedLatency(8*size), size, queue_request_type, requester);
                 } else if (m_r_partition_queues == 2) {
-                    page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request, m_r_bus_bandwidth.getRoundedLatency(8*size), size, queue_request_type, requester);
+                    page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + evict_compression_latency, m_r_bus_bandwidth.getRoundedLatency(8*size), size, queue_request_type, requester);
                 } else if (m_r_partition_queues == 3) {
-                    page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request, m_r_part_bandwidth.getRoundedLatency(8*size), size, queue_request_type, requester);
+                    page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + evict_compression_latency, m_r_part_bandwidth.getRoundedLatency(8*size), size, queue_request_type, requester);
                 } else if (m_r_partition_queues == 4) {
-                    page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request, m_r_part_bandwidth.getRoundedLatency(8*size), size, queue_request_type, requester);
+                    page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + evict_compression_latency, m_r_part_bandwidth.getRoundedLatency(8*size), size, queue_request_type, requester);
                 } /* else if (m_r_cacheline_gran) {
-                    page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request, m_r_bus_bandwidth.getRoundedLatency(8*size), size, queue_request_type, requester);
+                    page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + evict_compression_latency, m_r_bus_bandwidth.getRoundedLatency(8*size), size, queue_request_type, requester);
                 } */ else {
-                    page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request, m_r_bus_bandwidth.getRoundedLatency(8*size), size, queue_request_type, requester);
+                    page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + evict_compression_latency, m_r_bus_bandwidth.getRoundedLatency(8*size), size, queue_request_type, requester);
                 }
+            }
+
+            // TODO: Currently model decompression by adding decompression latency to inflight page time
+            if (m_use_compression)
+            {
+                SubsecondTime decompression_latency = m_compression_model->decompress(evicted_page, address_to_num_cache_lines[evicted_page], m_core_id);
+                page_datamovement_delay += decompression_latency;
+                m_total_decompression_latency += decompression_latency;
             }
 
             // if (std::find(m_remote_pages.begin(), m_remote_pages.end(), evicted_page) == m_remote_pages.end()) {
@@ -2338,7 +2370,7 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
             else
                 page_network_processing_time = m_r_bus_bandwidth.getRoundedLatency(8*size);
 
-            m_inflightevicted_pages[evicted_page] = t_remote_queue_request + page_datamovement_delay + page_network_processing_time;
+            m_inflightevicted_pages[evicted_page] = t_remote_queue_request + evict_compression_latency + page_datamovement_delay + page_network_processing_time;
             if (m_inflightevicted_pages.size() > m_max_inflightevicted_bufferspace)
                 m_max_inflightevicted_bufferspace++;
             if (m_inflight_pages.size() + m_inflightevicted_pages.size() > m_max_total_bufferspace)
@@ -2350,22 +2382,54 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
             m_remote_pages.insert(evicted_page);
             ++m_page_moves;
 
+            // Compress
             UInt32 size = m_r_cacheline_gran ? m_cache_line_size : m_page_size;
+            if (m_use_compression)
+            {
+                m_compression_model->update_bandwidth_utilization(m_data_movement->getPageQueueUtilizationPercentage(t_now));
+                if (m_r_partition_queues == 1 || m_r_partition_queues == 3 || m_r_partition_queues == 4)
+                    m_compression_model->update_queue_model(m_data_movement, t_now, &m_r_part_bandwidth, requester);
+                else
+                    m_compression_model->update_queue_model(m_data_movement, t_now, &m_r_bus_bandwidth, requester);
+
+                // UInt32 gran_size = size;
+                // UInt32 compressed_cache_lines;
+                // SubsecondTime compression_latency = m_compression_model->compress(evicted_page, gran_size, m_core_id, &size, &compressed_cache_lines);
+                // if (gran_size > size)
+                //     bytes_saved += gran_size - size;
+                // else
+                //     bytes_saved -= size - gran_size;
+ 
+                // address_to_compressed_size[evicted_page] = size;
+                // address_to_num_cache_lines[evicted_page] = compressed_cache_lines;
+                // evict_compression_latency += compression_latency;
+                // m_total_compression_latency += compression_latency;
+                evict_compression_latency += compress(m_compression_model, false, evicted_page, size, &size);
+            }
+
             SubsecondTime page_datamovement_delay = SubsecondTime::Zero();
             if (m_r_simulate_datamov_overhead) {
                 if (m_r_partition_queues == 1) {
-                    page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request, m_r_part_bandwidth.getRoundedLatency(8*size), size, queue_request_type, requester);
+                    page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + evict_compression_latency, m_r_part_bandwidth.getRoundedLatency(8*size), size, queue_request_type, requester);
                 } else if (m_r_partition_queues == 2) {
-                    page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request, m_r_bus_bandwidth.getRoundedLatency(8*size), size, queue_request_type, requester);
+                    page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + evict_compression_latency, m_r_bus_bandwidth.getRoundedLatency(8*size), size, queue_request_type, requester);
                 } else if (m_r_partition_queues == 3) {
-                    page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request, m_r_part_bandwidth.getRoundedLatency(8*size), size, queue_request_type, requester);
+                    page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + evict_compression_latency, m_r_part_bandwidth.getRoundedLatency(8*size), size, queue_request_type, requester);
                 } else if (m_r_partition_queues == 4) {
-                    page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request, m_r_part_bandwidth.getRoundedLatency(8*size), size, queue_request_type, requester);
+                    page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + evict_compression_latency, m_r_part_bandwidth.getRoundedLatency(8*size), size, queue_request_type, requester);
                 } /* else if (m_r_cacheline_gran) {
-                    page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request, m_r_bus_bandwidth.getRoundedLatency(8*size), size, queue_request_type, requester);
+                    page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + evict_compression_latency, m_r_bus_bandwidth.getRoundedLatency(8*size), size, queue_request_type, requester);
                 } */ else {
-                    page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request, m_r_bus_bandwidth.getRoundedLatency(8*size), size, queue_request_type, requester);
+                    page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + evict_compression_latency, m_r_bus_bandwidth.getRoundedLatency(8*size), size, queue_request_type, requester);
                 }
+            }
+
+            // TODO: Currently model decompression by adding decompression latency to inflight page time
+            if (m_use_compression)
+            {
+                SubsecondTime decompression_latency = m_compression_model->decompress(evicted_page, address_to_num_cache_lines[evicted_page], m_core_id);
+                page_datamovement_delay += decompression_latency;
+                m_total_decompression_latency += decompression_latency;
             }
 
             // Compute network transmission delay
@@ -2374,7 +2438,7 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
             else
                 page_network_processing_time = m_r_bus_bandwidth.getRoundedLatency(8*size);
 
-            m_inflightevicted_pages[evicted_page] = t_remote_queue_request + page_datamovement_delay + page_network_processing_time;
+            m_inflightevicted_pages[evicted_page] = t_remote_queue_request + evict_compression_latency + page_datamovement_delay + page_network_processing_time;
             if (m_inflightevicted_pages.size() > m_max_inflightevicted_bufferspace)
                 m_max_inflightevicted_bufferspace++;
             if (m_inflight_pages.size() + m_inflightevicted_pages.size() > m_max_total_bufferspace)
@@ -2383,6 +2447,7 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
 
         m_dirty_pages.erase(evicted_page);
     }
+    // return sw_overhead + evict_compression_latency;
     return sw_overhead;  // latencies that are on the critical path
 }
 
