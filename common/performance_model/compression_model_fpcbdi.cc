@@ -196,7 +196,7 @@ CompressionModelFPCBDI::checkDeltaLimits(SInt64 delta, UInt32 delta_size)
 {
     bool within_limits = true;
     SInt8 cur_byte;
-    for(SInt8 j = delta_size; j < sizeof(SInt64); j++) {     
+    for(SInt8 j = delta_size; j < (SInt8)sizeof(SInt64); j++) {     
         cur_byte = (delta >> (8*j)) & 0xff; // Get j-th byte from the word
         if (cur_byte != 0)
             within_limits = false;
@@ -347,7 +347,7 @@ CompressionModelFPCBDI::compressCacheLine(void* in, void* out)
 	UInt32 mask_to_bits[6] = {3, 4, 8, 16, 16, 16};
     UInt8 *fpc_chosen_options = new UInt8[(m_cache_line_size * 8) / 32];
 
-	for (int i = 0; i < (m_cache_line_size * 8) / 32; i++)
+	for (UInt32 i = 0; i < (m_cache_line_size * 8) / 32; i++)
 	{
 		UInt32 word = cache_line[i];
         fpc_chosen_options[i] = 42;
@@ -377,7 +377,7 @@ CompressionModelFPCBDI::compressCacheLine(void* in, void* out)
             bool repeated = true;
             SInt8 base = word & repeated_mask;
             for (int j = 1; j < 4; j++)
-                if ((word & (repeated_mask << (j * 8))) >> (j * 8) != base) {
+                if ((word & (repeated_mask << (j * 8))) >> (j * 8) != (UInt8)base) {
                     repeated = false;
                     break;
                 }
@@ -443,7 +443,7 @@ CompressionModelFPCBDI::compressCacheLine(void* in, void* out)
         // BDI-Option 15: base_size = 2 bytes, delta_size = 1 byte
         for (b = 8; b >= 2; b /= 2) {
             for(d = 1; d < b; d++){
-                assert(cur_option < m_options);
+                assert(cur_option < (SInt32)m_options);
                 specializedCompress(in, &(m_options_compress_info[cur_option]), (void*)m_options_data_buffer[cur_option], b, d);
                 cur_option++;
             }
@@ -458,7 +458,7 @@ CompressionModelFPCBDI::compressCacheLine(void* in, void* out)
         // BDI-Option 10: base_size = 2 bytes, delta_size = 1 byte
         for (b = 8; b >= 2; b /= 2) {
             for(d = 1; d <= (b/2); d *= 2){
-                assert(cur_option < m_options);
+                assert(cur_option < (SInt32)m_options);
                 specializedCompress(in, &(m_options_compress_info[cur_option]), (void*)m_options_data_buffer[cur_option], b, d);
                 cur_option++;
             }
@@ -482,7 +482,7 @@ CompressionModelFPCBDI::compressCacheLine(void* in, void* out)
     // Select best option between BDI and FPC
     if(fpc_compressed_size_bits < bdi_compressed_size_bits) { // FPC is selected
         compressed_size_bits = fpc_compressed_size_bits;
-	    for (int i = 0; i < (m_cache_line_size * 8) / 32; i++) {
+	    for (UInt32 i = 0; i < (m_cache_line_size * 8) / 32; i++) {
             if(fpc_chosen_options[i] < 6) {
                 m_compress_options[fpc_chosen_options[i]]++;
                 m_bits_saved_per_option[fpc_chosen_options[i]] += 32 - m_prefix_len - mask_to_bits[fpc_chosen_options[i]]; 

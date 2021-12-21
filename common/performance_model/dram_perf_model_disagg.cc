@@ -1123,7 +1123,7 @@ DramPerfModelDisagg::updateLocalIPCStat(UInt64 instr_count)
         UInt64 instructions = IPC_window_end_instr_count - IPC_window_start_instr_count;
         UInt64 cycles = converter.subsecondTimeToCycles(SubsecondTime::NS(1000) * IPC_window_capacity);
         double IPC = instructions / (double) cycles;
-        std::round(IPC * 100000.0) / 100000.0;
+        IPC = std::round(IPC * 100000.0) / 100000.0;
         m_local_IPCs.push_back(IPC);
         m_instruction_count_x_axis.push_back(IPC_window_end_instr_count);
 

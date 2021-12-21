@@ -56,7 +56,7 @@ CompressionModelLCP::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
         UInt32 compressed_size = target * m_cacheline_count + 64; // Init w/ compressed data region + metadata region size
 
         // Account for exception storage region
-        for (int j = 0; j < m_cacheline_count; j++) {
+        for (UInt32 j = 0; j < m_cacheline_count; j++) {
             if (m_compressed_cache_line_sizes[j] > target) {
                 compressed_size += m_cache_line_size;
             } else {

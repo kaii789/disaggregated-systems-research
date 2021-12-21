@@ -82,11 +82,11 @@ CompressionModelAdaptive::compress(IntPtr addr, size_t data_size, core_id_t core
     SubsecondTime compression_latency = SubsecondTime::Zero();
 
     int type = m_type;
-    if ((type == 1 || type == 3) && (m_low_compression_count < m_type_switch_threshold || m_high_compression_count < m_type_switch_threshold))
+    if ((type == 1 || type == 3) && (m_low_compression_count < (UInt64)m_type_switch_threshold || m_high_compression_count < (UInt64)m_type_switch_threshold))
         type = 2;
 
-    bool use_low_compression;
-    bool use_high_compression;
+    bool use_low_compression = true;
+    bool use_high_compression = false;
     if (type == 0) {
         // Fixed BW Threshold
         use_low_compression = m_bandwidth_utilization >= m_lower_bandwidth_threshold && m_bandwidth_utilization < m_upper_bandwidth_threshold;
@@ -206,7 +206,7 @@ CompressionModelAdaptive::compress(IntPtr addr, size_t data_size, core_id_t core
         double high_compression_ratio = (double)m_page_size / (double)high_compressed_size;
         high_compression_ratio_window.push(high_compression_ratio);
         high_compression_ratio_sum += high_compression_ratio;
-        if (high_compression_ratio_window.size() > window_capacity) {
+        if (high_compression_ratio_window.size() > (size_t)window_capacity) {
             high_compression_ratio_sum -= high_compression_ratio_window.front();
             high_compression_ratio_window.pop();
         }
@@ -214,7 +214,7 @@ CompressionModelAdaptive::compress(IntPtr addr, size_t data_size, core_id_t core
         double low_compression_ratio = (double)m_page_size / (double)low_compressed_size;
         low_compression_ratio_window.push(low_compression_ratio);
         low_compression_ratio_sum += low_compression_ratio;
-        if (low_compression_ratio_window.size() > window_capacity) {
+        if (low_compression_ratio_window.size() > (size_t)window_capacity) {
             low_compression_ratio_sum -= low_compression_ratio_window.front();
             low_compression_ratio_window.pop();
         }
