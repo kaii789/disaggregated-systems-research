@@ -8,8 +8,8 @@ CompressionModelZlib::CompressionModelZlib(String name, UInt32 id, UInt32 page_s
     : m_name(name)
     , m_page_size(page_size)
     , m_cache_line_size(cache_line_size)
-    , m_compression_granularity(Sim()->getCfg()->getInt("perf_model/dram/compression_model/zlib/compression_granularity"))
     , m_num_overflowed_pages(0)
+    , m_compression_granularity(Sim()->getCfg()->getInt("perf_model/dram/compression_model/zlib/compression_granularity"))
 {
     // Set compression/decompression cycle latencies if configured
     if (Sim()->getCfg()->getInt("perf_model/dram/compression_model/zlib/compression_latency") != -1)
@@ -51,7 +51,7 @@ CompressionModelZlib::compress(IntPtr addr, size_t data_size, core_id_t core_id,
     // Zlib
     int total_bytes = 0;
     uLongf compressed_size = m_compression_granularity;
-    for (int i = 0; i < m_page_size / (UInt32)m_compression_granularity; i++) {
+    for (UInt32 i = 0; i < m_page_size / (UInt32)m_compression_granularity; i++) {
         int res = compress2((Bytef*)&m_compressed_data_buffer[total_bytes], &compressed_size, (Bytef*)&m_data_buffer[m_compression_granularity * i], (uLongf)m_compression_granularity, Z_DEFAULT_COMPRESSION);
         if (res == Z_OK) {
             total_bytes += compressed_size;
@@ -62,7 +62,7 @@ CompressionModelZlib::compress(IntPtr addr, size_t data_size, core_id_t core_id,
         }
     }
 
-    if (total_bytes > m_page_size) {
+    if ((UInt32)total_bytes > m_page_size) {
         m_num_overflowed_pages++;
         //printf("[Zlib] Compressed size is bigger than page: %d bytes", total_bytes);
     }

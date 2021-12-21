@@ -533,7 +533,7 @@ DramPerfModelDisaggMultipage::getAccessLatencyRemote(SubsecondTime pkt_time, UIn
                 UInt32 page_size = m_page_size * m_page_buffer_capacity; // Actually multipage size
                 if (m_use_compression)
                 {
-                    UInt32 compressed_cache_lines;
+                    // UInt32 compressed_cache_lines;
                     SubsecondTime compression_latency = m_compression_model->compress_multipage(page_buffer, m_page_buffer_capacity, m_core_id, &page_size, &address_to_num_cache_lines); // TODO:
                     bytes_saved += m_page_size * m_page_buffer_capacity - page_size;
                     // address_to_compressed_size[phys_page] = page_size;
@@ -612,7 +612,7 @@ DramPerfModelDisaggMultipage::getAccessLatency(SubsecondTime pkt_time, UInt64 pk
     UInt64 phys_page = address & ~((UInt64(1) << floorLog2(m_page_size)) - 1);
     if(m_r_cacheline_gran) 
         phys_page =  address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1); // Was << 6
-    UInt64 cacheline =  address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1); // Was << 6
+    // UInt64 cacheline =  address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1); // Was << 6
 
     if (m_page_usage_map.count(phys_page) == 0) {
         ++m_unique_pages_accessed;

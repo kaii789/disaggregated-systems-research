@@ -7,8 +7,8 @@ CompressionModelLZ4::CompressionModelLZ4(String name, UInt32 id, UInt32 page_siz
     : m_name(name)
     , m_page_size(page_size)
     , m_cache_line_size(cache_line_size)
-    , m_compression_granularity(Sim()->getCfg()->getInt("perf_model/dram/compression_model/lz4/compression_granularity"))
     , m_freq_norm(Sim()->getCfg()->getFloat("perf_model/dram/compression_model/lz4/frequency_normalization"))
+    , m_compression_granularity(Sim()->getCfg()->getInt("perf_model/dram/compression_model/lz4/compression_granularity"))
 {
     // Set compression/decompression cycle latencies if configured
     if (Sim()->getCfg()->getInt("perf_model/dram/compression_model/lz4/compression_latency") != -1)
@@ -49,7 +49,7 @@ CompressionModelLZ4::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
     // LZ4
     int total_bytes = 0;
     double compression_latency = 0;
-    for (int i = 0; i < m_page_size / (UInt32)m_compression_granularity; i++) {
+    for (UInt32 i = 0; i < m_page_size / (UInt32)m_compression_granularity; i++) {
         clock_t begin = clock();
         total_bytes += LZ4_compress_default(&m_data_buffer[m_compression_granularity * i], &m_compressed_data_buffer[total_bytes], m_compression_granularity, m_max_dst_size);
         clock_t end = clock();
@@ -97,7 +97,7 @@ CompressionModelLZ4::decompress(IntPtr addr, UInt32 compressed_cache_lines, core
     if (m_compression_granularity == -1) {
         total_bytes = LZ4_compress_default(m_data_buffer, m_compressed_data_buffer, m_page_size, m_page_size);
     } else {
-        for (int i = 0; i < m_page_size / (UInt32)m_compression_granularity; i++) {
+        for (UInt32 i = 0; i < m_page_size / (UInt32)m_compression_granularity; i++) {
             total_bytes += LZ4_compress_default(&m_data_buffer[m_compression_granularity * i], &m_compressed_data_buffer[total_bytes], m_compression_granularity, m_max_dst_size);
         }
     }

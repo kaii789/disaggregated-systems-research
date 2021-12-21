@@ -58,8 +58,8 @@ CompressionModelFPC::~CompressionModelFPC()
     delete [] m_data_buffer;
     delete [] m_compressed_data_buffer;
     delete [] m_compressed_cache_line_sizes;
-    delete [] pattern_to_compressed_words;
-    delete [] pattern_to_bytes_saved;
+    // delete [] pattern_to_compressed_words;
+    // delete [] pattern_to_bytes_saved;
 }
 
 void CompressionModelFPC::finalizeStats()
@@ -124,7 +124,7 @@ UInt32 CompressionModelFPC::compressCacheLine(void* _inbuf, void* _outbuf)
 	UInt32 compressed_size_bits = 0;
 	UInt32 mask_to_bits[6] = {3, 4, 8, 16, 16, 16};
 
-	for (int i = 0; i < (m_cache_line_size * 8) / 32; i++)
+	for (UInt32 i = 0; i < (m_cache_line_size * 8) / 32; i++)
 	{
 		UInt32 word = cache_line[i];
 
@@ -151,7 +151,7 @@ UInt32 CompressionModelFPC::compressCacheLine(void* _inbuf, void* _outbuf)
             bool repeated = true;
             SInt8 base = word & repeated_mask;
             for (int j = 1; j < 4; j++)
-                if ((word & (repeated_mask << (j * 8))) >> (j * 8) != base) {
+                if ((word & (repeated_mask << (j * 8))) >> (j * 8) != (UInt8)base) {
                     repeated = false;
                     break;
                 }

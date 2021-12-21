@@ -80,7 +80,7 @@ CompressionModelFVE::compress(IntPtr addr, size_t data_size, core_id_t core_id, 
         //if (m_compressed_cache_line_sizes[i] < m_cache_line_size) // FIXME
         //    total_compressed_words++;
         curr_compressed_words = (UInt32) ((SInt32) ((SInt32) m_compressed_cache_line_sizes[i] - (SInt32) (m_cache_line_size * 8 / m_word_size_bits) - (SInt32) (m_cache_line_size * 8)) / (SInt32) (floorLog2(m_cam_size) - m_word_size_bits));
-        assert(curr_compressed_words >= 0);
+        // assert(curr_compressed_words >= 0);
         assert(curr_compressed_words <= (m_cache_line_size * 8 / m_word_size_bits));
         total_compressed_words += curr_compressed_words;
     }

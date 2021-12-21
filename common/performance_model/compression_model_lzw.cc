@@ -124,15 +124,15 @@ CompressionModelLZW::finalizeStats()
         for (UInt32 i = 0; i < m_dictsize_saved_stats_num_points - 1; ++i) {
             UInt64 index = (UInt64)((double)(i + 1) / m_dictsize_saved_stats_num_points * (dictsize_saved_counts.size() - 1));
             dictsize_count_stats[i] = (UInt64) dictsize_saved_counts[index].first; // Store the dictionary size
-            for(SInt32 j = prev_index + 1; j <= index; j++) 
+            for(SInt32 j = prev_index + 1; j <= (SInt32)index; j++) 
                 bytes_saved += dictsize_saved_counts[j].second;
             bytes_saved_count_stats[i] = bytes_saved; // Store the number of bytes saved for that range of dictionary size
 
-            for(SInt32 j = prev_index + 1; j <= index; j++) 
+            for(SInt32 j = prev_index + 1; j <= (SInt32)index; j++) 
                 accesses += dictsize_accesses_counts[j].second;
             accesses_count_stats[i] = accesses; // Store the number of accesses for that range of dictionary size
 
-            for(SInt32 j = prev_index + 1; j <= index; j++) 
+            for(SInt32 j = prev_index + 1; j <= (SInt32)index; j++) 
                 if(dictsize_max_entry_counts[j].second > max_entry)
                     max_entry = dictsize_max_entry_counts[j].second;
             max_entry_bytes_count_stats[i] = (UInt64) max_entry;
@@ -146,15 +146,15 @@ CompressionModelLZW::finalizeStats()
 
         // Make sure last one is p100
         dictsize_count_stats[m_dictsize_saved_stats_num_points - 1] = (UInt64) dictsize_saved_counts[dictsize_saved_counts.size() - 1].first;
-        for(SInt32 j = prev_index + 1; j <= dictsize_saved_counts.size() - 1; j++) 
+        for(SInt32 j = prev_index + 1; j <= (SInt32)dictsize_saved_counts.size() - 1; j++) 
             bytes_saved += dictsize_saved_counts[j].second;
         total_bytes_saved += bytes_saved;
         bytes_saved_count_stats[m_dictsize_saved_stats_num_points - 1] = bytes_saved; // Store the number of bytes saved for that range of dictionary size
         std::cout << "Total bytes saved: " << total_bytes_saved << std::endl;
-        for(SInt32 j = prev_index + 1; j <= dictsize_accesses_counts.size() - 1; j++) 
+        for(SInt32 j = prev_index + 1; j <= (SInt32)dictsize_accesses_counts.size() - 1; j++) 
             accesses += dictsize_accesses_counts[j].second;
         accesses_count_stats[m_dictsize_saved_stats_num_points - 1] = accesses; // Store the number of accesses for that range of dictionary size
-        for(SInt32 j = prev_index + 1; j <= dictsize_max_entry_counts.size() - 1; j++) 
+        for(SInt32 j = prev_index + 1; j <= (SInt32)dictsize_max_entry_counts.size() - 1; j++) 
             if(dictsize_max_entry_counts[j].second > max_entry)
                 max_entry = dictsize_max_entry_counts[j].second;
         max_entry_bytes_count_stats[m_dictsize_saved_stats_num_points - 1] = (UInt64) max_entry;
@@ -350,7 +350,7 @@ CompressionModelLZW::compressData(void* in, void* out, UInt32 data_size, UInt32 
 
     UInt32 accesses = 0;
     UInt32 i = 0;
-    UInt32 out_indx = 0;
+    // UInt32 out_indx = 0;
     UInt32 inserts = 0;
     SInt64 cur_word;
     bool found, inserted;
