@@ -8,6 +8,7 @@
 #include "config.hpp"
 #include "log.h"
 #include "stats.h"
+#include "print_utils.h"
 
 // #include <algorithm>
 
@@ -135,43 +136,17 @@ QueueModelWindowedMG1RemoteIndQueues::~QueueModelWindowedMG1RemoteIndQueues()
       return;
    }
    // Print one time debug output in the destructor method, to be printed once when the program finishes
-   // if (m_effective_bandwidth_tracker.size() < 1) {
-   //    return;
-   // }
    std::cout << "Queue " << m_name << ":" << std::endl; 
    std::cout << "m_max_effective_bandwidth gave: " << 1000 * m_max_effective_bandwidth << " GB/s" << std::endl;
 
-   // // Compute approximate percentiles of m_effective_bandwidth_tracker
-   // std::sort(m_effective_bandwidth_tracker.begin(), m_effective_bandwidth_tracker.end());
-
-   // // Compute percentiles for stats
-   // UInt64 index;
-   // double percentile;
-   
-   // // Compute more percentiles for output
-   // UInt32 num_bins = 40;  // the total number of points is 1 more than num_bins, since it includes the endpoints
-   // std::map<double, double> effective_bandwidth_percentiles;
-   // for (UInt32 bin = 0; bin < num_bins; ++bin) {
-   //    double percentage = (double)bin / num_bins;
-   //    index = (UInt64)(percentage * (m_effective_bandwidth_tracker.size() - 1));  // -1 so array indices don't go out of bounds
-   //    percentile = m_effective_bandwidth_tracker[index];  // in bytes/ps
-   //    std::cout << "percentage: " << percentage << ", vector index: " << index << ", percentile: " << 1000 * percentile << " GB/s" << std::endl;
-   //    effective_bandwidth_percentiles.insert(std::pair<double, double>(percentage, percentile));
+   // if (m_effective_bandwidth_tracker.size() > 0) {
+   //    // Compute approximate percentiles of m_effective_bandwidth_tracker
+   //    std::cout << "True page locality measure:" << std::endl;
+   //    std::ostringstream percentages_buffer, cdf_buffer;
+   //    sortAndPrintVectorPercentiles(m_effective_bandwidth_tracker, percentages_buffer, cdf_buffer);
+   //    std::cout << "CDF X values (bandwidth), in GB/s:\n" << cdf_buffer.str() << std::endl;
+   //    std::cout << "CDF Y values (probability):\n" << percentages_buffer.str() << std::endl;
    // }
-   // // Print output in format that can easily be graphed in Python
-   // std::ostringstream percentages_buffer;
-   // std::ostringstream cdf_buffer;
-   // percentages_buffer << "[";
-   // cdf_buffer << "[";
-   // for (std::map<double, double>::iterator it = effective_bandwidth_percentiles.begin(); it != effective_bandwidth_percentiles.end(); ++it) {
-   //    percentages_buffer << it->first << ", ";
-   //    cdf_buffer << 1000 * it->second << ", ";  // Convert to GB/s
-   // }
-   // percentages_buffer << "]";
-   // cdf_buffer << "]";
-
-   // std::cout << "CDF X values (bandwidth), in GB/s:\n" << cdf_buffer.str() << std::endl;
-   // std::cout << "CDF Y values (probability):\n" << percentages_buffer.str() << std::endl;
 
    if ((double) m_effective_bandwidth_exceeded_allowable_max / m_total_requests > 0.0001) {
       std::cout << "Queue " << m_name << " overall had " << 100 * (double)m_effective_bandwidth_exceeded_allowable_max / m_total_requests;
