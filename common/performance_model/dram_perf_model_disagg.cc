@@ -330,7 +330,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
 
 DramPerfModelDisagg::~DramPerfModelDisagg()
 {
-    bool print_extra_stats = Sim()->getCfg()->getBool("perf_model/dram/track_extra_stats");
+    bool print_extra_stats = Sim()->getCfg()->getBool("perf_model/dram/print_extra_stats");
     if (print_extra_stats) {
         // TODO: temporarily disabled for now
         // // Remote Avg Latency Stats

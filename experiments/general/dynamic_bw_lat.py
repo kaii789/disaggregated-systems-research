@@ -36,7 +36,7 @@ config_list = [
     automation.ExperimentRunConfig(
         [
             # automation.ConfigEntry("general", "magic", "false"),
-            automation.ConfigEntry("perf_model/dram", "track_extra_stats", "true"),
+            automation.ConfigEntry("perf_model/dram", "print_extra_stats", "true"),
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
             automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "0"),
@@ -55,7 +55,7 @@ config_list = [
     # 2 Deflate
     automation.ExperimentRunConfig(
         [
-            automation.ConfigEntry("perf_model/dram", "track_extra_stats", "true"),
+            automation.ConfigEntry("perf_model/dram", "print_extra_stats", "true"),
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
             automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "zlib"),
@@ -76,7 +76,7 @@ config_list = [
     # 3 PQ On (25%)
     automation.ExperimentRunConfig(
         [
-            automation.ConfigEntry("perf_model/dram", "track_extra_stats", "true"),
+            automation.ConfigEntry("perf_model/dram", "print_extra_stats", "true"),
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "false"),
             automation.ConfigEntry("perf_model/dram", "remote_partitioned_queues", "4"),
@@ -94,7 +94,7 @@ config_list = [
     # 4 PQ On, Compression On: Deflate (25%)
     automation.ExperimentRunConfig(
         [
-            automation.ConfigEntry("perf_model/dram", "track_extra_stats", "true"),
+            automation.ConfigEntry("perf_model/dram", "print_extra_stats", "true"),
             automation.ConfigEntry("perf_model/l3_cache", "cache_size", "4096"),
             automation.ConfigEntry("perf_model/dram/compression_model", "use_compression", "true"),
             automation.ConfigEntry("perf_model/dram/compression_model", "compression_scheme", "zlib"),

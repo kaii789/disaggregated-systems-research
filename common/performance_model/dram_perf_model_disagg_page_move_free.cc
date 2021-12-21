@@ -424,7 +424,7 @@ DramPerfModelDisaggPageMoveFree::DramPerfModelDisaggPageMoveFree(core_id_t core_
 
 DramPerfModelDisaggPageMoveFree::~DramPerfModelDisaggPageMoveFree()
 {
-    bool print_extra_stats = Sim()->getCfg()->getBool("perf_model/dram/track_extra_stats");
+    bool print_extra_stats = Sim()->getCfg()->getBool("perf_model/dram/print_extra_stats");
     if (print_extra_stats) {
         // Remote Avg Latency Stats
         std::cout << "\nAvg Remote DRAM Access Latencies:\n";
