@@ -157,21 +157,21 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
         m_data_movement = QueueModel::create(
                 name + "-datamovement-queue", core_id, "windowed_mg1_remote_ind_queues_enhanced",
                 m_r_bus_bandwidth.getRoundedLatency(8), m_r_bus_bandwidth.getBandwidthBitsPerUs(),
-                m_r_bus_bandwidth.getRoundedLatency(8*m_page_size), m_r_bus_bandwidth.getRoundedLatency(8*m_cache_line_size)); // bytes to bits
+                m_r_bus_bandwidth.getRoundedLatency(8*m_page_size), m_r_bus_bandwidth.getRoundedLatency(8*m_cache_line_size));  // bytes to bits
     } else if (m_r_partition_queues == 3) {
         // Hardcode the queue model type for now
         m_data_movement = QueueModel::create(
                 name + "-datamovement-queue", core_id, "windowed_mg1_remote_subqueuemodels",
-                m_r_bus_bandwidth.getRoundedLatency(8), m_r_bus_bandwidth.getBandwidthBitsPerUs()); // bytes to bits
+                m_r_bus_bandwidth.getRoundedLatency(8), m_r_bus_bandwidth.getBandwidthBitsPerUs());  // bytes to bits
     } else if (m_r_partition_queues == 4) {
         // Hardcode the queue model type for now
         m_data_movement = QueueModel::create(
                 name + "-datamovement-queue", core_id, "windowed_mg1_remote_ind_queues",
-                m_r_bus_bandwidth.getRoundedLatency(8), m_r_bus_bandwidth.getBandwidthBitsPerUs()); // bytes to bits
+                m_r_bus_bandwidth.getRoundedLatency(8), m_r_bus_bandwidth.getBandwidthBitsPerUs());  // bytes to bits
     } else {
         m_data_movement = QueueModel::create(
                 name + "-datamovement-queue", core_id, data_movement_queue_model_type,
-                m_r_bus_bandwidth.getRoundedLatency(8), m_r_bus_bandwidth.getBandwidthBitsPerUs()); // bytes to bits
+                m_r_bus_bandwidth.getRoundedLatency(8), m_r_bus_bandwidth.getBandwidthBitsPerUs());  // bytes to bits
     }
 
     if (m_r_mode == 5) {
@@ -539,7 +539,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             if (m_r_partition_queues == 3 || m_r_partition_queues == 4) {
                 m_compression_controller.m_compression_model->update_bandwidth_utilization(m_data_movement->getCachelineQueueUtilizationPercentage(t_now));
             }
-            else { // use getTotalQueueUtilizationPercentage
+            else {  // use getTotalQueueUtilizationPercentage
                 m_compression_controller.m_compression_model->update_bandwidth_utilization(m_data_movement->getTotalQueueUtilizationPercentage(t_now));
             }
 
@@ -549,7 +549,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             if (m_r_partition_queues == 3 || m_r_partition_queues == 4) {
                 m_compression_controller.m_cacheline_compression_model->update_bandwidth_utilization(m_data_movement->getCachelineQueueUtilizationPercentage(t_now));
             }
-            else { // use getTotalQueueUtilizationPercentage
+            else {  // use getTotalQueueUtilizationPercentage
                 m_compression_controller.m_cacheline_compression_model->update_bandwidth_utilization(m_data_movement->getTotalQueueUtilizationPercentage(t_now));
             }
 
@@ -584,7 +584,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
 
     // Track access to page
     if (m_r_cacheline_gran)
-        phys_page =  address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1); // Was << 6
+        phys_page = address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1);  // Was << 6
     bool move_page = false;
     if (m_r_mode == 2 || m_r_mode == 5) {  // Update m_remote_access_tracker
         auto it = m_remote_access_tracker.find(phys_page);
@@ -986,7 +986,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     if (access_latency < m_access_latency_outlier_threshold) {
         m_total_access_latency_no_outlier += access_latency;
         m_total_remote_access_latency_no_outlier += access_latency;
-    } else  {
+    } else {
         m_access_latency_outlier_count += 1;
         m_remote_access_latency_outlier_count += 1;
     }
@@ -1037,9 +1037,9 @@ DramPerfModelDisagg::updateBandwidth()
         m_r_disturbance_factor = rand() % 101;
     } else if (m_use_dynamic_cl_queue_fraction_adjustment) {
         // Same formulas here as in DramPerfModelDisagg constructor
-        m_r_bus_bandwidth.changeBandwidth(m_base_bus_bandwidth / (1000 * m_r_bw_scalefactor)); // Remote memory
-        m_r_page_bandwidth.changeBandwidth(m_base_bus_bandwidth / (1000 * m_r_bw_scalefactor / (1 - m_r_cacheline_queue_fraction))); // Remote memory - Partitioned Queues => Page Queue
-        m_r_cacheline_bandwidth.changeBandwidth(m_base_bus_bandwidth / (1000 * m_r_bw_scalefactor / m_r_cacheline_queue_fraction)); // Remote memory - Partitioned Queues => Cacheline Queue
+        m_r_bus_bandwidth.changeBandwidth(m_base_bus_bandwidth / (1000 * m_r_bw_scalefactor));  // Remote memory
+        m_r_page_bandwidth.changeBandwidth(m_base_bus_bandwidth / (1000 * m_r_bw_scalefactor / (1 - m_r_cacheline_queue_fraction)));  // Remote memory - Partitioned Queues => Page Queue
+        m_r_cacheline_bandwidth.changeBandwidth(m_base_bus_bandwidth / (1000 * m_r_bw_scalefactor / m_r_cacheline_queue_fraction));  // Remote memory - Partitioned Queues => Cacheline Queue
         // Currently only windowed_mg1_remote_ind_queues QueueModel updates stats tracking based on updateBandwidth()
         m_data_movement->updateBandwidth(m_r_bus_bandwidth.getBandwidthBitsPerUs(), m_r_cacheline_queue_fraction);
     }
@@ -1139,8 +1139,8 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
 
     UInt64 phys_page = address & ~((UInt64(1) << floorLog2(m_page_size)) - 1);
     if (m_r_cacheline_gran)
-        phys_page =  address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1); // Was << 6
-    UInt64 cacheline =  address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1); // Was << 6
+        phys_page = address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1);  // Was << 6
+    UInt64 cacheline = address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1);  // Was << 6
 
     if (!m_speed_up_simulation) {
         if (m_page_usage_map.count(phys_page) == 0) {
@@ -1268,7 +1268,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
         if (access_latency < m_access_latency_outlier_threshold) {
             m_total_access_latency_no_outlier += access_latency;
             m_total_local_access_latency_no_outlier += access_latency;
-        } else  {
+        } else {
             m_access_latency_outlier_count += 1;
             m_local_access_latency_outlier_count += 1;
         }
@@ -1466,12 +1466,12 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
         if (access_latency < m_access_latency_outlier_threshold) {
             m_total_access_latency_no_outlier += access_latency;
             m_total_local_access_latency_no_outlier += access_latency;
-        } else  {
+        } else {
             m_access_latency_outlier_count += 1;
             m_local_access_latency_outlier_count += 1;
         }
 
-        return access_latency;  
+        return access_latency;
     }
 }
 
@@ -1482,11 +1482,11 @@ DramPerfModelDisagg::isRemoteAccess(IntPtr address, core_id_t requester, DramCnt
     if (m_r_cacheline_gran) // When we perform moves at cacheline granularity (should be disabled by default)
         num_local_pages = m_localdram_size/m_cache_line_size;  // Assuming 64bit cache line
 
-    UInt64 phys_page =  address & ~((UInt64(1) << floorLog2(m_page_size)) - 1);
+    UInt64 phys_page = address & ~((UInt64(1) << floorLog2(m_page_size)) - 1);
     if (m_r_cacheline_gran) 
-        phys_page =  address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1);
+        phys_page = address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1);
 
-    if (m_r_mode == 0 || m_r_mode == 4) { // Static partitioning: no data movement and m_r_partitioning_ratio decides how many go where
+    if (m_r_mode == 0 || m_r_mode == 4) {  // Static partitioning: no data movement and m_r_partitioning_ratio decides how many go where
         if (m_local_pages.find(phys_page))
             return false;
         else if (m_remote_pages.count(phys_page))
@@ -1501,11 +1501,11 @@ DramPerfModelDisagg::isRemoteAccess(IntPtr address, core_id_t requester, DramCnt
         }
     }
     else if (m_r_mode == 1 || m_r_mode == 2 || m_r_mode == 3 || m_r_mode == 5) {  // local DRAM as a cache 
-        if (m_local_pages.find(phys_page)) { // Is it in local DRAM?
-            m_local_pages.remove(phys_page); // LRU
+        if (m_local_pages.find(phys_page)) {  // Is it in local DRAM?
+            m_local_pages.remove(phys_page);  // LRU
             m_local_pages.push_back(phys_page);
             if (access_type == DramCntlrInterface::WRITE) {
-                m_dirty_pages.insert(phys_page); // for unordered_set, the element is only inserted if it's not already in the container
+                m_dirty_pages.insert(phys_page);  // for unordered_set, the element is only inserted if it's not already in the container
             }
             return false;
         }
@@ -1570,7 +1570,7 @@ DramPerfModelDisagg::isRemoteAccess(IntPtr address, core_id_t requester, DramCnt
             }
         }  
     }
-    return false;  
+    return false;
 }
 
 SubsecondTime 
@@ -1614,7 +1614,7 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
 
         // If found==false, remove the first page
         if (!found) {
-            evicted_page = m_local_pages.front(); // Evict the least recently used page
+            evicted_page = m_local_pages.front();  // Evict the least recently used page
             m_local_pages.pop_front();
             // if (!m_speed_up_simulation)
             //     m_local_pages_remote_origin.erase(evicted_page);
