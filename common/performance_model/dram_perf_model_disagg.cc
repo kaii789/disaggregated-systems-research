@@ -101,10 +101,10 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_inflight_page_delayed(0)
     , m_inflight_pages_delay_time(SubsecondTime::Zero())
     , page_usage_count_stats(m_page_usage_stats_num_points, 0)
+    , m_compression_controller(CompressionController(core_id, m_r_cacheline_gran, m_cache_line_size, m_page_size))
     , m_num_recent_remote_accesses(0)
     , m_num_recent_remote_additional_accesses(0)
     , m_num_recent_local_accesses(0)
-    // , m_recent_access_count_begin_time(SubsecondTime::Zero())
     , m_r_cacheline_queue_fraction_increased(0)
     , m_r_cacheline_queue_fraction_decreased(0)
     , m_num_accesses(0)
@@ -128,7 +128,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_extra_cachelines    (0)
     , m_redundant_moves     (0)
     , m_redundant_moves_type1  (0)
-    , partition_queues_cacheline_slower_than_page (0)  // with the new change, these situations no longer result in redundant moves
+    , partition_queues_cacheline_slower_than_page (0)  // These situations don't result in redundant moves
     , m_redundant_moves_type2  (0)
     , m_redundant_moves_type2_cancelled_already_inflight(0)
     , m_redundant_moves_type2_cancelled_datamovement_queue_full(0)
@@ -163,9 +163,6 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_total_remote_dram_hardware_latency_cachelines_count(0)
     , m_total_remote_dram_hardware_latency_pages_count(0)
     , m_total_local_dram_hardware_write_latency_pages(SubsecondTime::Zero())
-    // , m_local_get_dram_access_cost_called(0)
-    // , m_remote_cacheline_get_dram_access_cost_called(0)
-    // , m_remote_page_get_dram_access_cost_called(0)
     , m_local_get_dram_access_cost_processing_time(SubsecondTime::Zero())
     , m_local_get_dram_access_cost_queue_delay(SubsecondTime::Zero())
     , m_remote_cacheline_get_dram_access_cost_processing_time(SubsecondTime::Zero())
@@ -181,6 +178,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_global_time_much_larger_than_page_arrival(0)
     , m_sum_global_time_much_larger(SubsecondTime::Zero())
     , m_local_total_remote_access_latency(SubsecondTime::Zero())
+    , IPC_window_capacity(Sim()->getCfg()->getInt("perf_model/dram/IPC_window_capacity"))
     , m_max_inflight_cachelines_reads(0)
     , m_max_inflight_cachelines_writes(0)
     , m_max_inflight_cachelines_total(0)
@@ -194,9 +192,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_local_access_latency_outlier_count(0)
     , m_total_remote_access_latency_no_outlier(SubsecondTime::Zero())
     , m_remote_access_latency_outlier_count(0)
-    , IPC_window_capacity(Sim()->getCfg()->getInt("perf_model/dram/IPC_window_capacity"))
     , m_disturbance_bq_size(Sim()->getCfg()->getInt("perf_model/dram/disturbance_bq_size"))
-    , m_compression_controller(CompressionController(core_id, m_r_cacheline_gran, m_cache_line_size, m_page_size))
 {
     String name("dram"); 
     if (Sim()->getCfg()->getBool("perf_model/dram/queue_model/enabled"))
@@ -304,7 +300,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     registerStatsMetric("ddr", core_id, "page-empty", &m_dram_page_empty);
     registerStatsMetric("ddr", core_id, "page-closing", &m_dram_page_closing);
     registerStatsMetric("ddr", core_id, "page-misses", &m_dram_page_misses);
-    registerStatsMetric("dram", core_id, "total-access-latency", &m_total_access_latency); // cgiannoula
+    registerStatsMetric("dram", core_id, "total-access-latency", &m_total_access_latency);
     registerStatsMetric("dram", core_id, "total-local-access-latency", &m_total_local_access_latency);
     registerStatsMetric("dram", core_id, "total-local-dram-hardware-latency", &m_total_local_dram_hardware_latency);
     registerStatsMetric("dram", core_id, "total-local-dram-hardware-latency-processing-time", &m_local_get_dram_access_cost_processing_time);
@@ -572,24 +568,21 @@ DramPerfModelDisagg::finalizeStats()
     std::cout << "dram_perf_model_disagg.cc finalizeStats():" << std::endl;
     if (m_page_locality_measures.size() > 0) {
         std::cout << "True page locality measure:" << std::endl;
-        std::ostringstream percentages_buf;
-        std::ostringstream counts_buf;
+        std::ostringstream percentages_buf, counts_buf;
         sortAndPrintVectorPercentiles(m_page_locality_measures, percentages_buf, counts_buf);
         std::cout << "CDF X values (true page locality):\n" << counts_buf.str() << std::endl;
         std::cout << "CDF Y values (probability):\n" << percentages_buf.str() << std::endl;
     }
     if (m_modified_page_locality_measures.size() > 0) {
         std::cout << "Modified page locality measure:" << std::endl;
-        std::ostringstream percentages_buf;
-        std::ostringstream counts_buf;
+        std::ostringstream percentages_buf, counts_buf;
         sortAndPrintVectorPercentiles(m_modified_page_locality_measures, percentages_buf, counts_buf);
         std::cout << "CDF X values (modified page locality):\n" << counts_buf.str() << std::endl;
         std::cout << "CDF Y values (probability):\n" << percentages_buf.str() << std::endl;
     }
     if (m_modified2_page_locality_measures.size() > 0) {
         std::cout << "Modified2 page locality measure:" << std::endl;
-        std::ostringstream percentages_buf;
-        std::ostringstream counts_buf;
+        std::ostringstream percentages_buf, counts_buf;
         sortAndPrintVectorPercentiles(m_modified2_page_locality_measures, percentages_buf, counts_buf);
         std::cout << "CDF X values (modified2 page locality):\n" << counts_buf.str() << std::endl;
         std::cout << "CDF Y values (probability):\n" << percentages_buf.str() << std::endl;
@@ -661,7 +654,6 @@ DramPerfModelDisagg::finalizeStats()
     if (process_and_print_throttled_pages_stats && m_use_throttled_pages_tracker) {
         // Add values in the map at the end of program execution to m_throttled_pages_tracker_values
         for (std::map<UInt64, std::pair<SubsecondTime, UInt32>>::iterator it = m_throttled_pages_tracker.begin(); it != m_throttled_pages_tracker.end(); ++it) {
-            // if ((it->second).second > 0)
             m_throttled_pages_tracker_values.push_back(std::pair<UInt64, UInt32>(it->first, (it->second).second));
         }
         if (m_throttled_pages_tracker_values.size() < 1) {
@@ -690,16 +682,14 @@ DramPerfModelDisagg::finalizeStats()
         
         // Compute individual_counts percentiles for output
         std::cout << "Throttled pages tracker individual counts:" << std::endl;
-        std::ostringstream percentages_buf;
-        std::ostringstream individual_counts_buf;
+        std::ostringstream percentages_buf, individual_counts_buf;
         sortAndPrintVectorPercentiles(throttled_pages_tracker_individual_counts, percentages_buf, individual_counts_buf);
         std::cout << "CDF X values (throttled page accesses within time frame):\n" << individual_counts_buf.str() << std::endl;
         std::cout << "CDF Y values (probability):\n" << percentages_buf.str() << std::endl;
 
         // Compute aggregated_counts percentiles for output
         std::cout << "Throttled pages tracker page aggregated counts:" << std::endl;
-        std::ostringstream percentages_buf_2;
-        std::ostringstream aggregated_counts_buf;
+        std::ostringstream percentages_buf_2, aggregated_counts_buf;
         sortAndPrintVectorPercentiles(throttled_pages_tracker_page_aggregated_counts, percentages_buf_2, aggregated_counts_buf);
         std::cout << "CDF X values (throttled page accesses aggregated by phys_page):\n" << aggregated_counts_buf.str() << std::endl;
         std::cout << "CDF Y values (probability):\n" << percentages_buf_2.str() << std::endl;
@@ -1771,7 +1761,6 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
             m_num_recent_remote_additional_accesses = 0;   // For cacheline queue requests made on inflight pages. Track this separately since they could be counted as either "remote" or "local" cacheline accesses
             m_num_recent_local_accesses = 0;
             m_recent_accessed_pages.clear();
-            // m_recent_access_count_begin_time = Sim()->getClockSkewMinimizationServer()->getGlobalTime();
         }
     }
     if (m_use_dynamic_cl_queue_fraction_adjustment || !m_speed_up_simulation) {  // only track if using dynamic cl queue fraction, or if not speeding up simulation

@@ -292,7 +292,7 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_max_dirty_write_buffer_size = 0;
 
         std::map<UInt64, SubsecondTime> m_inflight_cachelines_reads;
-        std::multimap<UInt64, SubsecondTime> m_inflight_cachelines_writes;  // possibility of mutliple writes to the same address
+        std::multimap<UInt64, SubsecondTime> m_inflight_cachelines_writes;  // possibility of multiple writes to the same address
         UInt64 m_max_inflight_cachelines_reads;
         UInt64 m_max_inflight_cachelines_writes;
         UInt64 m_max_inflight_cachelines_total;
