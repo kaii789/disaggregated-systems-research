@@ -73,8 +73,7 @@ class DramPerfModelDisagg : public DramPerfModel
         double m_cancel_pq_inflight_buffer_threshold;
         bool m_keep_space_in_cacheline_queue;
 
-        QueueModel* m_data_movement;        // Normally, this is the combined queue for pages and cachelines. When partitioned queues are enabled, this is the page queue
-        QueueModel* m_data_movement_2;      // When partitioned queues are enabled, this is the cacheline queue
+        QueueModel* m_data_movement;        // Normally, this is the one queue for pages and cachelines. When partitioned queues are enabled, both page and cacheline queues are contained in this QueueModel
 
         HashedLinkedList m_local_pages; // Pages of local memory
         std::unordered_map<UInt64, char> m_local_pages_remote_origin;  // Pages of local memory that were originally in remote; char type can be changed to int for tracking number of accesses
@@ -249,10 +248,6 @@ class DramPerfModelDisagg : public DramPerfModel
 
         SubsecondTime possiblyEvict(UInt64 phys_page, SubsecondTime pkt_time, core_id_t requester);
         void possiblyPrefetch(UInt64 phys_page, SubsecondTime pkt_time, core_id_t requester);
-
-        // Helper to print vector percentiles, for stats output
-        template<typename T>
-        void sortAndPrintVectorPercentiles(std::vector<T>& vec, std::ostringstream& percentages_buffer, std::ostringstream& counts_buffer, UInt32 num_bins = 40);
 
         void updateBandwidthUtilizationCount(SubsecondTime pkt_time);
 
