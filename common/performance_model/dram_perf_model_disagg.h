@@ -30,8 +30,8 @@ class DramPerfModelDisagg : public DramPerfModel
         
         const UInt32 m_base_bus_bandwidth;      // Temporary variable to calculate bus bandwidths; in bits/us
         ComponentBandwidth m_r_bus_bandwidth;   // Remote
-        ComponentBandwidth m_r_part_bandwidth;  // Remote - Partitioned Queues => Page Queue
-        ComponentBandwidth m_r_part2_bandwidth; // Remote - Partitioned Queues => Cacheline Queue
+        ComponentBandwidth m_r_page_bandwidth;  // Remote - Partitioned Queues => Page Queue
+        ComponentBandwidth m_r_cacheline_bandwidth; // Remote - Partitioned Queues => Cacheline Queue
         double m_r_bw_scalefactor;              // Remote memory bandwidth is ddr bandwidth scaled down by m_r_bw_scalefactor
         bool m_use_dynamic_bandwidth;
         bool m_use_dynamic_latency;
@@ -250,9 +250,12 @@ class DramPerfModelDisagg : public DramPerfModel
         void possiblyPrefetch(UInt64 phys_page, SubsecondTime pkt_time, core_id_t requester);
 
         void updateBandwidthUtilizationCount(SubsecondTime pkt_time);
-
         void updateLocalRemoteLatencyStat(SubsecondTime access_latency);
         void updateDynamicCachelineQueueRatio(SubsecondTime pkt_time);
+
+        SubsecondTime getPartitionQueueDelayNoEffect(SubsecondTime pkt_time, UInt64 num_bytes, QueueModel::request_t queue_request_type, core_id_t requester);
+        SubsecondTime getPartitionQueueDelayTrackBytes(SubsecondTime pkt_time, UInt64 num_bytes, QueueModel::request_t queue_request_type, core_id_t requester);
+        SubsecondTime getDataMovementBandwidthProcessingTime(UInt64 num_bytes, QueueModel::request_t queue_request_type);
 
     public:
         DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_size, AddressHomeLookup* address_home_lookup);

@@ -18,8 +18,8 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_dram_hardware_cntlr (DramHardwareCntlr(core_id, address_home_lookup, m_cache_line_size, m_page_size, m_r_partition_queues))
     , m_base_bus_bandwidth  (Sim()->getCfg()->getInt("perf_model/dram/ddr/dram_speed") * Sim()->getCfg()->getInt("perf_model/dram/ddr/data_bus_width")) // in bits/us
     , m_r_bus_bandwidth     (m_base_bus_bandwidth / (1000 * Sim()->getCfg()->getFloat("perf_model/dram/remote_mem_bw_scalefactor"))) // Remote memory
-    , m_r_part_bandwidth    (m_base_bus_bandwidth / (1000 * Sim()->getCfg()->getFloat("perf_model/dram/remote_mem_bw_scalefactor") / (1 - Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_fraction")))) // Remote memory - Partitioned Queues => Page Queue
-    , m_r_part2_bandwidth   (m_base_bus_bandwidth / (1000 * Sim()->getCfg()->getFloat("perf_model/dram/remote_mem_bw_scalefactor") / Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_fraction"))) // Remote memory - Partitioned Queues => Cacheline Queue
+    , m_r_page_bandwidth    (m_base_bus_bandwidth / (1000 * Sim()->getCfg()->getFloat("perf_model/dram/remote_mem_bw_scalefactor") / (1 - Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_fraction")))) // Remote memory - Partitioned Queues => Page Queue
+    , m_r_cacheline_bandwidth   (m_base_bus_bandwidth / (1000 * Sim()->getCfg()->getFloat("perf_model/dram/remote_mem_bw_scalefactor") / Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_fraction"))) // Remote memory - Partitioned Queues => Cacheline Queue
     , m_r_bw_scalefactor    (Sim()->getCfg()->getFloat("perf_model/dram/remote_mem_bw_scalefactor"))
     , m_use_dynamic_bandwidth (Sim()->getCfg()->getBool("perf_model/dram/use_dynamic_bandwidth"))
     , m_use_dynamic_latency (Sim()->getCfg()->getBool("perf_model/dram/use_dynamic_latency"))
@@ -561,32 +561,15 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
 
     SubsecondTime cacheline_network_processing_time;
     if (m_r_partition_queues > 0)
-        cacheline_network_processing_time = m_r_part2_bandwidth.getRoundedLatency(8*size);
+        cacheline_network_processing_time = m_r_cacheline_bandwidth.getRoundedLatency(8*size);
     else
         cacheline_network_processing_time = m_r_bus_bandwidth.getRoundedLatency(8*size);
     SubsecondTime cacheline_queue_delay;
     if (m_r_throttle_redundant_moves) {
-        if (m_r_partition_queues == 2) {
-            cacheline_queue_delay = m_data_movement->computeQueueDelayNoEffect(t_remote_queue_request + cacheline_compression_latency, m_r_bus_bandwidth.getRoundedLatency(8*size), QueueModel::CACHELINE, requester);
-        } else if (m_r_partition_queues == 3) {
-            cacheline_queue_delay = m_data_movement->computeQueueDelayNoEffect(t_remote_queue_request + cacheline_compression_latency, m_r_part2_bandwidth.getRoundedLatency(8*size), QueueModel::CACHELINE, requester);
-        } else if (m_r_partition_queues == 4) {
-            cacheline_queue_delay = m_data_movement->computeQueueDelayNoEffect(t_remote_queue_request + cacheline_compression_latency, m_r_part2_bandwidth.getRoundedLatency(8*size), QueueModel::CACHELINE, requester);
-        } else {
-            // Use computeQueueDelayNoEffect here, in case need we end up moving the whole page instead and not requesting the cacheline separately
-            cacheline_queue_delay = m_data_movement->computeQueueDelayNoEffect(t_remote_queue_request + cacheline_compression_latency, m_r_bus_bandwidth.getRoundedLatency(8*size), QueueModel::CACHELINE, requester);
-        }
+        // Use computeQueueDelayNoEffect here, in case need we end up moving the whole page instead and not requesting the cacheline separately
+        cacheline_queue_delay = getPartitionQueueDelayNoEffect(t_remote_queue_request + cacheline_compression_latency, size, QueueModel::CACHELINE, requester);
     } else {  // always make cacheline queue request
-        if (m_r_partition_queues == 2) {
-            cacheline_queue_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + cacheline_compression_latency, m_r_bus_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, requester);
-        } else if (m_r_partition_queues == 3) {
-            cacheline_queue_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + cacheline_compression_latency, m_r_part2_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, requester);
-        } else if (m_r_partition_queues == 4) {
-            cacheline_queue_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + cacheline_compression_latency, m_r_part2_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, requester);
-        } else {
-            // Use computeQueueDelayNoEffect here, in case need we end up moving the whole page instead and not requesting the cacheline separately
-            cacheline_queue_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + cacheline_compression_latency, m_r_bus_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, requester);
-        }
+        cacheline_queue_delay = getPartitionQueueDelayTrackBytes(t_remote_queue_request + cacheline_compression_latency, size, QueueModel::CACHELINE, requester);
     }
     SubsecondTime datamovement_delay = (cacheline_queue_delay + cacheline_network_processing_time);
     m_cacheline_network_processing_time += cacheline_network_processing_time;
@@ -722,14 +705,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
 
             // Other systems using the remote memory and creating disturbance
             if (m_r_disturbance_factor > 0 && (unsigned int)(rand() % 100) < m_r_disturbance_factor) {
-                if (m_r_partition_queues == 2)
-                    /* SubsecondTime page_datamovement_delay = */ m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request, m_r_bus_bandwidth.getRoundedLatency(8*page_size), page_size, QueueModel::PAGE, requester);
-                else if (m_r_partition_queues == 3)
-                    /* SubsecondTime page_datamovement_delay = */ m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request, m_r_part_bandwidth.getRoundedLatency(8*page_size), page_size, QueueModel::PAGE, requester);
-                else if (m_r_partition_queues == 4)
-                    /* SubsecondTime page_datamovement_delay = */ m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request, m_r_part_bandwidth.getRoundedLatency(8*page_size), page_size, QueueModel::PAGE, requester);
-                else
-                    /* SubsecondTime page_datamovement_delay = */ m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request, m_r_bus_bandwidth.getRoundedLatency(8*page_size), page_size, QueueModel::PAGE, requester);
+                /* SubsecondTime page_datamovement_delay = */ getPartitionQueueDelayTrackBytes(t_remote_queue_request, page_size, QueueModel::PAGE, requester);
                 m_extra_pages++;
             }
 
@@ -752,18 +728,15 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
 
             // Compute network transmission delay
             if (m_r_partition_queues > 0)
-                page_network_processing_time = m_r_part_bandwidth.getRoundedLatency(8*page_size);  // default of moving the whole page, use processing time of just the cacheline if we use that in the critical path
+                page_network_processing_time = m_r_page_bandwidth.getRoundedLatency(8*page_size);  // default of moving the whole page, use processing time of just the cacheline if we use that in the critical path
             else
                 page_network_processing_time = m_r_bus_bandwidth.getRoundedLatency(8*page_size);
 
-            if (m_r_partition_queues == 2) {
-                page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + page_hw_access_latency + page_compression_latency, m_r_bus_bandwidth.getRoundedLatency(8*page_size), page_size, QueueModel::PAGE, requester);
-            } else if (m_r_partition_queues == 3) {
-                page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + page_hw_access_latency + page_compression_latency, m_r_part_bandwidth.getRoundedLatency(8*page_size), page_size, QueueModel::PAGE, requester, true, phys_page);
-            } else if (m_r_partition_queues == 4) {
-                page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + page_hw_access_latency + page_compression_latency, m_r_part_bandwidth.getRoundedLatency(8*page_size), page_size, QueueModel::PAGE, requester);
+            
+            if (m_r_partition_queues == 3) {
+                page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + page_hw_access_latency + page_compression_latency, m_r_page_bandwidth.getRoundedLatency(8*page_size), page_size, QueueModel::PAGE, requester, true, phys_page);
             } else {
-                page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + page_hw_access_latency + page_compression_latency, m_r_bus_bandwidth.getRoundedLatency(8*page_size), page_size, QueueModel::PAGE, requester);
+                page_datamovement_delay = getPartitionQueueDelayTrackBytes(t_remote_queue_request + page_hw_access_latency + page_compression_latency, page_size, QueueModel::PAGE, requester);
             }
 
             // TODO: Currently model decompression by adding decompression latency to inflight page time
@@ -802,13 +775,11 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
                     // Actually put the cacheline request on the cacheline queue, since after checking the page arrival time we're sure we actually use the cacheline request
                     // This is an ideal situation, since in real life we might not be able to compare these times, not actually send the cacheline request, avoid the cacheline compression latency, etc
                     if (m_r_throttle_redundant_moves) {
-                        if (m_r_partition_queues == 2) {
-                            cacheline_queue_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + cacheline_compression_latency, m_r_bus_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, requester);
-                        } else if (m_r_partition_queues == 3) {
+                        if (m_r_partition_queues == 3) {
                             // Delayed inflight pages, if any, updated after m_inflight_pages includes the current page
-                            cacheline_queue_delay = m_data_movement->computeQueueDelayTrackBytesPotentialPushback(t_remote_queue_request + cacheline_compression_latency, m_r_part2_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, updated_inflight_page_arrival_time_deltas, true, requester);
-                        } else if (m_r_partition_queues == 4) {
-                            cacheline_queue_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + cacheline_compression_latency, m_r_part2_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, requester);
+                            cacheline_queue_delay = m_data_movement->computeQueueDelayTrackBytesPotentialPushback(t_remote_queue_request + cacheline_compression_latency, m_r_cacheline_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, updated_inflight_page_arrival_time_deltas, true, requester);
+                        } else if (m_r_partition_queues == 2 || m_r_partition_queues == 4) {
+                            cacheline_queue_delay = getPartitionQueueDelayTrackBytes(t_remote_queue_request + cacheline_compression_latency, size, QueueModel::CACHELINE, requester);
                         }
                     }
                     t_now -= page_compression_latency;  // Page compression is not on critical path; this is 0 if compression is off
@@ -947,14 +918,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
 
         // Other systems using the remote memory and creating disturbance
         if (m_r_disturbance_factor > 0 && (unsigned int)(rand() % 100) < m_r_disturbance_factor) {
-            if (m_r_partition_queues == 2)
-                /* SubsecondTime page_datamovement_delay = */ m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request, m_r_bus_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, requester);
-            else if (m_r_partition_queues == 3)
-                /* SubsecondTime page_datamovement_delay = */ m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request, m_r_part2_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, requester);
-            else if (m_r_partition_queues == 4)
-                /* SubsecondTime page_datamovement_delay = */ m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request, m_r_part2_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, requester);
-            else
-                /* SubsecondTime page_datamovement_delay = */ m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request, m_r_bus_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, requester);
+            /* SubsecondTime page_datamovement_delay = */ getPartitionQueueDelayTrackBytes(t_remote_queue_request, size, QueueModel::CACHELINE, requester);
             m_extra_cachelines++;
         }
 
@@ -977,11 +941,9 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         }
 
         if (m_r_throttle_redundant_moves) {
-            if (m_r_partition_queues == 2) {
-                cacheline_queue_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + cacheline_compression_latency, m_r_bus_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, requester);
-            } else if (m_r_partition_queues == 3) {
+            if (m_r_partition_queues == 3) {
                 std::vector<std::pair<UInt64, SubsecondTime>> updated_inflight_page_arrival_time_deltas;
-                cacheline_queue_delay = m_data_movement->computeQueueDelayTrackBytesPotentialPushback(t_remote_queue_request + cacheline_compression_latency, m_r_part2_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, updated_inflight_page_arrival_time_deltas, true, requester);
+                cacheline_queue_delay = m_data_movement->computeQueueDelayTrackBytesPotentialPushback(t_remote_queue_request + cacheline_compression_latency, m_r_cacheline_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, updated_inflight_page_arrival_time_deltas, true, requester);
                 for (auto it = updated_inflight_page_arrival_time_deltas.begin(); it != updated_inflight_page_arrival_time_deltas.end(); ++it) {
                     if (m_inflight_pages.count(it->first) && it->second > SubsecondTime::Zero()) {
                         m_inflight_pages_delay_time += it->second;
@@ -989,11 +951,9 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
                         ++m_inflight_page_delayed;
                     }
                 }
-            } else if (m_r_partition_queues == 4) {
-                cacheline_queue_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + cacheline_compression_latency, m_r_part2_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, requester);
             } else {
-                // partition queues off, but move_page = false so actually put the cacheline request on the queue
-                cacheline_queue_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + cacheline_compression_latency, m_r_bus_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, requester);
+                // move_page == false so if PQ=off actually put the cacheline request on the queue
+                cacheline_queue_delay = getPartitionQueueDelayTrackBytes(t_remote_queue_request + cacheline_compression_latency, size, QueueModel::CACHELINE, requester);
             }
         }
 
@@ -1078,8 +1038,8 @@ DramPerfModelDisagg::updateBandwidth()
     } else if (m_use_dynamic_cl_queue_fraction_adjustment) {
         // Same formulas here as in DramPerfModelDisagg constructor
         m_r_bus_bandwidth.changeBandwidth(m_base_bus_bandwidth / (1000 * m_r_bw_scalefactor)); // Remote memory
-        m_r_part_bandwidth.changeBandwidth(m_base_bus_bandwidth / (1000 * m_r_bw_scalefactor / (1 - m_r_cacheline_queue_fraction))); // Remote memory - Partitioned Queues => Page Queue
-        m_r_part2_bandwidth.changeBandwidth(m_base_bus_bandwidth / (1000 * m_r_bw_scalefactor / m_r_cacheline_queue_fraction)); // Remote memory - Partitioned Queues => Cacheline Queue
+        m_r_page_bandwidth.changeBandwidth(m_base_bus_bandwidth / (1000 * m_r_bw_scalefactor / (1 - m_r_cacheline_queue_fraction))); // Remote memory - Partitioned Queues => Page Queue
+        m_r_cacheline_bandwidth.changeBandwidth(m_base_bus_bandwidth / (1000 * m_r_bw_scalefactor / m_r_cacheline_queue_fraction)); // Remote memory - Partitioned Queues => Cacheline Queue
         // Currently only windowed_mg1_remote_ind_queues QueueModel updates stats tracking based on updateBandwidth()
         m_data_movement->updateBandwidth(m_r_bus_bandwidth.getBandwidthBitsPerUs(), m_r_cacheline_queue_fraction);
     }
@@ -1388,7 +1348,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                     }
 
                     // Network transmission cost
-                    SubsecondTime cacheline_network_processing_time = m_r_part2_bandwidth.getRoundedLatency(8*size);
+                    SubsecondTime cacheline_network_processing_time = m_r_cacheline_bandwidth.getRoundedLatency(8*size);
                     
                     SubsecondTime add_cacheline_request_time = t_remote_queue_request + add_cacheline_hw_access_latency + cacheline_compression_latency;  // cacheline_compression_latency is 0 if compression not enabled
                     // Main difference when m_r_throttle_redundant_moves is true: reduce traffic sent through cacheline queue
@@ -1396,20 +1356,14 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                         // Don't request cacheline via the cacheline queue if the inflight page arrives sooner
                         // But otherwise use the earlier arrival time to determine access_latency
                         SubsecondTime datamov_delay;
-                        if (m_r_partition_queues == 2) {
-                            datamov_delay = m_data_movement->computeQueueDelayNoEffect(add_cacheline_request_time, m_r_bus_bandwidth.getRoundedLatency(8*size), QueueModel::CACHELINE, requester);
-                        } else if (m_r_partition_queues == 3) {
-                            datamov_delay = m_data_movement->computeQueueDelayNoEffect(add_cacheline_request_time, m_r_part2_bandwidth.getRoundedLatency(8*size), QueueModel::CACHELINE, requester);
-                        } else if (m_r_partition_queues == 4) {
-                            datamov_delay = m_data_movement->computeQueueDelayNoEffect(add_cacheline_request_time, m_r_part2_bandwidth.getRoundedLatency(8*size), QueueModel::CACHELINE, requester);
+                        if (m_r_partition_queues > 1) {
+                            datamov_delay = getPartitionQueueDelayNoEffect(add_cacheline_request_time, size, QueueModel::CACHELINE, requester);
                         }
                         datamov_delay += cacheline_network_processing_time + cacheline_decompression_latency;  // decompression latency is 0 if not using cacheline compression
                         if ((add_cacheline_request_time + datamov_delay - pkt_time) < access_latency) {
-                            if (m_r_partition_queues == 2) {
-                                datamov_delay = m_data_movement->computeQueueDelayTrackBytes(add_cacheline_request_time, m_r_bus_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, requester);
-                            } else if (m_r_partition_queues == 3) {
+                            if (m_r_partition_queues == 3) {
                                 std::vector<std::pair<UInt64, SubsecondTime>> updated_inflight_page_arrival_time_deltas;
-                                datamov_delay = m_data_movement->computeQueueDelayTrackBytesPotentialPushback(add_cacheline_request_time, m_r_part2_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, updated_inflight_page_arrival_time_deltas, true, requester);
+                                datamov_delay = m_data_movement->computeQueueDelayTrackBytesPotentialPushback(add_cacheline_request_time, m_r_cacheline_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, updated_inflight_page_arrival_time_deltas, true, requester);
                                 for (auto it = updated_inflight_page_arrival_time_deltas.begin(); it != updated_inflight_page_arrival_time_deltas.end(); ++it) {
                                     if (m_inflight_pages.count(it->first) && it->second > SubsecondTime::Zero()) {
                                         m_inflight_pages_delay_time += it->second;
@@ -1417,8 +1371,8 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                                         ++m_inflight_page_delayed;
                                     }
                                 }
-                            } else if (m_r_partition_queues == 4) {
-                                datamov_delay = m_data_movement->computeQueueDelayTrackBytes(add_cacheline_request_time, m_r_part2_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, requester);
+                            } else if (m_r_partition_queues == 2 || m_r_partition_queues == 4) {
+                                datamov_delay = getPartitionQueueDelayTrackBytes(add_cacheline_request_time, size, QueueModel::CACHELINE, requester);
                             }
                             datamov_delay += cacheline_network_processing_time + cacheline_decompression_latency;
                             ++m_redundant_moves;
@@ -1452,11 +1406,9 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                     } else {
                         // Always request cacheline via the cacheline queue, then use the earlier arrival time to determine access_latency
                         SubsecondTime datamov_delay;
-                        if (m_r_partition_queues == 2) {
-                            datamov_delay = m_data_movement->computeQueueDelayTrackBytes(add_cacheline_request_time, m_r_bus_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, requester);
-                        } else if (m_r_partition_queues == 3) {
+                        if (m_r_partition_queues == 3) {
                             std::vector<std::pair<UInt64, SubsecondTime>> updated_inflight_page_arrival_time_deltas;
-                            datamov_delay = m_data_movement->computeQueueDelayTrackBytesPotentialPushback(add_cacheline_request_time, m_r_part2_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, updated_inflight_page_arrival_time_deltas, true, requester);
+                            datamov_delay = m_data_movement->computeQueueDelayTrackBytesPotentialPushback(add_cacheline_request_time, m_r_cacheline_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, updated_inflight_page_arrival_time_deltas, true, requester);
                             for (auto it = updated_inflight_page_arrival_time_deltas.begin(); it != updated_inflight_page_arrival_time_deltas.end(); ++it) {
                                 if (m_inflight_pages.count(it->first) && it->second > SubsecondTime::Zero()) {
                                     m_inflight_pages_delay_time += it->second;
@@ -1464,8 +1416,8 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                                     ++m_inflight_page_delayed;
                                 }
                             }
-                        } else if (m_r_partition_queues == 4) {
-                            datamov_delay = m_data_movement->computeQueueDelayTrackBytes(add_cacheline_request_time, m_r_part2_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, requester);
+                        } else if (m_r_partition_queues == 2 || m_r_partition_queues == 4) {
+                            datamov_delay = getPartitionQueueDelayTrackBytes(add_cacheline_request_time, size, QueueModel::CACHELINE, requester);
                         }
                         datamov_delay += cacheline_network_processing_time + cacheline_decompression_latency;  // decompression latency is 0 if not using cacheline compression
                         ++m_redundant_moves;
@@ -1687,15 +1639,7 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
 
             SubsecondTime page_datamovement_delay = SubsecondTime::Zero();
             if (m_r_simulate_datamov_overhead) { 
-                if (m_r_partition_queues == 2) {
-                    page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + evict_compression_latency, m_r_bus_bandwidth.getRoundedLatency(8*size), size, queue_request_type, requester);
-                } else if (m_r_partition_queues == 3) {
-                    page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + evict_compression_latency, m_r_part_bandwidth.getRoundedLatency(8*size), size, queue_request_type, requester);
-                } else if (m_r_partition_queues == 4) {
-                    page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + evict_compression_latency, m_r_part_bandwidth.getRoundedLatency(8*size), size, queue_request_type, requester);
-                } else {
-                    page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + evict_compression_latency, m_r_bus_bandwidth.getRoundedLatency(8*size), size, queue_request_type, requester);
-                }
+                page_datamovement_delay = getPartitionQueueDelayTrackBytes(t_remote_queue_request + evict_compression_latency, size, queue_request_type, requester);
             }
 
             // TODO: Currently model decompression by adding decompression latency to inflight page time
@@ -1711,7 +1655,7 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
 
             // Compute network transmission delay
             if (m_r_partition_queues > 0)
-                page_network_processing_time = m_r_part_bandwidth.getRoundedLatency(8*size);
+                page_network_processing_time = m_r_page_bandwidth.getRoundedLatency(8*size);
             else
                 page_network_processing_time = m_r_bus_bandwidth.getRoundedLatency(8*size);
 
@@ -1736,15 +1680,7 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
 
             SubsecondTime page_datamovement_delay = SubsecondTime::Zero();
             if (m_r_simulate_datamov_overhead) {
-                if (m_r_partition_queues == 2) {
-                    page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + evict_compression_latency, m_r_bus_bandwidth.getRoundedLatency(8*size), size, queue_request_type, requester);
-                } else if (m_r_partition_queues == 3) {
-                    page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + evict_compression_latency, m_r_part_bandwidth.getRoundedLatency(8*size), size, queue_request_type, requester);
-                } else if (m_r_partition_queues == 4) {
-                    page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + evict_compression_latency, m_r_part_bandwidth.getRoundedLatency(8*size), size, queue_request_type, requester);
-                } else {
-                    page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + evict_compression_latency, m_r_bus_bandwidth.getRoundedLatency(8*size), size, queue_request_type, requester);
-                }
+                page_datamovement_delay = getPartitionQueueDelayTrackBytes(t_remote_queue_request + evict_compression_latency, size, queue_request_type, requester);
             }
 
             // TODO: Currently model decompression by adding decompression latency to inflight page time
@@ -1755,7 +1691,7 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
 
             // Compute network transmission delay
             if (m_r_partition_queues > 0)
-                page_network_processing_time = m_r_part_bandwidth.getRoundedLatency(8*size);
+                page_network_processing_time = m_r_page_bandwidth.getRoundedLatency(8*size);
             else
                 page_network_processing_time = m_r_bus_bandwidth.getRoundedLatency(8*size);
 
@@ -1828,20 +1764,16 @@ DramPerfModelDisagg::possiblyPrefetch(UInt64 phys_page, SubsecondTime t_now, cor
 
         SubsecondTime page_datamovement_delay = SubsecondTime::Zero();
         if (m_r_simulate_datamov_overhead) {
-            if (m_r_partition_queues == 2) {
-                page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + page_compression_latency, m_r_bus_bandwidth.getRoundedLatency(8*size), size, queue_request_type, requester);
-            } else if (m_r_partition_queues == 3) {
-                page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + page_compression_latency, m_r_part_bandwidth.getRoundedLatency(8*size), size, queue_request_type, requester, true, pref_page);
-            } else if (m_r_partition_queues == 4) {
-                page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + page_compression_latency, m_r_part_bandwidth.getRoundedLatency(8*size), size, queue_request_type, requester);
+            if (m_r_partition_queues == 3) {
+                page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + page_compression_latency, m_r_page_bandwidth.getRoundedLatency(8*size), size, queue_request_type, requester, true, pref_page);
             } else {
-                page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + page_compression_latency, m_r_bus_bandwidth.getRoundedLatency(8*size), size, queue_request_type, requester);
+                page_datamovement_delay = getPartitionQueueDelayTrackBytes(t_remote_queue_request + page_compression_latency, size, queue_request_type, requester);
             }
         }
 
         // Compute network transmission delay
         if (m_r_partition_queues > 0)
-            page_network_processing_time = m_r_part_bandwidth.getRoundedLatency(8*size);
+            page_network_processing_time = m_r_page_bandwidth.getRoundedLatency(8*size);
         else
             page_network_processing_time = m_r_bus_bandwidth.getRoundedLatency(8*size);
 
@@ -1867,4 +1799,36 @@ DramPerfModelDisagg::possiblyPrefetch(UInt64 phys_page, SubsecondTime t_now, cor
             m_max_total_bufferspace++;  // update stat
         possiblyEvict(phys_page, t_remote_queue_request, requester);
     }
+}
+
+SubsecondTime
+DramPerfModelDisagg::getDataMovementBandwidthProcessingTime(UInt64 num_bytes, QueueModel::request_t queue_request_type)
+{
+    SubsecondTime processing_time;
+    if (m_r_partition_queues == 3 || m_r_partition_queues == 4) {
+        if (queue_request_type == QueueModel::PAGE)
+            processing_time = m_r_page_bandwidth.getRoundedLatency(8*num_bytes);       // Page queue bandwidth
+        else  // queue_request_type == QueueModel::CACHELINE
+            processing_time = m_r_cacheline_bandwidth.getRoundedLatency(8*num_bytes);  // Cacheline queue bandwidth
+    }
+    else {
+        processing_time = m_r_bus_bandwidth.getRoundedLatency(8*num_bytes);            // Combined queue bandwidth
+    }
+    return processing_time;
+}
+
+SubsecondTime
+DramPerfModelDisagg::getPartitionQueueDelayTrackBytes(SubsecondTime pkt_time, UInt64 num_bytes, QueueModel::request_t queue_request_type, core_id_t requester)
+{
+    SubsecondTime processing_time = getDataMovementBandwidthProcessingTime(num_bytes, queue_request_type);
+    SubsecondTime queue_delay = m_data_movement->computeQueueDelayTrackBytes(pkt_time, processing_time, num_bytes, queue_request_type, requester);
+    return queue_delay;
+}
+
+SubsecondTime
+DramPerfModelDisagg::getPartitionQueueDelayNoEffect(SubsecondTime pkt_time, UInt64 num_bytes, QueueModel::request_t queue_request_type, core_id_t requester)
+{
+    SubsecondTime processing_time = getDataMovementBandwidthProcessingTime(num_bytes, queue_request_type);
+    SubsecondTime queue_delay = m_data_movement->computeQueueDelayNoEffect(pkt_time, processing_time, queue_request_type, requester);
+    return queue_delay;
 }
