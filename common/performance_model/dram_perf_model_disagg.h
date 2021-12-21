@@ -254,9 +254,10 @@ class DramPerfModelDisagg : public DramPerfModel
         template<typename T>
         void sortAndPrintVectorPercentiles(std::vector<T>& vec, std::ostringstream& percentages_buffer, std::ostringstream& counts_buffer, UInt32 num_bins = 40);
 
-        void update_bw_utilization_count(SubsecondTime pkt_time);
+        void updateBandwidthUtilizationCount(SubsecondTime pkt_time);
 
-        void update_local_remote_latency_stat(SubsecondTime access_latency);
+        void updateLocalRemoteLatencyStat(SubsecondTime access_latency);
+        void updateDynamicCachelineLatency(SubsecondTime pkt_time);
 
     public:
         DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_size, AddressHomeLookup* address_home_lookup);

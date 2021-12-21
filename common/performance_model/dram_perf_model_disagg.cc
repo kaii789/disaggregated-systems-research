@@ -1105,7 +1105,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         m_remote_access_latency_outlier_count += 1;
     }
 
-    update_local_remote_latency_stat(access_latency);
+    updateLocalRemoteLatencyStat(access_latency);
     return access_latency;
 }
 
@@ -1132,7 +1132,7 @@ DramPerfModelDisagg::updateLocalIPCStat(UInt64 instr_count)
 }
 
 void
-DramPerfModelDisagg::update_local_remote_latency_stat(SubsecondTime access_latency)
+DramPerfModelDisagg::updateLocalRemoteLatencyStat(SubsecondTime access_latency)
 {
     m_local_total_remote_access_latency += access_latency;
     m_local_total_remote_access_latency_window_cur_size += 1;
@@ -1170,7 +1170,7 @@ DramPerfModelDisagg::updateLatency()
 }
 
 void
-DramPerfModelDisagg::update_bw_utilization_count(SubsecondTime pkt_time)
+DramPerfModelDisagg::updateBandwidthUtilizationCount(SubsecondTime pkt_time)
 {
     double bw_utilization = m_data_movement->getPageQueueUtilizationPercentage(pkt_time);
     int decile = (int)(bw_utilization * 10);
@@ -1179,12 +1179,72 @@ DramPerfModelDisagg::update_bw_utilization_count(SubsecondTime pkt_time)
     m_bw_utilization_decile_to_count[decile] += 1;
 }
 
+void
+DramPerfModelDisagg::updateDynamicCachelineLatency(SubsecondTime pkt_time)
+{
+    UInt64 total_recent_accesses = m_num_recent_remote_accesses + m_num_recent_remote_additional_accesses + m_num_recent_local_accesses;
+    UInt64 total_recent_pages = m_recent_accessed_pages.size();
+    // average number of cachelines accessed per unique page
+    double true_page_locality_measure = (double)total_recent_accesses / total_recent_pages;
+    m_page_locality_measures.push_back(true_page_locality_measure);
+    
+    // counts every non-first access to a page as a "local" access
+    double modified_page_locality_measure = (double)(m_num_recent_local_accesses + m_num_recent_remote_additional_accesses) / total_recent_accesses;
+    // counts every non-first access to a page that wasn't accessed again via the cacheline queue as a "local" access
+    double modified2_page_locality_measure = (double)m_num_recent_local_accesses / total_recent_accesses;
+    m_modified_page_locality_measures.push_back(modified_page_locality_measure);
+    m_modified2_page_locality_measures.push_back(modified2_page_locality_measure);
+
+    // Adjust cl queue fraction if needed
+    double cacheline_queue_utilization_percentage;
+    if (m_r_partition_queues == 1)
+        cacheline_queue_utilization_percentage = m_data_movement_2->getCachelineQueueUtilizationPercentage(pkt_time);
+    else
+        cacheline_queue_utilization_percentage = m_data_movement->getCachelineQueueUtilizationPercentage(pkt_time); 
+    if (m_use_dynamic_cl_queue_fraction_adjustment && m_r_partition_queues != 0 && (m_data_movement->getPageQueueUtilizationPercentage(pkt_time) > 0.8 || cacheline_queue_utilization_percentage > 0.8)) {
+        // Consider adjusting m_r_cacheline_queue_fraction
+        // 0.2 is chosen as the "baseline" cacheline queue fraction, 0.025 is chosen as a step size
+        if (true_page_locality_measure > 40 + std::max(0.0, (0.2 - m_r_cacheline_queue_fraction) * 100)) {
+            // Page locality high, increase prioritization of cachelines
+            m_r_cacheline_queue_fraction -= 0.025;
+            if (m_r_cacheline_queue_fraction < 0.1)  // min cl queue fraction
+                m_r_cacheline_queue_fraction = 0.1;
+            else
+                ++m_r_cacheline_queue_fraction_decreased;
+        } else if (true_page_locality_measure < 20 - std::max(0.0, (m_r_cacheline_queue_fraction - 0.2) * 50)) {
+            // Page locality low, increase prioritization of cachelines
+            m_r_cacheline_queue_fraction += 0.025;
+            if (m_r_cacheline_queue_fraction > 0.6)  // max cl queue fraction (for now)
+                m_r_cacheline_queue_fraction = 0.6;
+            else
+                ++m_r_cacheline_queue_fraction_increased;
+        }
+        updateBandwidth();
+
+        // Update stats
+        if (m_r_cacheline_queue_fraction < m_min_r_cacheline_queue_fraction) {
+            m_min_r_cacheline_queue_fraction = m_r_cacheline_queue_fraction;
+            m_min_r_cacheline_queue_fraction_stat_scaled = m_min_r_cacheline_queue_fraction * 10000;
+        }
+        if (m_r_cacheline_queue_fraction > m_max_r_cacheline_queue_fraction) {
+            m_max_r_cacheline_queue_fraction = m_r_cacheline_queue_fraction;
+            m_max_r_cacheline_queue_fraction_stat_scaled = m_max_r_cacheline_queue_fraction * 10000;
+        }
+    }
+
+    // Reset variables
+    m_num_recent_remote_accesses = 0;
+    m_num_recent_remote_additional_accesses = 0;   // For cacheline queue requests made on inflight pages. Track this separately since they could be counted as either "remote" or "local" cacheline accesses
+    m_num_recent_local_accesses = 0;
+    m_recent_accessed_pages.clear();
+}
+
 SubsecondTime
 DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, core_id_t requester, IntPtr address, DramCntlrInterface::access_t access_type, ShmemPerf *perf)
 {
     if (m_track_page_bw_utilization_stats) {
         // Update BW utilization count
-        update_bw_utilization_count(pkt_time);
+        updateBandwidthUtilizationCount(pkt_time);
     }
     // Update BW utilization stat (5 decimal precision)
     if (m_r_partition_queues) {
@@ -1277,63 +1337,8 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
     // Every 1000 cacheline requests, update page locality stats and determine whether to adjust cacheline queue ratio
     ++m_num_accesses;
     if (m_num_accesses % 30000 == 0) {
-        LOG_PRINT("Processed %lu cacheline requests", m_num_accesses);
         if (m_use_dynamic_cl_queue_fraction_adjustment || !m_speed_up_simulation) {  // only track if using dynamic cl queue fraction, or if not speeding up simulation
-            UInt64 total_recent_accesses = m_num_recent_remote_accesses + m_num_recent_remote_additional_accesses + m_num_recent_local_accesses;
-            UInt64 total_recent_pages = m_recent_accessed_pages.size();
-            // average number of cachelines accessed per unique page
-            double true_page_locality_measure = (double)total_recent_accesses / total_recent_pages;
-            m_page_locality_measures.push_back(true_page_locality_measure);
             
-            // counts every non-first access to a page as a "local" access
-            double modified_page_locality_measure = (double)(m_num_recent_local_accesses + m_num_recent_remote_additional_accesses) / total_recent_accesses;
-            // counts every non-first access to a page that wasn't accessed again via the cacheline queue as a "local" access
-            double modified2_page_locality_measure = (double)m_num_recent_local_accesses / total_recent_accesses;
-            m_modified_page_locality_measures.push_back(modified_page_locality_measure);
-            m_modified2_page_locality_measures.push_back(modified2_page_locality_measure);
-
-            // Adjust cl queue fraction if needed
-            double cacheline_queue_utilization_percentage;
-            if (m_r_partition_queues == 1)
-                cacheline_queue_utilization_percentage = m_data_movement_2->getCachelineQueueUtilizationPercentage(pkt_time);
-            else
-                cacheline_queue_utilization_percentage = m_data_movement->getCachelineQueueUtilizationPercentage(pkt_time); 
-            if (m_use_dynamic_cl_queue_fraction_adjustment && m_r_partition_queues != 0 && (m_data_movement->getPageQueueUtilizationPercentage(pkt_time) > 0.8 || cacheline_queue_utilization_percentage > 0.8)) {
-                // Consider adjusting m_r_cacheline_queue_fraction
-                // 0.2 is chosen as the "baseline" cacheline queue fraction, 0.025 is chosen as a step size
-                if (true_page_locality_measure > 40 + std::max(0.0, (0.2 - m_r_cacheline_queue_fraction) * 100)) {
-                    // Page locality high, increase prioritization of cachelines
-                    m_r_cacheline_queue_fraction -= 0.025;
-                    if (m_r_cacheline_queue_fraction < 0.1)  // min cl queue fraction
-                        m_r_cacheline_queue_fraction = 0.1;
-                    else
-                        ++m_r_cacheline_queue_fraction_decreased;
-                } else if (true_page_locality_measure < 20 - std::max(0.0, (m_r_cacheline_queue_fraction - 0.2) * 50)) {
-                    // Page locality low, increase prioritization of cachelines
-                    m_r_cacheline_queue_fraction += 0.025;
-                    if (m_r_cacheline_queue_fraction > 0.6)  // max cl queue fraction (for now)
-                        m_r_cacheline_queue_fraction = 0.6;
-                    else
-                        ++m_r_cacheline_queue_fraction_increased;
-                }
-                updateBandwidth();
-
-                // Update stats
-                if (m_r_cacheline_queue_fraction < m_min_r_cacheline_queue_fraction) {
-                    m_min_r_cacheline_queue_fraction = m_r_cacheline_queue_fraction;
-                    m_min_r_cacheline_queue_fraction_stat_scaled = m_min_r_cacheline_queue_fraction * 10000;
-                }
-                if (m_r_cacheline_queue_fraction > m_max_r_cacheline_queue_fraction) {
-                    m_max_r_cacheline_queue_fraction = m_r_cacheline_queue_fraction;
-                    m_max_r_cacheline_queue_fraction_stat_scaled = m_max_r_cacheline_queue_fraction * 10000;
-                }
-            }
-
-            // Reset variables
-            m_num_recent_remote_accesses = 0;
-            m_num_recent_remote_additional_accesses = 0;   // For cacheline queue requests made on inflight pages. Track this separately since they could be counted as either "remote" or "local" cacheline accesses
-            m_num_recent_local_accesses = 0;
-            m_recent_accessed_pages.clear();
         }
     }
     if (m_use_dynamic_cl_queue_fraction_adjustment || !m_speed_up_simulation) {  // only track if using dynamic cl queue fraction, or if not speeding up simulation
