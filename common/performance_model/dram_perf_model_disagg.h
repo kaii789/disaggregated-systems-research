@@ -9,6 +9,7 @@
 #include "subsecond_time.h"
 #include "dram_cntlr_interface.h"
 #include "hashed_linked_list.h"
+#include "dram_hardware_cntlr.h"
 
 #include <vector>
 #include <bitset>
@@ -22,57 +23,21 @@
 class DramPerfModelDisagg : public DramPerfModel
 {
     private:
-        const core_id_t m_core_id;
-        const AddressHomeLookup* m_address_home_lookup;
-        const UInt32 m_num_banks;       // number of banks in a rank
-        const UInt32 m_num_banks_log2;
-        const UInt32 m_num_bank_groups; // number of bank groups in a rank
-        const UInt32 m_num_ranks;
-        const UInt32 m_rank_offset;
-        const UInt32 m_num_channels;
-        const UInt32 m_channel_offset;
-        const UInt32 m_home_lookup_bit;
-        const UInt32 m_total_ranks;
-        const UInt32 m_banks_per_channel;
-        const UInt32 m_banks_per_bank_group;
-        const UInt32 m_total_banks;
-        const UInt32 m_total_bank_groups;
-        const UInt32 m_data_bus_width;  // bus between dram and memory controller
-        const UInt32 m_dram_speed;      // MHz, 533, 667, etc.
-        const UInt32 m_dram_page_size;  // dram page size in bytes
-        const UInt32 m_dram_page_size_log2;
-        const bool m_open_page_mapping;
-        const UInt32 m_column_offset;
-        const UInt32 m_column_hi_offset;
-        const UInt32 m_bank_offset;
-        const bool m_randomize_address;
-        const UInt32 m_randomize_offset;
-        const UInt32 m_column_bits_shift; // Position of column bits for closed-page mapping (after cutting interleaving/channel/rank/bank from bottom)
-        SubsecondTime m_dram_hw_fixed_latency;  // Only used in the simplified dram HW access cost queuing model, a fixed latency for dram access cost
-        const ComponentBandwidth m_bus_bandwidth;
-        const ComponentBandwidth m_r_dram_bus_bandwidth;
+        const UInt32 m_cache_line_size;
+        const UInt32 m_page_size; // Memory page size (in bytes) in disagg.cc (different from ddr page size)
+        UInt32 m_r_partition_queues; // Enable partitioned queues
+        DramHardwareCntlr m_dram_hardware_cntlr;  // Manage DRAM hardware access latency, based on memory address
+        
+        const UInt32 m_base_bus_bandwidth;      // Temporary variable to calculate bus bandwidths; in bits/us
         ComponentBandwidth m_r_bus_bandwidth;   // Remote
         ComponentBandwidth m_r_part_bandwidth;  // Remote - Partitioned Queues => Page Queue
         ComponentBandwidth m_r_part2_bandwidth; // Remote - Partitioned Queues => Cacheline Queue
         double m_r_bw_scalefactor;              // Remote memory bandwidth is ddr bandwidth scaled down by m_r_bw_scalefactor
         bool m_use_dynamic_bandwidth;
         bool m_use_dynamic_latency;
-        const SubsecondTime m_bank_keep_open;
-        const SubsecondTime m_bank_open_delay;
-        const SubsecondTime m_bank_close_delay;
-        const SubsecondTime m_dram_access_cost;
-        const SubsecondTime m_r_added_dram_access_cost;
-        const SubsecondTime m_intercommand_delay;       // Rank availability
-        const SubsecondTime m_intercommand_delay_short; // Rank availability
-        const SubsecondTime m_intercommand_delay_long;  // Bank group availability
-        const SubsecondTime m_controller_delay;         // Average pipeline delay for various DDR controller stages
-        const SubsecondTime m_refresh_interval;         // tRFCI
-        const SubsecondTime m_refresh_length;           // tRFC
         SubsecondTime m_r_added_latency; // Additional remote latency
         UInt64 m_r_added_latency_int;
         const UInt32 m_r_datamov_threshold; // Move data if greater than yy
-        const UInt32 m_cache_line_size;
-        const UInt32 m_page_size; // Memory page size (in bytes) in disagg.cc (different from ddr page size)
         const UInt32 m_localdram_size; // Local DRAM size
         const bool m_enable_remote_mem; // Enable remote memory with the same DDR type as local for now
         const bool m_r_simulate_tlb_overhead; // Simulate tlb overhead
@@ -85,7 +50,6 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt32 m_r_disturbance_factor; // Other systems using the remote memory and creating disturbance
         const bool m_r_dontevictdirty; // Do not evict dirty data
         const bool m_r_enable_selective_moves; 
-        UInt32 m_r_partition_queues; // Enable partitioned queues
         double m_r_cacheline_queue_fraction; // The fraction of remote bandwidth used for the cacheline queue (decimal between 0 and 1) 
         bool m_use_dynamic_cl_queue_fraction_adjustment; // Whether to dynamically adjust m_r_cacheline_queue_fraction
         const bool m_r_cacheline_gran; // Move data and operate in cacheline granularity
@@ -103,36 +67,14 @@ class DramPerfModelDisagg : public DramPerfModel
         SubsecondTime m_r_ideal_pagethrottle_remote_access_history_window_size;  // Track remote page accesses using the most recent window size number of ns
         bool m_track_page_bw_utilization_stats;
         bool m_speed_up_simulation;  // When this is true, some optional stats aren't calculated
-        bool m_r_pq_cacheline_hw_no_queue_delay;  // When this is true, remove HW access queue delay from PQ=on cacheline requests' critical path to simulate prioritized cachelines
         bool m_track_inflight_cachelines;  // Whether to track simultaneous inflight cachelines (slows down simulation)
         bool m_auto_turn_off_partition_queues;
         double m_turn_off_pq_cacheline_queue_utilization_threshold;
         double m_cancel_pq_inflight_buffer_threshold;
         bool m_keep_space_in_cacheline_queue;
 
-        // Local Memory
-        QueueModel* m_dram_queue_model_single;
-        std::vector<QueueModel*> m_queue_model;
-        std::vector<QueueModel*> m_rank_avail;
-        std::vector<QueueModel*> m_bank_group_avail;
-
         QueueModel* m_data_movement;        // Normally, this is the combined queue for pages and cachelines. When partitioned queues are enabled, this is the page queue
         QueueModel* m_data_movement_2;      // When partitioned queues are enabled, this is the cacheline queue
-
-        struct BankInfo
-        {
-            IntPtr open_page;
-            SubsecondTime t_avail;
-        };
-        std::vector<BankInfo> m_banks;
-
-        // Remote memory
-        QueueModel* m_r_dram_queue_model_single;
-        std::vector<QueueModel*> m_r_queue_model;
-        std::vector<QueueModel*> m_r_rank_avail;
-        std::vector<QueueModel*> m_r_bank_group_avail;
-
-        std::vector<BankInfo> m_r_banks;
 
         HashedLinkedList m_local_pages; // Pages of local memory
         std::unordered_map<UInt64, char> m_local_pages_remote_origin;  // Pages of local memory that were originally in remote; char type can be changed to int for tracking number of accesses
@@ -191,10 +133,6 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_num_accesses;                                // Total number of calls to getAccessLatency(), ie # cachelines requested
 
         // Variables to keep track of stats
-        UInt64 m_dram_page_hits;
-        UInt64 m_dram_page_empty;
-        UInt64 m_dram_page_closing;
-        UInt64 m_dram_page_misses;
         UInt64 m_local_reads_remote_origin;
         UInt64 m_local_writes_remote_origin;
         UInt64 m_remote_reads;
@@ -248,15 +186,6 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_total_remote_dram_hardware_latency_cachelines_count;
         UInt64 m_total_remote_dram_hardware_latency_pages_count;
         SubsecondTime m_total_local_dram_hardware_write_latency_pages;
-        // UInt64 m_local_get_dram_access_cost_called;
-        // UInt64 m_remote_cacheline_get_dram_access_cost_called;
-        // UInt64 m_remote_page_get_dram_access_cost_called;
-        SubsecondTime m_local_get_dram_access_cost_processing_time;
-        SubsecondTime m_local_get_dram_access_cost_queue_delay;
-        SubsecondTime m_remote_cacheline_get_dram_access_cost_processing_time;
-        SubsecondTime m_remote_cacheline_get_dram_access_cost_queue_delay;
-        SubsecondTime m_remote_page_get_dram_access_cost_processing_time;
-        SubsecondTime m_remote_page_get_dram_access_cost_queue_delay;
         SubsecondTime m_cacheline_network_processing_time;
         SubsecondTime m_cacheline_network_queue_delay;
         SubsecondTime m_page_network_processing_time;
@@ -318,12 +247,6 @@ class DramPerfModelDisagg : public DramPerfModel
 
         UInt64 m_disturbance_bq_size;
 
-        SubsecondTime getDramAccessCost(SubsecondTime start_time, UInt64 size, core_id_t requester, IntPtr address, ShmemPerf *perf, bool is_remote, bool is_exclude_cacheline, bool is_page);
-        SubsecondTime getDramAccessCostSimple(SubsecondTime start_time, UInt64 size, core_id_t requester, IntPtr address, ShmemPerf *perf, bool is_remote, bool is_exclude_cacheline, bool is_page);
-        SubsecondTime getDramAccessCostDetailed(SubsecondTime start_time, UInt64 size, core_id_t requester, IntPtr address, ShmemPerf *perf, bool is_remote, bool is_exclude_cacheline, bool is_page);
-        SubsecondTime getDramWriteCost(SubsecondTime start_time, UInt64 size, core_id_t requester, IntPtr address, ShmemPerf *perf, bool is_exclude_cacheline, bool is_page);
-        void parseDeviceAddress(IntPtr address, UInt32 &channel, UInt32 &rank, UInt32 &bank_group, UInt32 &bank, UInt32 &column, UInt64 &dram_page);
-        UInt64 parseAddressBits(UInt64 address, UInt32 &data, UInt32 offset, UInt32 size, UInt64 base_address);
         SubsecondTime possiblyEvict(UInt64 phys_page, SubsecondTime pkt_time, core_id_t requester);
         void possiblyPrefetch(UInt64 phys_page, SubsecondTime pkt_time, core_id_t requester);
 
