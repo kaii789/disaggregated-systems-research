@@ -257,7 +257,7 @@ class DramPerfModelDisagg : public DramPerfModel
         void updateBandwidthUtilizationCount(SubsecondTime pkt_time);
 
         void updateLocalRemoteLatencyStat(SubsecondTime access_latency);
-        void updateDynamicCachelineLatency(SubsecondTime pkt_time);
+        void updateDynamicCachelineQueueRatio(SubsecondTime pkt_time);
 
     public:
         DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_size, AddressHomeLookup* address_home_lookup);

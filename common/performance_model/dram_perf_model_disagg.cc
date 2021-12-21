@@ -1180,7 +1180,7 @@ DramPerfModelDisagg::updateBandwidthUtilizationCount(SubsecondTime pkt_time)
 }
 
 void
-DramPerfModelDisagg::updateDynamicCachelineLatency(SubsecondTime pkt_time)
+DramPerfModelDisagg::updateDynamicCachelineQueueRatio(SubsecondTime pkt_time)
 {
     UInt64 total_recent_accesses = m_num_recent_remote_accesses + m_num_recent_remote_additional_accesses + m_num_recent_local_accesses;
     UInt64 total_recent_pages = m_recent_accessed_pages.size();
@@ -1336,10 +1336,8 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
 
     // Every 1000 cacheline requests, update page locality stats and determine whether to adjust cacheline queue ratio
     ++m_num_accesses;
-    if (m_num_accesses % 30000 == 0) {
-        if (m_use_dynamic_cl_queue_fraction_adjustment || !m_speed_up_simulation) {  // only track if using dynamic cl queue fraction, or if not speeding up simulation
-            
-        }
+    if (m_num_accesses % 30000 == 0 && (m_use_dynamic_cl_queue_fraction_adjustment || !m_speed_up_simulation)) {  // only track if using dynamic cl queue fraction, or if not speeding up simulation
+        updateDynamicCachelineQueueRatio(pkt_time);
     }
     if (m_use_dynamic_cl_queue_fraction_adjustment || !m_speed_up_simulation) {  // only track if using dynamic cl queue fraction, or if not speeding up simulation
         if (!m_recent_accessed_pages.count(phys_page)) {
@@ -1355,7 +1353,6 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
             ++m_remote_writes;
         }
         ++m_num_recent_remote_accesses;
-        //	printf("Remote access: %d\n",m_remote_reads); 
         return (getAccessLatencyRemote(pkt_time, pkt_size, requester, address, access_type, perf)); 
     }
     // if (!m_speed_up_simulation) {
