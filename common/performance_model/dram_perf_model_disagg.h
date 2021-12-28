@@ -54,7 +54,7 @@ class DramPerfModelDisagg : public DramPerfModel
         const bool m_r_cacheline_gran; // Move data and operate in cacheline granularity
         const double m_r_reserved_bufferspace; // Max % of local DRAM that can be reserved for pages in transit
         const UInt32 m_r_redundant_moves_limit; 
-        const bool m_r_throttle_redundant_moves;
+        const bool m_r_throttle_redundant_moves; // Reduce traffic sent through cacheline queue by only actually making cacheline requests when it leads to speed improvements
         const bool m_r_use_separate_queue_model;  // Whether to use the separate remote queue model
         double m_r_page_queue_utilization_threshold;  // When the datamovement queue for pages has percentage utilization above this, remote pages aren't moved to local
         double m_r_cacheline_queue_type1_utilization_threshold;
@@ -67,7 +67,7 @@ class DramPerfModelDisagg : public DramPerfModel
         bool m_speed_up_simulation;  // When this is true, some optional stats aren't calculated
         bool m_track_inflight_cachelines;  // Whether to track simultaneous inflight cachelines (slows down simulation)
         bool m_track_page_bw_utilization_stats;
-        bool m_auto_turn_off_partition_queues;
+        bool m_auto_turn_off_partition_queues; 
         double m_turn_off_pq_cacheline_queue_utilization_threshold;
         double m_cancel_pq_inflight_buffer_threshold;
         bool m_keep_space_in_cacheline_queue;
@@ -82,7 +82,7 @@ class DramPerfModelDisagg : public DramPerfModel
         std::unordered_set<UInt64> m_dirty_pages; // Dirty pages of local memory
         std::map<UInt64, SubsecondTime> m_inflight_pages; // Inflight pages that are being transferred from remote memory to local memory
         std::map<UInt64, UInt32> m_inflight_redundant;    // Count the number of redundant moves that occur for each inflight page while it is being transferred
-        std::unordered_set<UInt64> m_pages_cacheline_request_limit_exceeded;  // Remote/inflight pages with cacheline queues requests >= m_r_redundant_moves_limit
+        std::unordered_set<UInt64> m_pages_cacheline_request_limit_exceeded;  // Remote/inflight pages with cacheline queues requests >= m_r_redundant_moves_limit (to be used to track if pq = off is needed)
         std::map<UInt64, SubsecondTime> m_inflightevicted_pages; // Inflight pages that are being transferred from local memory to remote memory
         std::map<UInt64, SubsecondTime> m_inflight_pages_extra; // Inflight pages that are being transferred from remote memory to local memory, that exceed the limit from inflight buffer size or network bw (track arrival time while not counting it in the normal data structures)
 
@@ -213,7 +213,7 @@ class DramPerfModelDisagg : public DramPerfModel
         std::vector<double> m_local_ipcs;
         std::vector<UInt64> m_instruction_count_x_axis;
 
-        std::unordered_map<UInt64, UInt64> m_inflight_page_to_dirty_write_count;
+        std::unordered_map<UInt64, UInt64> m_inflight_page_to_dirty_write_count; // Evicted paged from local to remote which are inflight and dirty.
         UInt64 m_dirty_write_buffer_size = 0;
         UInt64 m_sum_write_buffer_size = 0;
         UInt64 m_max_dirty_write_buffer_size = 0;
