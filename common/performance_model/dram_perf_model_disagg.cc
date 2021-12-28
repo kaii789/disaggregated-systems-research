@@ -41,7 +41,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_r_enable_selective_moves      (Sim()->getCfg()->getBool("perf_model/dram/remote_enable_selective_moves"))
     , m_r_cacheline_gran      (Sim()->getCfg()->getBool("perf_model/dram/remote_use_cacheline_granularity")) // Move data and operate in cacheline granularity
     , m_r_reserved_bufferspace      (Sim()->getCfg()->getFloat("perf_model/dram/remote_reserved_buffer_space")) // Max % of local DRAM that can be reserved for pages in transit
-    , m_r_limit_redundant_moves      (Sim()->getCfg()->getInt("perf_model/dram/remote_limit_redundant_moves"))
+    , m_r_redundant_moves_limit      (Sim()->getCfg()->getInt("perf_model/dram/remote_limit_redundant_moves"))
     , m_r_throttle_redundant_moves      (Sim()->getCfg()->getBool("perf_model/dram/remote_throttle_redundant_moves"))
     , m_r_use_separate_queue_model      (Sim()->getCfg()->getBool("perf_model/dram/queue_model/use_separate_remote_queue_model")) // Whether to use the separate remote queue model
     , m_r_page_queue_utilization_threshold   (Sim()->getCfg()->getFloat("perf_model/dram/remote_page_queue_utilization_threshold")) // When the datamovement queue for pages has percentage utilization above this, remote pages aren't moved to local
@@ -527,10 +527,13 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     SubsecondTime t_now = pkt_time + cacheline_hw_access_latency;
 
     SubsecondTime t_remote_queue_request = t_now;  // time of making queue request (after DRAM hardware access cost added)
-    // Compress
     UInt64 phys_page = address & ~((UInt64(1) << floorLog2(m_page_size)) - 1);
     UInt64 cacheline = address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1);  // Was << 6
-    UInt32 size = pkt_size;
+    if (m_r_cacheline_gran)
+        phys_page = cacheline;
+    
+    // Compress
+    UInt32 size = pkt_size;  // store the compressed size of the cacheline (unmodified when compression is off)
     SubsecondTime cacheline_compression_latency = SubsecondTime::Zero();  // when cacheline compression is not enabled, this is always 0
     if (m_use_compression) {
         if (m_r_cacheline_gran) {
@@ -580,8 +583,6 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     }
 
     // Track access to page
-    if (m_r_cacheline_gran)
-        phys_page = address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1);  // Was << 6
     bool move_page = false;
     if (m_r_mode == 2 || m_r_mode == 5) {  // Update m_remote_access_tracker
         auto it = m_remote_access_tracker.find(phys_page);
@@ -623,14 +624,14 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         }
     }
     // Cancel moving the page if the amount of reserved bufferspace in localdram for inflight + inflight_evicted pages is not enough to support an additional move
-    if (m_r_partition_queues != 0 && move_page && m_r_reserved_bufferspace > 0 && ((m_inflight_pages.size() + m_inflightevicted_pages.size())  >= ((double)m_r_reserved_bufferspace/100)*(m_localdram_size/m_page_size))) {
+    if (m_r_partition_queues > 1 && move_page && m_r_reserved_bufferspace > 0 && ((m_inflight_pages.size() + m_inflightevicted_pages.size())  >= ((double)m_r_reserved_bufferspace/100)*(m_localdram_size/m_page_size))) {
         move_page = false;
         ++m_move_page_cancelled_bufferspace_full;
     }
     double page_queue_utilization_percentage = m_data_movement->getPageQueueUtilizationPercentage(t_now);
     double cacheline_queue_utilization_percentage = m_data_movement->getCachelineQueueUtilizationPercentage(t_now);
     // Cancel moving the page if the queue used to move the page is already full AND there is space in the cacheline queue
-    if (m_r_partition_queues != 0 && move_page && page_queue_utilization_percentage > m_r_page_queue_utilization_threshold && ((m_keep_space_in_cacheline_queue && cacheline_queue_utilization_percentage <= m_r_cacheline_queue_type1_utilization_threshold) || page_queue_utilization_percentage > cacheline_queue_utilization_percentage)) {  // save 5% for evicted pages?
+    if (m_r_partition_queues > 1 && move_page && page_queue_utilization_percentage > m_r_page_queue_utilization_threshold && ((m_keep_space_in_cacheline_queue && cacheline_queue_utilization_percentage <= m_r_cacheline_queue_type1_utilization_threshold) || page_queue_utilization_percentage > cacheline_queue_utilization_percentage)) {  // save 5% for evicted pages?
         move_page = false;
         ++m_move_page_cancelled_datamovement_queue_full;
 
@@ -671,7 +672,6 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
 
     SubsecondTime page_network_processing_time = SubsecondTime::Zero();
 
-    // Adding data movement cost of the entire page for now (this just adds contention in the queue)
     SubsecondTime page_datamovement_delay = SubsecondTime::Zero();
     if (move_page) {
         ++m_page_moves;
@@ -679,11 +679,11 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         SubsecondTime page_compression_latency = SubsecondTime::Zero();  // when page compression is not enabled, this is always 0
         SubsecondTime page_hw_access_latency = SubsecondTime::Zero();
         SubsecondTime local_page_hw_write_latency = SubsecondTime::Zero();
-        std::vector<std::pair<UInt64, SubsecondTime>> updated_inflight_page_arrival_time_deltas;
+        std::vector<std::pair<UInt64, SubsecondTime>> updated_inflight_page_arrival_time_deltas;  // only for m_r_partition_queues == 3, ie windowed_mg1_remote_subqueuemodels
         if (m_r_simulate_datamov_overhead && !m_r_cacheline_gran) {
             UInt32 page_size = m_page_size;
             if (m_r_partition_queues) {
-                page_size = m_page_size - m_cache_line_size;
+                page_size = m_page_size - m_cache_line_size;  // We don't have to move the cacheline since it was separately moved via the cacheline queue
             }
 
             // Compress
@@ -711,7 +711,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             if (cacheline_remainder > 0)
                 page_size_for_dram = page_size_for_dram + m_cache_line_size - cacheline_remainder;
             if (m_r_partition_queues) {
-                // Set exclude_cacheline to true (in this case, should still pass in the original page size for the size parameter)
+                // Set exclude_cacheline to true (in this case, should still pass in the whole page size for the size parameter)
                 page_hw_access_latency = m_dram_hardware_cntlr.getDramAccessCost(t_remote_queue_request, page_size_for_dram, requester, address, perf, true, true, true);
                 local_page_hw_write_latency = m_dram_hardware_cntlr.getDramWriteCost(t_remote_queue_request, page_size_for_dram, requester, address, perf, true, true);
             } else {
@@ -743,7 +743,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             }
 
             // Update t_now after page_datamovement_delay includes the decompression latency
-            if (m_r_partition_queues != 0) {
+            if (m_r_partition_queues > 1) {
                 m_page_network_processing_time += page_network_processing_time;
                 m_page_network_queue_delay += page_datamovement_delay - page_decompression_latency;
                 m_remote_to_local_page_move_count++;
@@ -783,21 +783,8 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
                     m_redundant_moves_type1_time_savings += (page_hw_access_latency + page_compression_latency + page_datamovement_delay) - (cacheline_hw_access_latency + cacheline_compression_latency + datamovement_delay);
 
                     if (m_track_inflight_cachelines) {
-                        // Track inflight cachelines
-                        if (access_type == DramCntlrInterface::READ && m_inflight_cachelines_reads.find(cacheline) == m_inflight_cachelines_reads.end()) {
-                            // The current cacheline is not in inflight cachelines
-                            m_inflight_cachelines_reads.insert(std::pair<UInt64, SubsecondTime>(cacheline, t_remote_queue_request + cacheline_compression_latency + datamovement_delay));  // datamovement_delay includes cacheline network processing time; for PQ=on, cacheline hw latency already included in t_remote_queue_request 
-                            if (m_inflight_cachelines_reads.size() > m_max_inflight_cachelines_reads)
-                                m_max_inflight_cachelines_reads++;
-                            if (m_inflight_cachelines_reads.size()+ m_inflight_cachelines_writes.size() > m_max_inflight_cachelines_total)
-                                m_max_inflight_cachelines_total++;
-                        } else if (access_type == DramCntlrInterface::WRITE) {
-                            m_inflight_cachelines_writes.insert(std::pair<UInt64, SubsecondTime>(cacheline, t_remote_queue_request + cacheline_compression_latency + datamovement_delay));  // datamovement_delay includes cacheline network processing time; for PQ=on, cacheline hw latency already included in t_remote_queue_request 
-                            if (m_inflight_cachelines_writes.size() > m_max_inflight_cachelines_writes)
-                                m_max_inflight_cachelines_writes++;
-                            if (m_inflight_cachelines_reads.size()+ m_inflight_cachelines_writes.size() > m_max_inflight_cachelines_total)
-                                m_max_inflight_cachelines_total++;
-                        }
+                        // datamovement_delay includes cacheline network processing time; for PQ=on, cacheline hw latency already included in t_remote_queue_request 
+                        addInflightCacheline(cacheline, t_remote_queue_request + cacheline_compression_latency + datamovement_delay, access_type);
                     }
                 }
             } else {
@@ -918,21 +905,8 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         }
 
         if (m_track_inflight_cachelines) {
-            // Track inflight cachelines
-            if (access_type == DramCntlrInterface::READ && m_inflight_cachelines_reads.find(cacheline) == m_inflight_cachelines_reads.end()) {
-                // The current cacheline is not in inflight cachelines
-                m_inflight_cachelines_reads.insert(std::pair<UInt64, SubsecondTime>(cacheline, t_remote_queue_request + cacheline_compression_latency + datamovement_delay));  // datamovement_delay includes cacheline network processing time; for PQ=on, cacheline hw latency already included in t_remote_queue_request 
-                if (m_inflight_cachelines_reads.size() > m_max_inflight_cachelines_reads)
-                    m_max_inflight_cachelines_reads++;
-                if (m_inflight_cachelines_reads.size()+ m_inflight_cachelines_writes.size() > m_max_inflight_cachelines_total)
-                    m_max_inflight_cachelines_total++;
-            } else if (access_type == DramCntlrInterface::WRITE) {
-                m_inflight_cachelines_writes.insert(std::pair<UInt64, SubsecondTime>(cacheline, t_remote_queue_request + cacheline_compression_latency + datamovement_delay));  // datamovement_delay includes cacheline network processing time; for PQ=on, cacheline hw latency already included in t_remote_queue_request 
-                if (m_inflight_cachelines_writes.size() > m_max_inflight_cachelines_writes)
-                    m_max_inflight_cachelines_writes++;
-                if (m_inflight_cachelines_reads.size()+ m_inflight_cachelines_writes.size() > m_max_inflight_cachelines_total)
-                    m_max_inflight_cachelines_total++;
-            }
+            // datamovement_delay includes cacheline network processing time; for PQ=on, cacheline hw latency already included in t_remote_queue_request 
+            addInflightCacheline(cacheline, t_remote_queue_request + cacheline_compression_latency + datamovement_delay, access_type);            
         }
 
         if (m_r_throttle_redundant_moves) {
@@ -959,12 +933,12 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             m_pages_cacheline_request_limit_exceeded.erase(phys_page);
         } else {
             m_inflight_redundant[phys_page] += 1;
-            if (m_inflight_redundant[phys_page] >= m_r_limit_redundant_moves)
+            if (m_inflight_redundant[phys_page] >= m_r_redundant_moves_limit)
                 m_pages_cacheline_request_limit_exceeded.insert(phys_page);
         }
         if (m_auto_turn_off_partition_queues && cacheline_queue_utilization_percentage > m_turn_off_pq_cacheline_queue_utilization_threshold && m_pages_cacheline_request_limit_exceeded.size() > m_cancel_pq_inflight_buffer_threshold * (m_inflight_pages.size() + m_inflight_pages_extra.size())) {
             m_r_partition_queues = 0;
-            std::cout << "Partition queues turned off due to >= type 1 redundant moves limit of " << m_r_limit_redundant_moves << " at " << m_num_accesses << " accesses" << std::endl;
+            std::cout << "Partition queues turned off due to >= type 1 redundant moves limit of " << m_r_redundant_moves_limit << " at " << m_num_accesses << " accesses" << std::endl;
         }
     } 
 
@@ -975,9 +949,10 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     possiblyPrefetch(phys_page, t_now, requester);
 
     SubsecondTime access_latency = t_now - pkt_time;
+
+    // Update stats
     m_total_remote_access_latency += access_latency;
     m_total_access_latency += access_latency;
-
     if (access_latency < m_access_latency_outlier_threshold) {
         m_total_access_latency_no_outlier += access_latency;
         m_total_remote_access_latency_no_outlier += access_latency;
@@ -985,8 +960,8 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         m_access_latency_outlier_count += 1;
         m_remote_access_latency_outlier_count += 1;
     }
-
     updateLocalRemoteLatencyStat(access_latency);
+
     return access_latency;
 }
 
@@ -1078,7 +1053,7 @@ DramPerfModelDisagg::updateDynamicCachelineQueueRatio(SubsecondTime pkt_time)
 
     // Adjust cl queue fraction if needed
     double cacheline_queue_utilization_percentage = m_data_movement->getCachelineQueueUtilizationPercentage(pkt_time); 
-    if (m_use_dynamic_cl_queue_fraction_adjustment && m_r_partition_queues != 0 && (m_data_movement->getPageQueueUtilizationPercentage(pkt_time) > 0.8 || cacheline_queue_utilization_percentage > 0.8)) {
+    if (m_use_dynamic_cl_queue_fraction_adjustment && m_r_partition_queues > 1 && (m_data_movement->getPageQueueUtilizationPercentage(pkt_time) > 0.8 || cacheline_queue_utilization_percentage > 0.8)) {
         // Consider adjusting m_r_cacheline_queue_fraction
         // 0.2 is chosen as the "baseline" cacheline queue fraction, 0.025 is chosen as a step size
         if (true_page_locality_measure > 40 + std::max(0.0, (0.2 - m_r_cacheline_queue_fraction) * 100)) {
@@ -1133,9 +1108,9 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
     }
 
     UInt64 phys_page = address & ~((UInt64(1) << floorLog2(m_page_size)) - 1);
-    if (m_r_cacheline_gran)
-        phys_page = address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1);  // Was << 6
     UInt64 cacheline = address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1);  // Was << 6
+    if (m_r_cacheline_gran)
+        phys_page = cacheline;
 
     if (!m_speed_up_simulation) {
         if (m_page_usage_map.count(phys_page) == 0) {
@@ -1270,7 +1245,6 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
         return access_latency;
     } else {
         // The phys_page is an inflight page and m_r_enable_selective_moves is false
-        //SubsecondTime current_time = std::min(Sim()->getClockSkewMinimizationServer()->getGlobalTime(), t_now);
         SubsecondTime access_latency;
         if (m_inflight_pages_extra.find(phys_page) != m_inflight_pages_extra.end()) {
             access_latency = m_inflight_pages_extra[phys_page] > t_now ? (m_inflight_pages_extra[phys_page] - pkt_time) : (t_now - pkt_time);
@@ -1282,7 +1256,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
             // The page is still in transit from remote to local memory
             m_inflight_hits++; 
 
-            if (m_r_partition_queues != 0) {
+            if (m_r_partition_queues > 1) {
                 double cacheline_queue_utilization_percentage = m_data_movement->getCachelineQueueUtilizationPercentage(t_now);
                 if (m_track_inflight_cachelines && access_type == DramCntlrInterface::READ && m_inflight_cachelines_reads.find(cacheline) != m_inflight_cachelines_reads.end()) {
                     // This cacheline read was already inflight, wait for to arrive
@@ -1293,7 +1267,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                     ++m_redundant_moves_type2_cancelled_datamovement_queue_full;
                     if (m_auto_turn_off_partition_queues)
                         m_inflight_redundant[phys_page] += 1;  // track this as a redundant request even though it wasn't actually made
-                } else if (m_inflight_redundant[phys_page] < m_r_limit_redundant_moves) {
+                } else if (m_inflight_redundant[phys_page] < m_r_redundant_moves_limit) {
                     // Update dirty write buffer
                     if (access_type == DramCntlrInterface::WRITE) {
                         UInt64 dirty_write_count = 0;
@@ -1314,22 +1288,14 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                     m_total_remote_dram_hardware_latency_cachelines += add_cacheline_hw_access_latency;
                     m_total_remote_dram_hardware_latency_cachelines_count++;
 
-                    UInt32 size = pkt_size;
+                    UInt32 size = pkt_size;  // store the compressed size of the cacheline (unmodified when compression is off)
                     SubsecondTime cacheline_compression_latency = SubsecondTime::Zero();  // when cacheline compression is not enabled, this is always 0
                     if (m_use_compression) {
                         if (m_r_cacheline_gran) {
-                            if (m_r_partition_queues > 1)
-                                m_compression_controller.m_compression_model->update_bandwidth_utilization(m_data_movement->getCachelineQueueUtilizationPercentage(t_now));
-                            else  // ie partition queues off
-                                m_compression_controller.m_compression_model->update_bandwidth_utilization(m_data_movement->getTotalQueueUtilizationPercentage(t_now));
-
+                            m_compression_controller.m_compression_model->update_bandwidth_utilization(m_data_movement->getCachelineQueueUtilizationPercentage(t_now));
                             cacheline_compression_latency = m_compression_controller.compress(false, phys_page, m_cache_line_size, &size);
                         } else if (m_use_cacheline_compression) {
-                            if (m_r_partition_queues > 1)
-                                m_compression_controller.m_cacheline_compression_model->update_bandwidth_utilization(m_data_movement->getCachelineQueueUtilizationPercentage(t_now));
-                            else  // ie partition queues off
-                                m_compression_controller.m_cacheline_compression_model->update_bandwidth_utilization(m_data_movement->getTotalQueueUtilizationPercentage(t_now));
-
+                            m_compression_controller.m_cacheline_compression_model->update_bandwidth_utilization(m_data_movement->getCachelineQueueUtilizationPercentage(t_now));
                             cacheline_compression_latency = m_compression_controller.compress(true, phys_page, m_cache_line_size, &size);
                         }
                     }
@@ -1344,60 +1310,18 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                     SubsecondTime cacheline_network_processing_time = m_r_cacheline_bandwidth.getRoundedLatency(8*size);
                     
                     SubsecondTime add_cacheline_request_time = t_remote_queue_request + add_cacheline_hw_access_latency + cacheline_compression_latency;  // cacheline_compression_latency is 0 if compression not enabled
+                    bool make_add_cacheline_request = true;
                     // Main difference when m_r_throttle_redundant_moves is true: reduce traffic sent through cacheline queue
                     if (m_r_throttle_redundant_moves) {
                         // Don't request cacheline via the cacheline queue if the inflight page arrives sooner
-                        // But otherwise use the earlier arrival time to determine access_latency
-                        SubsecondTime datamov_delay;
-                        if (m_r_partition_queues > 1) {
-                            datamov_delay = getPartitionQueueDelayNoEffect(add_cacheline_request_time, size, QueueModel::CACHELINE, requester);
-                        }
+                        SubsecondTime datamov_delay = getPartitionQueueDelayNoEffect(add_cacheline_request_time, size, QueueModel::CACHELINE, requester);
                         datamov_delay += cacheline_network_processing_time + cacheline_decompression_latency;  // decompression latency is 0 if not using cacheline compression
-                        if ((add_cacheline_request_time + datamov_delay - pkt_time) < access_latency) {
-                            if (m_r_partition_queues == 3) {
-                                std::vector<std::pair<UInt64, SubsecondTime>> updated_inflight_page_arrival_time_deltas;
-                                datamov_delay = m_data_movement->computeQueueDelayTrackBytesPotentialPushback(add_cacheline_request_time, m_r_cacheline_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, updated_inflight_page_arrival_time_deltas, true, requester);
-                                for (auto it = updated_inflight_page_arrival_time_deltas.begin(); it != updated_inflight_page_arrival_time_deltas.end(); ++it) {
-                                    if (m_inflight_pages.count(it->first) && it->second > SubsecondTime::Zero()) {
-                                        m_inflight_pages_delay_time += it->second;
-                                        m_inflight_pages[it->first] += it->second;  // update arrival time if it's still an inflight page
-                                        ++m_inflight_page_delayed;
-                                    }
-                                }
-                            } else if (m_r_partition_queues == 2 || m_r_partition_queues == 4) {
-                                datamov_delay = getPartitionQueueDelayTrackBytes(add_cacheline_request_time, size, QueueModel::CACHELINE, requester);
-                            }
-                            datamov_delay += cacheline_network_processing_time + cacheline_decompression_latency;
-                            ++m_redundant_moves;
-                            ++m_redundant_moves_type2;
-                            --m_num_recent_local_accesses;
-                            ++m_num_recent_remote_additional_accesses;  // this is now an additional remote access
-                            m_inflight_redundant[phys_page] += 1;
-                            m_redundant_moves_type2_time_savings += (access_latency - (add_cacheline_request_time + datamov_delay - pkt_time));
-                            access_latency = add_cacheline_request_time + datamov_delay - pkt_time;
-
-                            if (m_track_inflight_cachelines) {
-                                // Track inflight cachelines
-                                if (access_type == DramCntlrInterface::READ && m_inflight_cachelines_reads.find(cacheline) == m_inflight_cachelines_reads.end()) {
-                                    // The current cacheline is not in inflight cachelines
-                                    m_inflight_cachelines_reads.insert(std::pair<UInt64, SubsecondTime>(cacheline, add_cacheline_request_time + datamov_delay));
-                                    if (m_inflight_cachelines_reads.size() > m_max_inflight_cachelines_reads)
-                                        m_max_inflight_cachelines_reads++;
-                                    if (m_inflight_cachelines_reads.size()+ m_inflight_cachelines_writes.size() > m_max_inflight_cachelines_total)
-                                        m_max_inflight_cachelines_total++;
-                                } else if (access_type == DramCntlrInterface::WRITE) {
-                                    m_inflight_cachelines_writes.insert(std::pair<UInt64, SubsecondTime>(cacheline, add_cacheline_request_time + datamov_delay));
-                                    if (m_inflight_cachelines_writes.size() > m_max_inflight_cachelines_writes)
-                                        m_max_inflight_cachelines_writes++;
-                                    if (m_inflight_cachelines_reads.size()+ m_inflight_cachelines_writes.size() > m_max_inflight_cachelines_total)
-                                        m_max_inflight_cachelines_total++;
-                                }
-                            }
-                        } else {
+                        if (add_cacheline_request_time + datamov_delay - pkt_time >= access_latency) {
+                            make_add_cacheline_request = false;
                             ++m_redundant_moves_type2_slower_than_page_arrival;
                         }
-                    } else {
-                        // Always request cacheline via the cacheline queue, then use the earlier arrival time to determine access_latency
+                    } 
+                    if (make_add_cacheline_request) {
                         SubsecondTime datamov_delay;
                         if (m_r_partition_queues == 3) {
                             std::vector<std::pair<UInt64, SubsecondTime>> updated_inflight_page_arrival_time_deltas;
@@ -1418,28 +1342,14 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                         --m_num_recent_local_accesses;
                         ++m_num_recent_remote_additional_accesses;  // this is now an additional remote access
                         m_inflight_redundant[phys_page] += 1;
-
-                        if (m_track_inflight_cachelines) {
-                            // Track inflight cachelines
-                            if (access_type == DramCntlrInterface::READ && m_inflight_cachelines_reads.find(cacheline) == m_inflight_cachelines_reads.end()) {
-                                // The current cacheline is not in inflight cachelines
-                                m_inflight_cachelines_reads.insert(std::pair<UInt64, SubsecondTime>(cacheline, add_cacheline_request_time + datamov_delay));
-                                if (m_inflight_cachelines_reads.size() > m_max_inflight_cachelines_reads)
-                                    m_max_inflight_cachelines_reads++;
-                                if (m_inflight_cachelines_reads.size()+ m_inflight_cachelines_writes.size() > m_max_inflight_cachelines_total)
-                                    m_max_inflight_cachelines_total++;
-                            } else if (access_type == DramCntlrInterface::WRITE) {
-                                m_inflight_cachelines_writes.insert(std::pair<UInt64, SubsecondTime>(cacheline, add_cacheline_request_time + datamov_delay));
-                                if (m_inflight_cachelines_writes.size() > m_max_inflight_cachelines_writes)
-                                    m_max_inflight_cachelines_writes++;
-                                if (m_inflight_cachelines_reads.size()+ m_inflight_cachelines_writes.size() > m_max_inflight_cachelines_total)
-                                    m_max_inflight_cachelines_total++;
-                            }
+                        SubsecondTime new_arrival_time = add_cacheline_request_time + datamov_delay;
+                        if (new_arrival_time - pkt_time < access_latency) {
+                            m_redundant_moves_type2_time_savings += access_latency - (new_arrival_time - pkt_time);
+                            access_latency = new_arrival_time - pkt_time;
                         }
 
-                        if ((add_cacheline_request_time + datamov_delay - pkt_time) < access_latency) {
-                            m_redundant_moves_type2_time_savings += access_latency - (add_cacheline_request_time + datamov_delay - pkt_time);
-                            access_latency = add_cacheline_request_time + datamov_delay - pkt_time;
+                        if (m_track_inflight_cachelines) {
+                            addInflightCacheline(cacheline, new_arrival_time, access_type);
                         }
                     }
                 } else {
@@ -1448,7 +1358,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                     m_pages_cacheline_request_limit_exceeded.insert(phys_page);
                     if (m_auto_turn_off_partition_queues && cacheline_queue_utilization_percentage > m_turn_off_pq_cacheline_queue_utilization_threshold && m_pages_cacheline_request_limit_exceeded.size() > m_cancel_pq_inflight_buffer_threshold * (m_inflight_pages.size() + m_inflight_pages_extra.size())) {
                         m_r_partition_queues = 0;
-                        std::cout << "Partition queues turned off due to >= type 2 redundant moves limit of " << m_r_limit_redundant_moves << " at " << m_num_accesses << " accesses" << std::endl;
+                        std::cout << "Partition queues turned off due to >= type 2 redundant moves limit of " << m_r_redundant_moves_limit << " at " << m_num_accesses << " accesses" << std::endl;
                     }
                 }
             }
@@ -1471,9 +1381,9 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
 bool
 DramPerfModelDisagg::isRemoteAccess(IntPtr address, core_id_t requester, DramCntlrInterface::access_t access_type) 
 {
-    UInt64 num_local_pages = m_localdram_size/m_page_size;
+    UInt64 num_local_pages = m_localdram_size / m_page_size;
     if (m_r_cacheline_gran) // When we perform moves at cacheline granularity (should be disabled by default)
-        num_local_pages = m_localdram_size/m_cache_line_size;  // Assuming 64bit cache line
+        num_local_pages = m_localdram_size / m_cache_line_size;
 
     UInt64 phys_page = address & ~((UInt64(1) << floorLog2(m_page_size)) - 1);
     if (m_r_cacheline_gran) 
@@ -1623,7 +1533,7 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
             ++m_writeback_pages;
 
             // Compress
-            UInt32 size = m_r_cacheline_gran ? m_cache_line_size : m_page_size;
+            UInt32 size = m_r_cacheline_gran ? m_cache_line_size : m_page_size;  // store the compressed size of the page (unmodified when compression is off)
             if (m_use_compression) {
                 m_compression_controller.m_compression_model->update_bandwidth_utilization(m_data_movement->getPageQueueUtilizationPercentage(t_now));
                 evict_compression_latency += m_compression_controller.compress(false, evicted_page, size, &size);
@@ -1662,7 +1572,7 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
             ++m_page_moves;
 
             // Compress
-            UInt32 size = m_r_cacheline_gran ? m_cache_line_size : m_page_size;
+            UInt32 size = m_r_cacheline_gran ? m_cache_line_size : m_page_size;  // store the compressed size of the page (unmodified when compression is off)
             if (m_use_compression) {
                 m_compression_controller.m_compression_model->update_bandwidth_utilization(m_data_movement->getPageQueueUtilizationPercentage(t_now));
                 evict_compression_latency += m_compression_controller.compress(false, evicted_page, size, &size);
@@ -1739,7 +1649,7 @@ DramPerfModelDisagg::possiblyPrefetch(UInt64 phys_page, SubsecondTime t_now, cor
         // SubsecondTime page_hw_access_latency = m_dram_hardware_cntlr.getDramAccessCost(t_remote_queue_request, m_page_size, requester, address, perf, true, false, true);
 
         // Compress
-        UInt32 size = m_r_cacheline_gran ? m_cache_line_size : m_page_size;
+        UInt32 size = m_r_cacheline_gran ? m_cache_line_size : m_page_size;  // store the compressed size of the page (unmodified when compression is off)
         SubsecondTime page_compression_latency = SubsecondTime::Zero();  // when page compression is not enabled, this is always 0
         if (m_use_compression) {
             if (m_use_r_compressed_pages && m_compression_controller.address_to_compressed_size.find(phys_page) != m_compression_controller.address_to_compressed_size.end()) {
@@ -1818,4 +1728,24 @@ DramPerfModelDisagg::getPartitionQueueDelayNoEffect(SubsecondTime pkt_time, UInt
     SubsecondTime processing_time = getDataMovementBandwidthProcessingTime(num_bytes, queue_request_type);
     SubsecondTime queue_delay = m_data_movement->computeQueueDelayNoEffect(pkt_time, processing_time, queue_request_type, requester);
     return queue_delay;
+}
+
+void
+DramPerfModelDisagg::addInflightCacheline(UInt64 cacheline, SubsecondTime arrival_time, DramCntlrInterface::access_t access_type)
+{
+    // Track inflight cachelines
+    if (access_type == DramCntlrInterface::READ && m_inflight_cachelines_reads.find(cacheline) == m_inflight_cachelines_reads.end()) {
+        // The current cacheline is not in inflight cachelines
+        m_inflight_cachelines_reads.insert(std::pair<UInt64, SubsecondTime>(cacheline, arrival_time));
+        if (m_inflight_cachelines_reads.size() > m_max_inflight_cachelines_reads)
+            m_max_inflight_cachelines_reads++;
+        if (m_inflight_cachelines_reads.size() + m_inflight_cachelines_writes.size() > m_max_inflight_cachelines_total)
+            m_max_inflight_cachelines_total++;
+    } else if (access_type == DramCntlrInterface::WRITE) {
+        m_inflight_cachelines_writes.insert(std::pair<UInt64, SubsecondTime>(cacheline, arrival_time));
+        if (m_inflight_cachelines_writes.size() > m_max_inflight_cachelines_writes)
+            m_max_inflight_cachelines_writes++;
+        if (m_inflight_cachelines_reads.size() + m_inflight_cachelines_writes.size() > m_max_inflight_cachelines_total)
+            m_max_inflight_cachelines_total++;
+    }
 }

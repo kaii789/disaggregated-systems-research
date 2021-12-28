@@ -53,7 +53,7 @@ class DramPerfModelDisagg : public DramPerfModel
         const bool m_r_enable_selective_moves; 
         const bool m_r_cacheline_gran; // Move data and operate in cacheline granularity
         const double m_r_reserved_bufferspace; // Max % of local DRAM that can be reserved for pages in transit
-        const UInt32 m_r_limit_redundant_moves; 
+        const UInt32 m_r_redundant_moves_limit; 
         const bool m_r_throttle_redundant_moves;
         const bool m_r_use_separate_queue_model;  // Whether to use the separate remote queue model
         double m_r_page_queue_utilization_threshold;  // When the datamovement queue for pages has percentage utilization above this, remote pages aren't moved to local
@@ -82,7 +82,7 @@ class DramPerfModelDisagg : public DramPerfModel
         std::unordered_set<UInt64> m_dirty_pages; // Dirty pages of local memory
         std::map<UInt64, SubsecondTime> m_inflight_pages; // Inflight pages that are being transferred from remote memory to local memory
         std::map<UInt64, UInt32> m_inflight_redundant;    // Count the number of redundant moves that occur for each inflight page while it is being transferred
-        std::unordered_set<UInt64> m_pages_cacheline_request_limit_exceeded;  // Remote/inflight pages with cacheline queues requests >= m_r_limit_redundant_moves
+        std::unordered_set<UInt64> m_pages_cacheline_request_limit_exceeded;  // Remote/inflight pages with cacheline queues requests >= m_r_redundant_moves_limit
         std::map<UInt64, SubsecondTime> m_inflightevicted_pages; // Inflight pages that are being transferred from local memory to remote memory
         std::map<UInt64, SubsecondTime> m_inflight_pages_extra; // Inflight pages that are being transferred from remote memory to local memory, that exceed the limit from inflight buffer size or network bw (track arrival time while not counting it in the normal data structures)
 
@@ -151,7 +151,7 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_redundant_moves_type2;
         UInt64 m_redundant_moves_type2_cancelled_already_inflight;  // cacheline queue (read) request cancelled because the cacheline is already inflight (only applicable when m_track_inflight_cachelines is true)
         UInt64 m_redundant_moves_type2_cancelled_datamovement_queue_full;
-        UInt64 m_redundant_moves_type2_cancelled_limit_redundant_moves; // number of times a cacheline queue request is cancelled due to m_r_limit_redundant_moves
+        UInt64 m_redundant_moves_type2_cancelled_limit_redundant_moves; // number of times a cacheline queue request is cancelled due to m_r_redundant_moves_limit
         UInt64 m_redundant_moves_type2_slower_than_page_arrival;  // these situations don't result in redundant moves
         UInt64 m_max_total_bufferspace;                        // the maximum number of localdram pages actually used to back inflight_pages and inflightevicted_pages pages 
         UInt64 m_max_inflight_bufferspace;                     // the maximum number of localdram pages actually used to back inflight pages in the m_inflight_pages map
@@ -255,6 +255,8 @@ class DramPerfModelDisagg : public DramPerfModel
         SubsecondTime getPartitionQueueDelayNoEffect(SubsecondTime pkt_time, UInt64 num_bytes, QueueModel::request_t queue_request_type, core_id_t requester);
         SubsecondTime getPartitionQueueDelayTrackBytes(SubsecondTime pkt_time, UInt64 num_bytes, QueueModel::request_t queue_request_type, core_id_t requester);
         SubsecondTime getDataMovementBandwidthProcessingTime(UInt64 num_bytes, QueueModel::request_t queue_request_type);
+
+        void addInflightCacheline(UInt64 cacheline, SubsecondTime arrival_time, DramCntlrInterface::access_t access_type);
 
     public:
         DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_size, AddressHomeLookup* address_home_lookup);
