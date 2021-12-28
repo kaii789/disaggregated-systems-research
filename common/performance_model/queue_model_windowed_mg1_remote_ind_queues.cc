@@ -18,7 +18,6 @@ QueueModelWindowedMG1RemoteIndQueues::QueueModelWindowedMG1RemoteIndQueues(Strin
    , m_use_utilization_overflow(Sim()->getCfg()->getBool("queue_model/windowed_mg1_remote_ind_queues/use_utilization_overflow"))
    , m_page_queue_overflowed_to_cacheline_queue(0)
    , m_cacheline_queue_overflowed_to_page_queue(0)
-   // , m_num_arrivals(0)
    , m_num_page_arrivals(0)
    , m_num_cacheline_arrivals(0)
    , m_page_service_time_sum(0)
@@ -36,7 +35,6 @@ QueueModelWindowedMG1RemoteIndQueues::QueueModelWindowedMG1RemoteIndQueues(Strin
    , m_effective_bandwidth_exceeded_allowable_max(0)
    , m_page_effective_bandwidth_exceeded_allowable_max(0)
    , m_cacheline_effective_bandwidth_exceeded_allowable_max(0)
-   // , m_bytes_tracking(0)
    , m_max_effective_bandwidth(0.0)
    , m_max_effective_bandwidth_bytes(0)
    , m_max_effective_bandwidth_ps(1)  // dummy value; can't be 0
@@ -109,7 +107,7 @@ QueueModelWindowedMG1RemoteIndQueues::QueueModelWindowedMG1RemoteIndQueues(Strin
 
    // Divide the first following stat by the second one to get bytes / ps (can't register a double type as a stat)
    // The only reason why it's in bytes/ps is because these were the raw values used to compute effective bandwidth
-   // in this class. Considering converting to GB/s like other bandwidth values?
+   // in this class
    registerStatsMetric(name, id, "max-effective-bandwidth-bytes", &m_max_effective_bandwidth_bytes);
    registerStatsMetric(name, id, "max-effective-bandwidth-ps", &m_max_effective_bandwidth_ps);
    registerStatsMetric(name, id, "page-max-effective-bandwidth-bytes", &m_page_max_effective_bandwidth_bytes);
@@ -117,7 +115,7 @@ QueueModelWindowedMG1RemoteIndQueues::QueueModelWindowedMG1RemoteIndQueues(Strin
    registerStatsMetric(name, id, "cacheline-max-effective-bandwidth-bytes", &m_cacheline_max_effective_bandwidth_bytes);
    registerStatsMetric(name, id, "cacheline-max-effective-bandwidth-ps", &m_cacheline_max_effective_bandwidth_ps);
 
-   // Only tracked m_total_requests is incremented and addItems() is called (ie once per actual queue delay request)
+   // Effective bandwidth only tracked when m_total_requests is incremented and addItems() is called (ie once per actual queue delay request)
    registerStatsMetric(name, id, "num-effective-bandwidth-exceeded-allowable-max", &m_effective_bandwidth_exceeded_allowable_max);
    registerStatsMetric(name, id, "num-page-effective-bandwidth-exceeded-allowable-max", &m_page_effective_bandwidth_exceeded_allowable_max);
    registerStatsMetric(name, id, "num-cacheline-effective-bandwidth-exceeded-allowable-max", &m_cacheline_effective_bandwidth_exceeded_allowable_max);
@@ -201,7 +199,7 @@ void QueueModelWindowedMG1RemoteIndQueues::finalizeStats() {
    std::cout << "remote_ind_queues finalizeStats(): denominator=" << m_total_cacheline_queue_utilization_during_page_requests_denominator << std::endl;
 }
 
-double QueueModelWindowedMG1RemoteIndQueues::getPageQueueUtilizationPercentage(SubsecondTime pkt_time) {
+void QueueModelWindowedMG1RemoteIndQueues::updateQueues(SubsecondTime pkt_time, bool track_effective_bandwidth, request_t request_type) {
    // Remove packets that now fall outside the window
    // Advance the window based on the global (barrier) time, as this guarantees the earliest time any thread may be at.
    // Use a backup value of 10 window sizes before the current request to avoid excessive memory usage in case something fishy is going on.
@@ -209,7 +207,11 @@ double QueueModelWindowedMG1RemoteIndQueues::getPageQueueUtilizationPercentage(S
    SubsecondTime main = Sim()->getClockSkewMinimizationServer()->getGlobalTime() > m_window_size ? Sim()->getClockSkewMinimizationServer()->getGlobalTime() - m_window_size : SubsecondTime::Zero();
    SubsecondTime time_point = SubsecondTime::max(main, backup);
    removeItems(time_point);
-   removeItemsUpdateBytes(time_point, pkt_time, false);
+   removeItemsUpdateBytes(time_point, pkt_time, track_effective_bandwidth);
+}
+
+double QueueModelWindowedMG1RemoteIndQueues::getPageQueueUtilizationPercentage(SubsecondTime pkt_time) {
+   updateQueues(pkt_time, false);
 
    // Use queue utilization as measure to determine whether the queue is full
    double utilization = (double)m_page_service_time_sum / m_window_size.getPS();
@@ -217,14 +219,7 @@ double QueueModelWindowedMG1RemoteIndQueues::getPageQueueUtilizationPercentage(S
 }
 
 double QueueModelWindowedMG1RemoteIndQueues::getCachelineQueueUtilizationPercentage(SubsecondTime pkt_time) {
-   // Remove packets that now fall outside the window
-   // Advance the window based on the global (barrier) time, as this guarantees the earliest time any thread may be at.
-   // Use a backup value of 10 window sizes before the current request to avoid excessive memory usage in case something fishy is going on.
-   SubsecondTime backup = pkt_time > 10*m_window_size ? pkt_time - 10*m_window_size : SubsecondTime::Zero();
-   SubsecondTime main = Sim()->getClockSkewMinimizationServer()->getGlobalTime() > m_window_size ? Sim()->getClockSkewMinimizationServer()->getGlobalTime() - m_window_size : SubsecondTime::Zero();
-   SubsecondTime time_point = SubsecondTime::max(main, backup);
-   removeItems(time_point);
-   removeItemsUpdateBytes(time_point, pkt_time, false);
+   updateQueues(pkt_time, false);
 
    // Use queue utilization as measure to determine whether the queue is full
    double utilization = (double)m_cacheline_service_time_sum / m_window_size.getPS();
@@ -236,14 +231,7 @@ double QueueModelWindowedMG1RemoteIndQueues::getTotalQueueUtilizationPercentage(
       return getPageQueueUtilizationPercentage(pkt_time);
    }
 
-   // Remove packets that now fall outside the window
-   // Advance the window based on the global (barrier) time, as this guarantees the earliest time any thread may be at.
-   // Use a backup value of 10 window sizes before the current request to avoid excessive memory usage in case something fishy is going on.
-   SubsecondTime backup = pkt_time > 10*m_window_size ? pkt_time - 10*m_window_size : SubsecondTime::Zero();
-   SubsecondTime main = Sim()->getClockSkewMinimizationServer()->getGlobalTime() > m_window_size ? Sim()->getClockSkewMinimizationServer()->getGlobalTime() - m_window_size : SubsecondTime::Zero();
-   SubsecondTime time_point = SubsecondTime::max(main, backup);
-   removeItems(time_point);
-   removeItemsUpdateBytes(time_point, pkt_time, false);
+   updateQueues(pkt_time, false);
 
    // Use queue utilization as measure to determine whether the queue is full
    double utilization = (double)(m_page_service_time_sum + m_cacheline_service_time_sum) / (2 * m_window_size.getPS());
@@ -277,13 +265,7 @@ QueueModelWindowedMG1RemoteIndQueues::computeQueueDelayNoEffect(SubsecondTime pk
       request_type = QueueModel::PAGE;
    }
 
-   // Advance the window based on the global (barrier) time, as this guarantees the earliest time any thread may be at.
-   // Use a backup value of 10 window sizes before the current request to avoid excessive memory usage in case something fishy is going on.
-   SubsecondTime backup = pkt_time > 10*m_window_size ? pkt_time - 10*m_window_size : SubsecondTime::Zero();
-   SubsecondTime main = Sim()->getClockSkewMinimizationServer()->getGlobalTime() > m_window_size ? Sim()->getClockSkewMinimizationServer()->getGlobalTime() - m_window_size : SubsecondTime::Zero();
-   SubsecondTime time_point = SubsecondTime::max(main, backup);
-   removeItems(time_point);
-   removeItemsUpdateBytes(time_point, pkt_time, false);
+   updateQueues(pkt_time, false);
 
    double page_queue_utilization_percentage = getPageQueueUtilizationPercentage(pkt_time);
    double cacheline_queue_utilization_percentage = getCachelineQueueUtilizationPercentage(pkt_time);
@@ -334,13 +316,7 @@ QueueModelWindowedMG1RemoteIndQueues::computeQueueDelayTrackBytes(SubsecondTime 
       request_type = QueueModel::PAGE;
    }
 
-   // Advance the window based on the global (barrier) time, as this guarantees the earliest time any thread may be at.
-   // Use a backup value of 10 window sizes before the current request to avoid excessive memory usage in case something fishy is going on.
-   SubsecondTime backup = pkt_time > 10*m_window_size ? pkt_time - 10*m_window_size : SubsecondTime::Zero();
-   SubsecondTime main = Sim()->getClockSkewMinimizationServer()->getGlobalTime() > m_window_size ? Sim()->getClockSkewMinimizationServer()->getGlobalTime() - m_window_size : SubsecondTime::Zero();
-   SubsecondTime time_point = SubsecondTime::max(main, backup);
-   removeItems(time_point);
-   removeItemsUpdateBytes(time_point, pkt_time, true, request_type);  // only track effective bandwidth when m_total_requests is incremented and addItems() is called
+   updateQueues(pkt_time, true, request_type);  // only track effective bandwidth when m_total_requests is incremented and addItems() is called
 
    double page_queue_utilization_percentage = getPageQueueUtilizationPercentage(pkt_time);
    double cacheline_queue_utilization_percentage = getCachelineQueueUtilizationPercentage(pkt_time);
@@ -439,9 +415,6 @@ QueueModelWindowedMG1RemoteIndQueues::applyQueueDelayFormula(request_t request_t
          }
       }
 
-      // if (m_print_debugging_info) {
-      //    LOG_PRINT("moved_time= %ld ns, initial_time= %ld ns, difference= %ld ns", moved_time.getNS(), initial_time.getNS(), (moved_time - initial_time).getNS());
-      // }
       utilization_overflow_wait_time += (moved_time - initial_time);
 
       if (update_stats && request_type == QueueModel::PAGE) {
@@ -477,7 +450,7 @@ QueueModelWindowedMG1RemoteIndQueues::applyQueueDelayFormula(request_t request_t
    SubsecondTime t_queue = SubsecondTime::PS(arrival_rate * service_time_Es2 / (2 * (1. - utilization)));
    // if (m_name == "dram-datamovement-queue")
    //    LOG_PRINT("t_queue initially calculated as %ld ns: %f / %f = %f ps", t_queue.getNS(),
-   //              (arrival_rate * service_time_Es2), (2 * (1. - adjusted_utilization)), arrival_rate * service_time_Es2 / (2 * (1. - adjusted_utilization)));
+   //              (arrival_rate * service_time_Es2), (2 * (1. - utilization)), arrival_rate * service_time_Es2 / (2 * (1. - utilization)));
 
    // Our memory is limited in time to m_window_size. It would be strange to return more latency than that.
    if (!m_use_separate_queue_delay_cap && t_queue > m_window_size) {
@@ -501,8 +474,7 @@ QueueModelWindowedMG1RemoteIndQueues::applyQueueDelayFormula(request_t request_t
             ++m_total_cacheline_requests_capped_by_window_size;
       }
    }
-   // Note: network additional latency is NOT added here, needs to be added separately
-   // return t_queue + utilization_overflow_wait_time;  // utilization_overflow_wait_time is 0 if there was no waiting
+   // Note: network additional latency is NOT added in this method, needs to be added separately
    return t_queue;  // caller should add utilization_overflow_wait_time as appropriate
 }
 
@@ -523,9 +495,7 @@ QueueModelWindowedMG1RemoteIndQueues::applySingleWindowSizeFormula(request_t req
 void
 QueueModelWindowedMG1RemoteIndQueues::addItemUpdateBytes(SubsecondTime pkt_time, UInt64 num_bytes, SubsecondTime pkt_queue_delay, request_t request_type)
 {
-   // Add num_bytes to map tracking the current window & update m_bytes_tracking
-   // m_packet_bytes.insert(std::pair<SubsecondTime, UInt64>(pkt_time + pkt_queue_delay, num_bytes));
-   // m_bytes_tracking += num_bytes;
+   // Add num_bytes to the corresponding map, and update the total number of bytes being tracked in the map
    if (request_type == QueueModel::PAGE) {
       m_page_packet_bytes.insert(std::pair<SubsecondTime, UInt64>(pkt_time + pkt_queue_delay, num_bytes));
       m_page_bytes_tracking += num_bytes;
@@ -540,12 +510,6 @@ void
 QueueModelWindowedMG1RemoteIndQueues::removeItemsUpdateBytes(SubsecondTime earliest_time, SubsecondTime pkt_time, bool track_effective_bandwidth, request_t request_type)
 {
    // Can remove packets that arrived earlier than the current window
-   // while(!m_packet_bytes.empty() && m_packet_bytes.begin()->first < earliest_time)
-   // {
-   //    std::multimap<SubsecondTime, UInt64>::iterator bytes_entry = m_packet_bytes.begin();
-   //    m_bytes_tracking -= bytes_entry->second;
-   //    m_packet_bytes.erase(bytes_entry);
-   // }
    while(!m_page_packet_bytes.empty() && m_page_packet_bytes.begin()->first < earliest_time)
    {
       std::multimap<SubsecondTime, UInt64>::iterator bytes_entry = m_page_packet_bytes.begin();
@@ -560,10 +524,6 @@ QueueModelWindowedMG1RemoteIndQueues::removeItemsUpdateBytes(SubsecondTime earli
    }
    
    // Update bytes_in_window by not considering packets in m_cacheline_packet_bytes and m_page_packet_bytes that arrive later than pkt_time
-   // UInt64 bytes_in_window = m_bytes_tracking;
-   // for (std::multimap<SubsecondTime, UInt64>::iterator bytes_entry = m_packet_bytes.upper_bound(pkt_time); bytes_entry != m_packet_bytes.end(); ++bytes_entry) {
-   //    bytes_in_window -= bytes_entry->second;
-   // }
    UInt64 page_bytes_in_window = m_page_bytes_tracking;
    UInt64 cacheline_bytes_in_window = m_cacheline_bytes_tracking;
    for (std::multimap<SubsecondTime, UInt64>::iterator bytes_entry = m_page_packet_bytes.upper_bound(pkt_time); bytes_entry != m_page_packet_bytes.end(); ++bytes_entry) {
@@ -574,11 +534,10 @@ QueueModelWindowedMG1RemoteIndQueues::removeItemsUpdateBytes(SubsecondTime earli
    }
    UInt64 bytes_in_window = page_bytes_in_window + cacheline_bytes_in_window;
 
-   
    // Intention: only track effective bandwidth when m_total_requests is incremented and addItems() is called
    if (track_effective_bandwidth) {
       // Compute the effective current window length, and calculate the current effective bandwidth
-      // Note: bytes_in_window is used instead of m_bytes_tracking
+      // Note: bytes_in_window is used instead of m_page_bytes_tracking + m_cacheline_bytes_tracking
       UInt64 effective_window_length_ps = (pkt_time - earliest_time).getPS();
       double cur_effective_bandwidth = (double)bytes_in_window / effective_window_length_ps;  // in bytes/ps
       if (cur_effective_bandwidth > m_max_effective_bandwidth) {
@@ -651,7 +610,6 @@ QueueModelWindowedMG1RemoteIndQueues::removeItems(SubsecondTime earliest_time)
       std::multimap<SubsecondTime, SubsecondTime>::iterator entry = m_window_cacheline_requests.begin();
       m_num_cacheline_arrivals --;
       m_cacheline_service_time_sum -= entry->second.getPS();
-      // m_service_time_sum -= entry->second.getPS();  // TODO: remove
       m_cacheline_service_time_sum2 -= entry->second.getPS() * entry->second.getPS();
       m_window_cacheline_requests.erase(entry);
    }
