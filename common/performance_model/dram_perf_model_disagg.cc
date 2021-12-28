@@ -145,11 +145,9 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
 {
     String name("dram"); 
 
-    String data_movement_queue_model_type;
+    String data_movement_queue_model_type = Sim()->getCfg()->getString("perf_model/dram/queue_model/type");
     if (m_r_use_separate_queue_model) {
         data_movement_queue_model_type = Sim()->getCfg()->getString("perf_model/dram/queue_model/remote_queue_model_type");
-    } else {
-        data_movement_queue_model_type = Sim()->getCfg()->getString("perf_model/dram/queue_model/type");
     }
     if (m_r_partition_queues == 2) {
         // Hardcode the queue model type for now
@@ -173,6 +171,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
                 m_r_bus_bandwidth.getRoundedLatency(8), m_r_bus_bandwidth.getBandwidthBitsPerUs());  // bytes to bits
     }
 
+    // r_mode 5
     if (m_r_mode == 5) {
         m_r_mode_5_limit_moves_threshold = Sim()->getCfg()->getFloat("perf_model/dram/r_mode_5_page_queue_utilization_mode_switch_threshold");
         m_r_mode_5_remote_access_history_window_size = SubsecondTime::NS(Sim()->getCfg()->getInt("perf_model/dram/r_mode_5_remote_access_history_window_size"));
@@ -319,12 +318,12 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
         }
     }
 
+    // RNG
+    srand(time(NULL));
+    
     // For debugging
     if (m_r_partition_queues)
         std::cout << "Initial m_r_cacheline_queue_fraction=" << m_r_cacheline_queue_fraction << std::endl;
-    
-    // RNG
-    srand(time(NULL));
 }
 
 DramPerfModelDisagg::~DramPerfModelDisagg()
@@ -359,7 +358,7 @@ DramPerfModelDisagg::~DramPerfModelDisagg()
 
     delete m_data_movement;
 
-    if (m_r_partition_queues) {
+    if (m_r_partition_queues && m_use_dynamic_cl_queue_fraction_adjustment) {
         std::cout << "Final m_r_cacheline_queue_fraction=" << m_r_cacheline_queue_fraction << std::endl;
         std::cout << "Final m_r_cacheline_queue_fraction_increased=" << m_r_cacheline_queue_fraction_increased << ", Final m_r_cacheline_queue_fraction_decreased=" << m_r_cacheline_queue_fraction_decreased << std::endl;
         std::cout << "Final m_min_r_cacheline_queue_fraction_stat_scaled=" << m_min_r_cacheline_queue_fraction_stat_scaled << ", Final m_max_r_cacheline_queue_fraction_stat_scaled=" << m_max_r_cacheline_queue_fraction_stat_scaled << std::endl;
@@ -408,6 +407,7 @@ DramPerfModelDisagg::finalizeStats()
         for (auto it = m_page_usage_map.begin(); it != m_page_usage_map.end(); ++it) {
             page_usage_counts.push_back(std::pair<UInt32, UInt64>(it->second, it->first));
         }
+        // TODO: the following sort and printing could be extracted in another sortAndPrintVectorPercentiles() function
         std::sort(page_usage_counts.begin(), page_usage_counts.end());  // sort by access count
 
         // Update stats vector
@@ -518,7 +518,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     // When partition queues is off: don't get cacheline when moving the page
     SubsecondTime cacheline_hw_access_latency = SubsecondTime::Zero();
     if (m_r_partition_queues) {
-        // When partition queues is off, access the requested cacheline first
+        // When partition queues is on, access the requested cacheline before the page, if applicable
         cacheline_hw_access_latency = m_dram_hardware_cntlr.getDramAccessCost(pkt_time, pkt_size, requester, address, perf, true, false, false);
         m_total_remote_dram_hardware_latency_cachelines += cacheline_hw_access_latency;
         m_total_remote_dram_hardware_latency_cachelines_count++;
@@ -532,8 +532,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     UInt64 cacheline = address & ~((UInt64(1) << floorLog2(m_cache_line_size)) - 1);  // Was << 6
     UInt32 size = pkt_size;
     SubsecondTime cacheline_compression_latency = SubsecondTime::Zero();  // when cacheline compression is not enabled, this is always 0
-    if (m_use_compression)
-    {
+    if (m_use_compression) {
         if (m_r_cacheline_gran) {
             if (m_r_partition_queues == 3 || m_r_partition_queues == 4) {
                 m_compression_controller.m_compression_model->update_bandwidth_utilization(m_data_movement->getCachelineQueueUtilizationPercentage(t_now));
@@ -576,8 +575,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     m_remote_to_local_cacheline_move_count++;
     
     // TODO: Currently model decompression by adding decompression latency to inflight page time
-    if (m_use_compression && (m_r_cacheline_gran || m_use_cacheline_compression))
-    {
+    if (m_use_compression && (m_r_cacheline_gran || m_use_cacheline_compression)) {
         datamovement_delay += m_compression_controller.decompress(!m_r_cacheline_gran, phys_page);
     }
 
@@ -689,8 +687,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             }
 
             // Compress
-            if (m_use_compression)
-            {
+            if (m_use_compression) {
                 if (m_use_r_compressed_pages && m_compression_controller.address_to_compressed_size.find(phys_page) != m_compression_controller.address_to_compressed_size.end()) {
                     page_size = m_compression_controller.address_to_compressed_size[phys_page];
                 } else {
@@ -740,8 +737,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
 
             // TODO: Currently model decompression by adding decompression latency to inflight page time
             SubsecondTime page_decompression_latency = SubsecondTime::Zero();
-            if (m_use_compression)
-            {
+            if (m_use_compression) {
                 page_decompression_latency = m_compression_controller.decompress(false, phys_page);
                 page_datamovement_delay += page_decompression_latency;
             }
@@ -1320,8 +1316,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
 
                     UInt32 size = pkt_size;
                     SubsecondTime cacheline_compression_latency = SubsecondTime::Zero();  // when cacheline compression is not enabled, this is always 0
-                    if (m_use_compression)
-                    {
+                    if (m_use_compression) {
                         if (m_r_cacheline_gran) {
                             if (m_r_partition_queues > 1)
                                 m_compression_controller.m_compression_model->update_bandwidth_utilization(m_data_movement->getCachelineQueueUtilizationPercentage(t_now));
@@ -1341,8 +1336,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                     // For clearer code logic, calculate decompression latency (but not adding it to anything) before computing the queue delay
                     SubsecondTime cacheline_decompression_latency = SubsecondTime::Zero();
                     // TODO: Currently model decompression by adding decompression latency to inflight page time
-                    if (m_use_compression && (m_r_cacheline_gran || m_use_cacheline_compression))
-                    {
+                    if (m_use_compression && (m_r_cacheline_gran || m_use_cacheline_compression)) {
                         cacheline_decompression_latency = m_compression_controller.decompress(!m_r_cacheline_gran, phys_page);
                     }
 
@@ -1630,8 +1624,7 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
 
             // Compress
             UInt32 size = m_r_cacheline_gran ? m_cache_line_size : m_page_size;
-            if (m_use_compression)
-            {
+            if (m_use_compression) {
                 m_compression_controller.m_compression_model->update_bandwidth_utilization(m_data_movement->getPageQueueUtilizationPercentage(t_now));
                 evict_compression_latency += m_compression_controller.compress(false, evicted_page, size, &size);
             }
@@ -1642,8 +1635,7 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
             }
 
             // TODO: Currently model decompression by adding decompression latency to inflight page time
-            if (m_use_compression)
-            {
+            if (m_use_compression) {
                 page_datamovement_delay += m_compression_controller.decompress(false, evicted_page);
             }
 
@@ -1671,8 +1663,7 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
 
             // Compress
             UInt32 size = m_r_cacheline_gran ? m_cache_line_size : m_page_size;
-            if (m_use_compression)
-            {
+            if (m_use_compression) {
                 m_compression_controller.m_compression_model->update_bandwidth_utilization(m_data_movement->getPageQueueUtilizationPercentage(t_now));
                 evict_compression_latency += m_compression_controller.compress(false, evicted_page, size, &size);
             }
@@ -1683,8 +1674,7 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
             }
 
             // TODO: Currently model decompression by adding decompression latency to inflight page time
-            if (m_use_compression)
-            {
+            if (m_use_compression) {
                 page_datamovement_delay += m_compression_controller.decompress(false, evicted_page);
             }
 
@@ -1751,8 +1741,7 @@ DramPerfModelDisagg::possiblyPrefetch(UInt64 phys_page, SubsecondTime t_now, cor
         // Compress
         UInt32 size = m_r_cacheline_gran ? m_cache_line_size : m_page_size;
         SubsecondTime page_compression_latency = SubsecondTime::Zero();  // when page compression is not enabled, this is always 0
-        if (m_use_compression)
-        {
+        if (m_use_compression) {
             if (m_use_r_compressed_pages && m_compression_controller.address_to_compressed_size.find(phys_page) != m_compression_controller.address_to_compressed_size.end()) {
                 size = m_compression_controller.address_to_compressed_size[phys_page];
             } else {
@@ -1777,8 +1766,7 @@ DramPerfModelDisagg::possiblyPrefetch(UInt64 phys_page, SubsecondTime t_now, cor
             page_network_processing_time = m_r_bus_bandwidth.getRoundedLatency(8*size);
 
         // TODO: Currently model decompression by adding decompression latency to inflight page time
-        if (m_use_compression)
-        {
+        if (m_use_compression) {
             page_datamovement_delay += m_compression_controller.decompress(false, pref_page);
         }
 
