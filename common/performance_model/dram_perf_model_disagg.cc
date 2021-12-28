@@ -871,7 +871,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             if (m_inflight_pages.size() + m_inflightevicted_pages.size() > m_max_total_bufferspace)
                 m_max_total_bufferspace++;  // update stat
 
-            for (auto it = updated_inflight_page_arrival_time_deltas.begin(); it != updated_inflight_page_arrival_time_deltas.end(); ++it) {
+            for (auto it = updated_inflight_page_arrival_time_deltas.begin(); it != updated_inflight_page_arrival_time_deltas.end(); ++it) { // only for m_r_partition_queues == 3, i.e., windowed_mg1_remote_subqueuemodels
                 if (m_inflight_pages.count(it->first) && it->second > SubsecondTime::Zero()) {
                     m_inflight_pages_delay_time += it->second;
                     m_inflight_pages[it->first] += it->second;  // update arrival time if it's still an inflight page
@@ -921,7 +921,8 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
                     }
                 }
             } else {
-                // move_page == false so if PQ=off actually put the cacheline request on the queue
+                // Only cacheline is moved 
+                // move_page == false so if PQ=off/on actually put the cacheline request on the queue
                 cacheline_queue_delay = getPartitionQueueDelayTrackBytes(t_remote_queue_request + cacheline_compression_latency, size, QueueModel::CACHELINE, requester);
             }
         }
