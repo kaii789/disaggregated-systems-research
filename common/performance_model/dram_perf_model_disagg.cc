@@ -14,20 +14,21 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     : DramPerfModel(core_id, cache_block_size)
     , m_cache_line_size     (cache_block_size)
     , m_page_size           (Sim()->getCfg()->getInt("perf_model/dram/page_size"))  // Memory page size (bytes) in disagg.cc used for page movement (different from ddr page size)
+    , m_enable_remote_mem       (Sim()->getCfg()->getBool("perf_model/dram/enable_remote_mem")) // Enable remote memory simulation
     , m_r_partition_queues  (Sim()->getCfg()->getInt("perf_model/dram/remote_partitioned_queues")) // Enable partitioned queues
     , m_dram_hardware_cntlr (DramHardwareCntlr(core_id, address_home_lookup, m_cache_line_size, m_page_size, m_r_partition_queues))
-    , m_base_bus_bandwidth  (Sim()->getCfg()->getInt("perf_model/dram/ddr/dram_speed") * Sim()->getCfg()->getInt("perf_model/dram/ddr/data_bus_width")) // in bits/us
-    , m_r_bus_bandwidth     (m_base_bus_bandwidth / (1000 * Sim()->getCfg()->getFloat("perf_model/dram/remote_mem_bw_scalefactor"))) // Remote memory
-    , m_r_page_bandwidth    (m_base_bus_bandwidth / (1000 * Sim()->getCfg()->getFloat("perf_model/dram/remote_mem_bw_scalefactor") / (1 - Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_fraction")))) // Remote memory - Partitioned Queues => Page Queue
-    , m_r_cacheline_bandwidth   (m_base_bus_bandwidth / (1000 * Sim()->getCfg()->getFloat("perf_model/dram/remote_mem_bw_scalefactor") / Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_fraction"))) // Remote memory - Partitioned Queues => Cacheline Queue
+    , m_r_added_latency       (SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/remote_mem_add_lat"))) // Network latency for remote DRAM access 
     , m_r_bw_scalefactor    (Sim()->getCfg()->getFloat("perf_model/dram/remote_mem_bw_scalefactor"))
+    , m_r_cacheline_queue_fraction    (Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_fraction")) // The fraction of remote bandwidth used for the cacheline queue (decimal between 0 and 1)
+    , m_use_dynamic_cl_queue_fraction_adjustment    (Sim()->getCfg()->getBool("perf_model/dram/use_dynamic_cacheline_queue_fraction_adjustment"))  // Whether to dynamically adjust m_r_cacheline_queue_fraction
+    , m_base_bus_bandwidth  (Sim()->getCfg()->getInt("perf_model/dram/ddr/dram_speed") * Sim()->getCfg()->getInt("perf_model/dram/ddr/data_bus_width")) // in bits/us
+    , m_r_bus_bandwidth     (m_base_bus_bandwidth / (1000 * m_r_bw_scalefactor)) // Remote memory
+    , m_r_page_bandwidth    (m_base_bus_bandwidth / (1000 * m_r_bw_scalefactor / (1 - m_r_cacheline_queue_fraction))) // Remote memory - Partitioned Queues => Page Queue
+    , m_r_cacheline_bandwidth   (m_base_bus_bandwidth / (1000 * m_r_bw_scalefactor / m_r_cacheline_queue_fraction)) // Remote memory - Partitioned Queues => Cacheline Queue
     , m_use_dynamic_bandwidth (Sim()->getCfg()->getBool("perf_model/dram/use_dynamic_bandwidth"))
     , m_use_dynamic_latency (Sim()->getCfg()->getBool("perf_model/dram/use_dynamic_latency"))
-    , m_r_added_latency       (SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/remote_mem_add_lat"))) // Network latency for remote DRAM access 
-    , m_r_added_latency_int       (static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/remote_mem_add_lat"))) // Network latency for remote DRAM access 
-    , m_r_datamov_threshold       (Sim()->getCfg()->getInt("perf_model/dram/remote_datamov_threshold"))// Move data if greater than
     , m_localdram_size       (Sim()->getCfg()->getInt("perf_model/dram/localdram_size")) // Local DRAM size
-    , m_enable_remote_mem       (Sim()->getCfg()->getBool("perf_model/dram/enable_remote_mem")) // Enable remote memory simulation
+    , m_r_datamov_threshold       (Sim()->getCfg()->getInt("perf_model/dram/remote_datamov_threshold"))// Move data if greater than
     , m_r_simulate_tlb_overhead       (Sim()->getCfg()->getBool("perf_model/dram/simulate_tlb_overhead")) // Simulate TLB overhead
     , m_r_simulate_datamov_overhead       (Sim()->getCfg()->getBool("perf_model/dram/simulate_datamov_overhead"))  // Simulate datamovement overhead for remote DRAM (default: true)
     , m_r_mode       (Sim()->getCfg()->getInt("perf_model/dram/remote_memory_mode")) // Various modes for Local DRAM usage
@@ -38,8 +39,6 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_r_disturbance_factor      (Sim()->getCfg()->getInt("perf_model/dram/remote_disturbance_factor")) // Other systems using the remote memory and creating disturbance
     , m_r_dontevictdirty      (Sim()->getCfg()->getBool("perf_model/dram/remote_dontevictdirty")) // Do not evict dirty pages
     , m_r_enable_selective_moves      (Sim()->getCfg()->getBool("perf_model/dram/remote_enable_selective_moves"))
-    , m_r_cacheline_queue_fraction    (Sim()->getCfg()->getFloat("perf_model/dram/remote_cacheline_queue_fraction")) // The fraction of remote bandwidth used for the cacheline queue (decimal between 0 and 1)
-    , m_use_dynamic_cl_queue_fraction_adjustment    (Sim()->getCfg()->getBool("perf_model/dram/use_dynamic_cacheline_queue_fraction_adjustment"))  // Whether to dynamically adjust m_r_cacheline_queue_fraction
     , m_r_cacheline_gran      (Sim()->getCfg()->getBool("perf_model/dram/remote_use_cacheline_granularity")) // Move data and operate in cacheline granularity
     , m_r_reserved_bufferspace      (Sim()->getCfg()->getFloat("perf_model/dram/remote_reserved_buffer_space")) // Max % of local DRAM that can be reserved for pages in transit
     , m_r_limit_redundant_moves      (Sim()->getCfg()->getInt("perf_model/dram/remote_limit_redundant_moves"))
@@ -51,9 +50,9 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_use_throttled_pages_tracker    (Sim()->getCfg()->getBool("perf_model/dram/use_throttled_pages_tracker"))  // Whether to use and update m_use_throttled_pages_tracker
     , m_use_ideal_page_throttling    (Sim()->getCfg()->getBool("perf_model/dram/r_use_ideal_page_throttling"))  // Whether to use ideal page throttling (alternative currently is FCFS throttling)
     , m_r_ideal_pagethrottle_remote_access_history_window_size   (SubsecondTime::NS() * static_cast<uint64_t> (Sim()->getCfg()->getFloat("perf_model/dram/r_ideal_pagethrottle_access_history_window_size")))
-    , m_track_page_bw_utilization_stats    (Sim()->getCfg()->getBool("perf_model/dram/track_page_bw_utilization_stats"))  // Whether to track page queue bw utilization stats
     , m_speed_up_simulation    (Sim()->getCfg()->getBool("perf_model/dram/speed_up_disagg_simulation"))  // When this is true, some optional stats aren't calculated
     , m_track_inflight_cachelines    (Sim()->getCfg()->getBool("perf_model/dram/track_inflight_cachelines"))  // Whether to track simultaneous inflight cachelines (slows down simulation)
+    , m_track_page_bw_utilization_stats    (Sim()->getCfg()->getBool("perf_model/dram/track_page_bw_utilization_stats"))  // Whether to track page queue bw utilization stats
     , m_auto_turn_off_partition_queues    (Sim()->getCfg()->getBool("perf_model/dram/auto_turn_off_partition_queues"))  // Whether to enable automatic detection of conditions to turn off partition queues
     , m_turn_off_pq_cacheline_queue_utilization_threshold    (Sim()->getCfg()->getFloat("perf_model/dram/turn_off_pq_cacheline_queue_utilization_threshold"))  // Only consider turning off partition queues when cacheline queue utilization is above this threshold
     , m_cancel_pq_inflight_buffer_threshold    (Sim()->getCfg()->getFloat("perf_model/dram/cancel_pq_inflight_buffer_threshold"))  // Fraction of inflight_pages size at which to cancel partition queues
@@ -128,7 +127,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_global_time_much_larger_than_page_arrival(0)
     , m_sum_global_time_much_larger(SubsecondTime::Zero())
     , m_local_total_remote_access_latency(SubsecondTime::Zero())
-    , IPC_window_capacity(Sim()->getCfg()->getInt("perf_model/dram/IPC_window_capacity"))
+    , m_ipc_window_capacity(Sim()->getCfg()->getInt("perf_model/dram/IPC_window_capacity"))
     , m_max_inflight_cachelines_reads(0)
     , m_max_inflight_cachelines_writes(0)
     , m_max_inflight_cachelines_total(0)
@@ -325,7 +324,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
         std::cout << "Initial m_r_cacheline_queue_fraction=" << m_r_cacheline_queue_fraction << std::endl;
     
     // RNG
-    srand (time(NULL));
+    srand(time(NULL));
 }
 
 DramPerfModelDisagg::~DramPerfModelDisagg()
@@ -343,9 +342,9 @@ DramPerfModelDisagg::~DramPerfModelDisagg()
 
         // Local IPC Stats
         std::cout << "\nLocal IPC:\n";
-        for (std::vector<double>::iterator it = m_local_IPCs.begin(); it != m_local_IPCs.end(); ++it) {
-            double local_IPC = *it;
-            std::cout << local_IPC << ' ';
+        for (std::vector<double>::iterator it = m_local_ipcs.begin(); it != m_local_ipcs.end(); ++it) {
+            double local_ipc = *it;
+            std::cout << local_ipc << ' ';
         }
         std::cout << "\n\n";
 
@@ -996,24 +995,24 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
 }
 
 void
-DramPerfModelDisagg::updateLocalIPCStat(UInt64 instr_count)
+DramPerfModelDisagg::updateLocalIpcStat(UInt64 instr_count)
 {
-    if (IPC_window_cur_size == 0)
-        IPC_window_start_instr_count = instr_count;
-    IPC_window_cur_size += 1;
-    if (IPC_window_cur_size == IPC_window_capacity) {
+    if (m_ipc_window_cur_size == 0)
+        m_ipc_window_start_instr_count = instr_count;
+    m_ipc_window_cur_size += 1;
+    if (m_ipc_window_cur_size == m_ipc_window_capacity) {
         ComponentPeriod cp = ComponentPeriod::fromFreqHz(1000000000 * Sim()->getCfg()->getFloat("perf_model/core/frequency"));
         SubsecondTimeCycleConverter converter = SubsecondTimeCycleConverter(&cp);
 
-        IPC_window_end_instr_count = instr_count;
-        UInt64 instructions = IPC_window_end_instr_count - IPC_window_start_instr_count;
-        UInt64 cycles = converter.subsecondTimeToCycles(SubsecondTime::NS(1000) * IPC_window_capacity);
-        double IPC = instructions / (double) cycles;
-        IPC = std::round(IPC * 100000.0) / 100000.0;
-        m_local_IPCs.push_back(IPC);
-        m_instruction_count_x_axis.push_back(IPC_window_end_instr_count);
+        m_ipc_window_end_instr_count = instr_count;
+        UInt64 instructions = m_ipc_window_end_instr_count - m_ipc_window_start_instr_count;
+        UInt64 cycles = converter.subsecondTimeToCycles(SubsecondTime::NS(1000) * m_ipc_window_capacity);
+        double ipc = instructions / (double) cycles;
+        ipc = std::round(ipc * 100000.0) / 100000.0;
+        m_local_ipcs.push_back(ipc);
+        m_instruction_count_x_axis.push_back(m_ipc_window_end_instr_count);
 
-        IPC_window_cur_size = 0;
+        m_ipc_window_cur_size = 0;
     }
 }
 
@@ -1050,7 +1049,7 @@ DramPerfModelDisagg::updateLatency()
 {
     m_update_latency_count += 1;
     if (m_use_dynamic_latency && m_update_latency_count % m_disturbance_bq_size == 0) {
-        int added_netlat_ns = (rand() % 300) + 100;
+        int added_netlat_ns = (rand() % 300) + m_r_added_latency.getNS();
         m_data_movement->updateAddedNetLat(added_netlat_ns);
     }
 }

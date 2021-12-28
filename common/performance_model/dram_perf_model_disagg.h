@@ -25,21 +25,22 @@ class DramPerfModelDisagg : public DramPerfModel
     private:
         const UInt32 m_cache_line_size;
         const UInt32 m_page_size; // Memory page size (in bytes) in disagg.cc (different from ddr page size)
+        const bool m_enable_remote_mem; // Enable remote memory with the same DDR type as local for now
         UInt32 m_r_partition_queues; // Enable partitioned queues
         DramHardwareCntlr m_dram_hardware_cntlr;  // Manage DRAM hardware access latency, based on memory address
+        SubsecondTime m_r_added_latency;  // Network latency for remote DRAM access
+        double m_r_bw_scalefactor;              // Remote memory bandwidth is ddr bandwidth scaled down by m_r_bw_scalefactor
+        double m_r_cacheline_queue_fraction; // The fraction of remote bandwidth used for the cacheline queue (decimal between 0 and 1) 
+        bool m_use_dynamic_cl_queue_fraction_adjustment; // Whether to dynamically adjust m_r_cacheline_queue_fraction
         
         const UInt32 m_base_bus_bandwidth;      // Temporary variable to calculate bus bandwidths; in bits/us
         ComponentBandwidth m_r_bus_bandwidth;   // Remote
         ComponentBandwidth m_r_page_bandwidth;  // Remote - Partitioned Queues => Page Queue
         ComponentBandwidth m_r_cacheline_bandwidth; // Remote - Partitioned Queues => Cacheline Queue
-        double m_r_bw_scalefactor;              // Remote memory bandwidth is ddr bandwidth scaled down by m_r_bw_scalefactor
         bool m_use_dynamic_bandwidth;
         bool m_use_dynamic_latency;
-        SubsecondTime m_r_added_latency; // Additional remote latency
-        UInt64 m_r_added_latency_int;
-        const UInt32 m_r_datamov_threshold; // Move data if greater than yy
         const UInt32 m_localdram_size; // Local DRAM size
-        const bool m_enable_remote_mem; // Enable remote memory with the same DDR type as local for now
+        const UInt32 m_r_datamov_threshold; // Move data if greater than yy
         const bool m_r_simulate_tlb_overhead; // Simulate tlb overhead
         const bool m_r_simulate_datamov_overhead; // Simulate datamovement overhead for remote memory
         const UInt32 m_r_mode ; // Randomly assigned = 0; Cache = 1 (local DRAM as a cache) 
@@ -50,8 +51,6 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt32 m_r_disturbance_factor; // Other systems using the remote memory and creating disturbance
         const bool m_r_dontevictdirty; // Do not evict dirty data
         const bool m_r_enable_selective_moves; 
-        double m_r_cacheline_queue_fraction; // The fraction of remote bandwidth used for the cacheline queue (decimal between 0 and 1) 
-        bool m_use_dynamic_cl_queue_fraction_adjustment; // Whether to dynamically adjust m_r_cacheline_queue_fraction
         const bool m_r_cacheline_gran; // Move data and operate in cacheline granularity
         const double m_r_reserved_bufferspace; // Max % of local DRAM that can be reserved for pages in transit
         const UInt32 m_r_limit_redundant_moves; 
@@ -65,9 +64,9 @@ class DramPerfModelDisagg : public DramPerfModel
         bool m_use_throttled_pages_tracker;  // Whether to update m_throttled_pages_tracker. Must be true to use the ideal page throttler or print stats of throttled pages
         bool m_use_ideal_page_throttling;  // Whether to use ideal page throttling
         SubsecondTime m_r_ideal_pagethrottle_remote_access_history_window_size;  // Track remote page accesses using the most recent window size number of ns
-        bool m_track_page_bw_utilization_stats;
         bool m_speed_up_simulation;  // When this is true, some optional stats aren't calculated
         bool m_track_inflight_cachelines;  // Whether to track simultaneous inflight cachelines (slows down simulation)
+        bool m_track_page_bw_utilization_stats;
         bool m_auto_turn_off_partition_queues;
         double m_turn_off_pq_cacheline_queue_utilization_threshold;
         double m_cancel_pq_inflight_buffer_threshold;
@@ -207,11 +206,11 @@ class DramPerfModelDisagg : public DramPerfModel
         long long int m_update_latency_count = 0;
 
         // For local IPC calculation
-        UInt64 IPC_window_start_instr_count;
-        UInt64 IPC_window_end_instr_count;
-        UInt64 IPC_window_capacity;
-        UInt64 IPC_window_cur_size = 0;
-        std::vector<double> m_local_IPCs;
+        UInt64 m_ipc_window_start_instr_count;
+        UInt64 m_ipc_window_end_instr_count;
+        UInt64 m_ipc_window_capacity;
+        UInt64 m_ipc_window_cur_size = 0;
+        std::vector<double> m_local_ipcs;
         std::vector<UInt64> m_instruction_count_x_axis;
 
         std::unordered_map<UInt64, UInt64> m_inflight_page_to_dirty_write_count;
@@ -264,7 +263,7 @@ class DramPerfModelDisagg : public DramPerfModel
         void finalizeStats();
         void updateBandwidth();
         void updateLatency();
-        void updateLocalIPCStat(UInt64 instr_count);
+        void updateLocalIpcStat(UInt64 instr_count);
 
         bool isRemoteAccess(IntPtr address, core_id_t requester, DramCntlrInterface::access_t access_type); 
         SubsecondTime getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_size, core_id_t requester, IntPtr address, DramCntlrInterface::access_t access_type, ShmemPerf *perf);
