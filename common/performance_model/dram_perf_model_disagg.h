@@ -66,11 +66,11 @@ class DramPerfModelDisagg : public DramPerfModel
         SubsecondTime m_r_ideal_pagethrottle_remote_access_history_window_size;  // Track remote page accesses using the most recent window size number of ns
         bool m_speed_up_simulation;  // When this is true, some optional stats aren't calculated
         bool m_track_inflight_cachelines;  // Whether to track simultaneous inflight cachelines (slows down simulation)
-        bool m_track_page_bw_utilization_stats;
-        bool m_auto_turn_off_partition_queues; 
-        double m_turn_off_pq_cacheline_queue_utilization_threshold;
-        double m_cancel_pq_inflight_buffer_threshold;
-        bool m_keep_space_in_cacheline_queue;
+        bool m_track_page_bw_utilization_stats;  // Whether to track page queue bw utilization stats
+        bool m_auto_turn_off_partition_queues;  // Whether to enable automatic detection of conditions to turn off partition queues
+        double m_turn_off_pq_cacheline_queue_utilization_threshold;  // Only consider turning off partition queues when cacheline queue utilization is above this threshold
+        double m_cancel_pq_inflight_buffer_threshold;  // Fraction of inflight_pages size at which to cancel partition queues
+        bool m_keep_space_in_cacheline_queue;  // Try to keep more free bandwidth in cacheline queues
 
         QueueModel* m_data_movement;        // Normally, this is the one queue for pages and cachelines. When partitioned queues are enabled, both page and cacheline queues are contained in this QueueModel
 
@@ -89,7 +89,7 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_inflight_page_delayed;
         SubsecondTime m_inflight_pages_delay_time;
 
-        std::map<UInt64, UInt32> m_page_usage_map;  // track number of times each phys page is accessed
+        std::unordered_map<UInt64, UInt32> m_page_usage_map;  // track number of times each phys page is accessed
         const UInt32 m_page_usage_stats_num_points = 10;  // the number of percentiles (from above 0% to including 100%)
         std::vector<UInt64> page_usage_count_stats;       // percentiles of phys_page access counts, to be registered as stats
         std::map<UInt64, UInt32> m_remote_access_tracker;  // Track remote page accesses
@@ -245,6 +245,11 @@ class DramPerfModelDisagg : public DramPerfModel
 
         UInt64 m_disturbance_bq_size;
 
+        SubsecondTime getPartitionQueueDelayNoEffect(SubsecondTime pkt_time, UInt64 num_bytes, QueueModel::request_t queue_request_type, core_id_t requester);
+        SubsecondTime getPartitionQueueDelayTrackBytes(SubsecondTime pkt_time, UInt64 num_bytes, QueueModel::request_t queue_request_type, core_id_t requester);
+        SubsecondTime getDataMovementBandwidthProcessingTime(UInt64 num_bytes, QueueModel::request_t queue_request_type);
+        bool isMovePage(UInt64 phys_page, SubsecondTime &t_now, double page_queue_utilization_percentage, double cacheline_queue_utilization_percentage);
+
         SubsecondTime possiblyEvict(UInt64 phys_page, SubsecondTime pkt_time, core_id_t requester);
         void possiblyPrefetch(UInt64 phys_page, SubsecondTime pkt_time, core_id_t requester);
 
@@ -252,11 +257,9 @@ class DramPerfModelDisagg : public DramPerfModel
         void updateLocalRemoteLatencyStat(SubsecondTime access_latency);
         void updateDynamicCachelineQueueRatio(SubsecondTime pkt_time);
 
-        SubsecondTime getPartitionQueueDelayNoEffect(SubsecondTime pkt_time, UInt64 num_bytes, QueueModel::request_t queue_request_type, core_id_t requester);
-        SubsecondTime getPartitionQueueDelayTrackBytes(SubsecondTime pkt_time, UInt64 num_bytes, QueueModel::request_t queue_request_type, core_id_t requester);
-        SubsecondTime getDataMovementBandwidthProcessingTime(UInt64 num_bytes, QueueModel::request_t queue_request_type);
 
         void addInflightCacheline(UInt64 cacheline, SubsecondTime arrival_time, DramCntlrInterface::access_t access_type);
+        void doIdealPageSwap(UInt64 phys_page);
 
     public:
         DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_size, AddressHomeLookup* address_home_lookup);
