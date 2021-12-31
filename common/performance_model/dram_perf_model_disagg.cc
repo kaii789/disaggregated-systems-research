@@ -1070,7 +1070,8 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
             ++i;
         }
     }
-
+    
+    // Inflight pages that have been evicted from local memory: pages need to be transferred from local --> remote
     for (auto i = m_inflightevicted_pages.begin(); i != m_inflightevicted_pages.end();) {
         if (i->second <= current_time) {
             m_inflightevicted_pages.erase(i++);
@@ -1079,7 +1080,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
         }
     }
 
-    // Inflight cachelines
+    // Inflight cachelines from remote --> local (reads) and local --> remote (writes)
     if (m_track_inflight_cachelines) {
         for (auto i = m_inflight_cachelines_reads.begin(); i != m_inflight_cachelines_reads.end();) {
             if (i->second <= current_time) {
@@ -1121,6 +1122,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
         ++m_num_recent_remote_accesses;
         return (getAccessLatencyRemote(pkt_time, pkt_size, requester, address, access_type, perf)); 
     }
+    // FIXME: Should we completely remove these lines?
     // if (!m_speed_up_simulation) {
     //     // m_local_reads_remote_origin
     //     if (m_local_pages_remote_origin.count(phys_page)) {
@@ -1166,7 +1168,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
             access_latency = m_inflight_pages[phys_page] > t_now ? (m_inflight_pages[phys_page] - pkt_time) : (t_now - pkt_time);
         }
 
-        if (access_latency > (t_now - pkt_time)) {
+        if (access_latency > (t_now - pkt_time)) { // Inflight page hit
             // The page is still in transit from remote to local memory
             m_inflight_hits++; 
 
@@ -1194,10 +1196,11 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                         //     m_inflight_page_to_dirty_write_count.insert(phys_page, dirty_write_count);
                         // }
                         m_inflight_page_to_dirty_write_count[phys_page] = dirty_write_count;
-
                         m_dirty_write_buffer_size += 1;
                     }
 
+                    // Check when the cacheline granularity request would arrive in local memory, and compare it with the arrival time of the inflight page
+                    // Cacheline Arrival Time: 1. Cacheline is read from remote memory, 2. Cacheline is compressed when compression is on, 3. Cacheline is decompressed when compression is on, 4. Network processing delay on cacheline, 5. Network bandwidth queueing delay on cacheline
                     SubsecondTime add_cacheline_hw_access_latency = m_dram_hardware_cntlr.getDramAccessCost(t_now, pkt_size, requester, address, perf, true, false, false);
                     m_total_remote_dram_hardware_latency_cachelines += add_cacheline_hw_access_latency;
                     m_total_remote_dram_hardware_latency_cachelines_count++;
@@ -1229,13 +1232,17 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                     if (m_r_throttle_redundant_moves) {
                         // Don't request cacheline via the cacheline queue if the inflight page arrives sooner
                         SubsecondTime datamov_delay = getPartitionQueueDelayNoEffect(add_cacheline_request_time, size, QueueModel::CACHELINE, requester);
+                        // FIXME: I think that the cacheline_network_processing_time is added twice! Both here (line 1236) and also in line 1234 (datamov_delay) where we call the getPartitionQueueDelayTrackBytes (line 521 already includes the network processing time!)
                         datamov_delay += cacheline_network_processing_time + cacheline_decompression_latency;  // decompression latency is 0 if not using cacheline compression
+                        // If the estimated cacheline arrival time is larger than the arrival time of the inflight page, then throttle the cacheline granularity data movement (move only the corresponding page).
+                        // Otherwise, move both cacheline and the corresponding page to local memory.
                         if (add_cacheline_request_time + datamov_delay - pkt_time >= access_latency) {
                             make_add_cacheline_request = false;
                             ++m_redundant_moves_type2_slower_than_page_arrival;
                         }
                     } 
-                    if (make_add_cacheline_request) {
+                    
+                    if (make_add_cacheline_request) { // Also move data in cacheline granularity (along with page movement)
                         // Actually make the additional cacheline queue request
                         SubsecondTime datamov_delay;
                         if (m_r_partition_queues == 3) {
@@ -1249,8 +1256,11 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                                 }
                             }
                         } else if (m_r_partition_queues == 2 || m_r_partition_queues == 4) {
+                            // Actually perform the cacheline movement inside the network 
                             datamov_delay = getPartitionQueueDelayTrackBytes(add_cacheline_request_time, size, QueueModel::CACHELINE, requester);
                         }
+                        // FIXME: I think that the cacheline_network_processing_time is added twice! Both here (line 1261) and also in line 1259 where we call the getPartitionQueueDelayTrackBytes (line 521 already includes the network processing time!)
+                        // Does this issue happened because of the code cleanup or was it also accounted for twice in our previous/old code?
                         datamov_delay += cacheline_network_processing_time + cacheline_decompression_latency;  // decompression latency is 0 if not using cacheline compression
                         ++m_redundant_moves;
                         ++m_redundant_moves_type2;
@@ -1258,7 +1268,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                         ++m_num_recent_remote_additional_accesses;  // this is now an additional remote access
                         m_inflight_redundant[phys_page] += 1;
                         SubsecondTime new_arrival_time = add_cacheline_request_time + datamov_delay;
-                        if (new_arrival_time - pkt_time < access_latency) {
+                        if (new_arrival_time - pkt_time < access_latency) { 
                             m_redundant_moves_type2_time_savings += access_latency - (new_arrival_time - pkt_time);
                             access_latency = new_arrival_time - pkt_time;  // Only update access_latency if the additional cacheline arrives before the inflight page
                         }
@@ -1321,7 +1331,7 @@ DramPerfModelDisagg::isRemoteAccess(IntPtr address, core_id_t requester, DramCnt
     else if (m_r_mode == 1 || m_r_mode == 2 || m_r_mode == 3 || m_r_mode == 5) {  // local DRAM as a cache 
         if (m_local_pages.find(phys_page)) {  // Is it in local DRAM?
             m_local_pages.remove(phys_page);  // LRU
-            m_local_pages.push_back(phys_page);
+            m_local_pages.push_back(phys_page); // Most recently used pages are moved at the end of the queue
             if (access_type == DramCntlrInterface::WRITE) {
                 m_dirty_pages.insert(phys_page);  // for unordered_set, the element is only inserted if it's not already in the container
             }
