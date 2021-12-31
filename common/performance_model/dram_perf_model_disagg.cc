@@ -842,7 +842,6 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
                 m_remote_to_local_page_move_count++;
                 t_now += page_hw_access_latency;
                 t_now += local_page_hw_write_latency;
-                // FIXME I think here we also need to add at t_now also the decompression latency related to the page: t_now += page_decompression_latency;
                 if (m_r_mode != 4 && !m_r_enable_selective_moves) {
                     t_now -= datamovement_delay;  // only subtract if it was added earlier
                     m_total_remote_datamovement_latency -= datamovement_delay;
