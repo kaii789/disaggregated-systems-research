@@ -684,6 +684,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     } else {  // always make cacheline queue request
         cacheline_queue_delay = getPartitionQueueDelayTrackBytes(t_remote_queue_request + cacheline_compression_latency, size, QueueModel::CACHELINE, requester);
     }
+    // FIXME: I think that the cacheline_network_processing_time is added twice! Both here (line 688) and also in line 683/685 (cacheline_datamov_delay) where we call the getPartitionQueueDelayTrackBytes/NoEffect (line 521 already includes the network processing time!)
     SubsecondTime datamovement_delay = (cacheline_queue_delay + cacheline_network_processing_time);
     m_cacheline_network_processing_time += cacheline_network_processing_time;
     m_cacheline_network_queue_delay += cacheline_queue_delay;
@@ -702,10 +703,10 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         m_total_remote_datamovement_latency += datamovement_delay;
     }
 
+    // FIXME: Why do we have this line 707 here?
     perf->updateTime(t_now, ShmemPerf::DRAM_BUS);
 
     SubsecondTime page_network_processing_time = SubsecondTime::Zero();
-
     SubsecondTime page_datamovement_delay = SubsecondTime::Zero();
 
     double page_queue_utilization_percentage = m_data_movement->getPageQueueUtilizationPercentage(t_now);
@@ -937,6 +938,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         }
 
         // Other systems using the remote memory and creating disturbance
+        // FIXME: I think the disturbance factor could be called in a better place (Let's discuss it). Why do we have it only when move_page == false?
         if (m_r_disturbance_factor > 0 && (unsigned int)(rand() % 100) < m_r_disturbance_factor) {
             /* SubsecondTime page_datamovement_delay = */ getPartitionQueueDelayTrackBytes(t_remote_queue_request, size, QueueModel::CACHELINE, requester);
             m_extra_cachelines++;
@@ -962,6 +964,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             } else {
                 // Only cacheline is moved 
                 // move_page == false so if PQ=off/on actually put the cacheline request on the queue
+                // No need to update the t_now here. Queue delay has already been added as latency in lines 681-688
                 cacheline_queue_delay = getPartitionQueueDelayTrackBytes(t_remote_queue_request + cacheline_compression_latency, size, QueueModel::CACHELINE, requester);
             }
         }
@@ -982,6 +985,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         }
     } 
 
+    // FIXME: I think it is better to move these lines 989-991 inside the condition if (move_page) of line 715. E.g move these to be at line 921!
     if (move_page) {  // Check if there's place in local DRAM and if not evict an older page to make space
         t_now += possiblyEvict(phys_page, pkt_time, requester);
     }
