@@ -703,7 +703,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         m_total_remote_datamovement_latency += datamovement_delay;
     }
 
-    // FIXME: Why do we have this line 707 here?
+    // FIXME: Why do we have this line 707 here? - To be Removed
     perf->updateTime(t_now, ShmemPerf::DRAM_BUS);
 
     SubsecondTime page_network_processing_time = SubsecondTime::Zero();
@@ -730,7 +730,6 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             if (m_use_compression) {
                 if (m_use_r_compressed_pages && m_compression_controller.address_to_compressed_size.find(phys_page) != m_compression_controller.address_to_compressed_size.end()) {
                     page_size = m_compression_controller.address_to_compressed_size[phys_page];
-                    // FIXME I think here we need to have something like t_now += page_compression_latency
                 } else {
                     m_compression_controller.m_compression_model->update_bandwidth_utilization(m_data_movement->getPageQueueUtilizationPercentage(t_now));
                     size_t size_to_compress = (m_r_partition_queues) ? m_page_size - m_cache_line_size : m_page_size;
@@ -789,7 +788,8 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
                 m_page_network_queue_delay += page_datamovement_delay - page_decompression_latency;
                 m_remote_to_local_page_move_count++;
                 
-                // FIXME: 1. I think this condition needs also to add the (local_page_hw_access_latency) cost (Let's discuss it!) 2. datamovement_delay includes the cacheline network processing time twice!
+                // FIXME: 1. I think this condition needs also to add the (local_page_hw_access_latency) cost (Let's discuss it!) - Needs to be added inside the condition (not included in submitted results)
+                // FIXME: 2. datamovement_delay includes the cacheline network processing time twice!
                 if (page_hw_access_latency + page_compression_latency + page_datamovement_delay <= cacheline_hw_access_latency + cacheline_compression_latency + datamovement_delay) {
                     // If the page arrival time via the page queue is faster than the cacheline via the cacheline queue, use the page queue arrival time
                     // (and the cacheline request is not sent)
@@ -868,7 +868,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
                 m_cacheline_network_queue_delay -= cacheline_queue_delay;
                 m_remote_to_local_cacheline_move_count--;
             }
-            // FIXME I think here we also need to remove the cacheline_compression_latency, i.e., to add the following commented lines
+            // FIXME I think here we also need to remove the cacheline_compression_latency, i.e., to add the following commented lines - Needs to be added
             //if (m_use_compression && (m_r_cacheline_gran || m_use_cacheline_compression))
             //  t_now -= cacheline_compression_latency;  // essentially didn't separately compress cacheline, so subtract this previously added compression latency
         } else {
@@ -889,7 +889,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
 
 
         SubsecondTime global_time = Sim()->getClockSkewMinimizationServer()->getGlobalTime();
-        // FIXME 1. t_remote_queue_request includes the cacheline_hw_access_latency cost (line 639). I think we need to remove it here; and 2. page_network_processing_time is added twice (also included inside page_datamovement_delay)!
+        // FIXME 2. page_network_processing_time is added twice (also included inside page_datamovement_delay)!
         SubsecondTime page_arrival_time = t_remote_queue_request + page_hw_access_latency + page_compression_latency + page_datamovement_delay + page_network_processing_time + local_page_hw_write_latency;  // page_datamovement_delay already contains the page decompression latency
         if (global_time > page_arrival_time + SubsecondTime::NS(50)) {  // if global time is more than 50 ns ahead of page_arrival_time
             ++m_global_time_much_larger_than_page_arrival;
@@ -906,10 +906,9 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             if (m_inflight_pages_extra.size() > m_max_inflight_extra_bufferspace)
                 m_max_inflight_extra_bufferspace++;
         } else if (page_queue_utilization_percentage > m_r_page_queue_utilization_threshold) { 
-            // FIXME Don't we need to add m_r_partition_queues == 0 in the if condition here?
-            // FIXME Don't we need to add some extra additional latency here (e.g., 2000ns) because network is oversaturated (queueing model is inaccurate)?
             // PQ=off, page movement would exceed network bandwidth
-            // Queue model estimates how long it would take to send packet if inflight page buffer is full
+            // Queue model estimates how long it would take to send packet if network bandwidth is saturated
+            // Queue model already adds some extra (necessary) latency that needs to be added in this case
             m_inflight_pages_extra[phys_page] = SubsecondTime::max(global_time, page_arrival_time);
             m_inflight_redundant[phys_page] = 0;
             m_pages_cacheline_request_limit_exceeded.erase(phys_page);
@@ -917,7 +916,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             if (m_inflight_pages_extra.size() > m_max_inflight_extra_bufferspace)
                 m_max_inflight_extra_bufferspace++;
         } else { // Update the arrival time of the inflight page 
-            // FIXME when PQ=ON and we exceed inflight pages bufferspace, don't we need to add 2000ns latency in the inflight arrival page time?
+            // If PQ==ON and we exceed inflight pages bufferspace, page is already canceled before
             m_inflight_pages[phys_page] = SubsecondTime::max(global_time, page_arrival_time);
             m_inflight_redundant[phys_page] = 0;
             m_pages_cacheline_request_limit_exceeded.erase(phys_page);
@@ -943,7 +942,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         if (!m_r_partition_queues) {
             // When partition queues is off, only calculate cacheline access cost when moving the cacheline instead of the page
             cacheline_hw_access_latency = m_dram_hardware_cntlr.getDramAccessCost(pkt_time, pkt_size, requester, address, perf, true, false, false);  // A change for 64 byte page granularity
-            // FIXME I think the following line should be t_remote_queue_request += cacheline_hw_access_latency (because the cache line is read by remote memory and written to local memory, thus we have 2x internal dram costs)
+            // FIXME I think the following line should be t_remote_queue_request += cacheline_hw_access_latency (because the cache line is read by remote memory and written to local memory, thus we have 2x internal dram costs) - Needs to be added as a latency
             t_remote_queue_request = pkt_time + cacheline_hw_access_latency;
             m_total_remote_dram_hardware_latency_cachelines += cacheline_hw_access_latency;
             m_total_remote_dram_hardware_latency_cachelines_count++;
@@ -1520,7 +1519,7 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
                 m_max_total_bufferspace++;  // update stat
         }
 
-        // FIXME I this need to be called inside the if condition of line 1446
+        // FIXME I this need to be called inside the if condition of line 1446 - Correct
         m_dirty_pages.erase(evicted_page);
     }
 
