@@ -70,6 +70,7 @@ class DramPerfModelDisagg : public DramPerfModel
         bool m_auto_turn_off_partition_queues;  // Whether to enable automatic detection of conditions to turn off partition queues
         double m_turn_off_pq_cacheline_queue_utilization_threshold;  // Only consider turning off partition queues when cacheline queue utilization is above this threshold
         double m_cancel_pq_inflight_buffer_threshold;  // Fraction of inflight_pages size at which to cancel partition queues
+        SubsecondTime m_inflight_page_buffer_full_penalty;  // Additional penalty latency for an inflight page when the inflight buffer is full
         bool m_keep_space_in_cacheline_queue;  // Try to keep more free bandwidth in cacheline queues
 
         QueueModel* m_data_movement;        // Normally, this is the one queue for pages and cachelines. When partitioned queues are enabled, both page and cacheline queues are contained in this QueueModel
@@ -183,6 +184,7 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_total_local_dram_hardware_latency_count;
         UInt64 m_total_remote_dram_hardware_latency_cachelines_count;
         UInt64 m_total_remote_dram_hardware_latency_pages_count;
+        SubsecondTime m_total_local_dram_hardware_write_latency_cachelines;
         SubsecondTime m_total_local_dram_hardware_write_latency_pages;
         SubsecondTime m_cacheline_network_processing_time;
         SubsecondTime m_cacheline_network_queue_delay;
