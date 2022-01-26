@@ -1215,11 +1215,11 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                     // Main difference when m_r_throttle_redundant_moves is true: reduce traffic sent through cacheline queue
                     if (m_r_throttle_redundant_moves) {
                         // Don't request cacheline via the cacheline queue if the inflight page arrives sooner
-                        SubsecondTime datamov_delay = getPartitionQueueDelayNoEffect(add_cacheline_request_time, size, QueueModel::CACHELINE, requester);
-                        datamov_delay += cacheline_decompression_latency;  // decompression latency is 0 if not using cacheline compression
+                        SubsecondTime cacheline_datamov_delay = getPartitionQueueDelayNoEffect(add_cacheline_request_time, size, QueueModel::CACHELINE, requester);
+                        cacheline_datamov_delay += cacheline_decompression_latency;  // decompression latency is 0 if not using cacheline compression
                         // If the estimated cacheline arrival time is larger than the arrival time of the inflight page, then throttle the cacheline granularity data movement (move only the corresponding page).
                         // Otherwise, move both cacheline and the corresponding page to local memory.
-                        if (add_cacheline_request_time + datamov_delay - pkt_time >= access_latency) {
+                        if (add_cacheline_request_time + cacheline_datamov_delay - pkt_time >= access_latency) {
                             make_add_cacheline_request = false;
                             ++m_redundant_moves_type2_slower_than_page_arrival;
                         }
@@ -1227,10 +1227,10 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                     
                     if (make_add_cacheline_request) { // Also move data in cacheline granularity (along with page movement)
                         // Actually make the additional cacheline queue request
-                        SubsecondTime datamov_delay;
+                        SubsecondTime cacheline_datamov_delay;
                         if (m_r_partition_queues == 3) {
                             std::vector<std::pair<UInt64, SubsecondTime>> updated_inflight_page_arrival_time_deltas;
-                            datamov_delay = m_data_movement->computeQueueDelayTrackBytesPotentialPushback(add_cacheline_request_time, m_r_cacheline_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, updated_inflight_page_arrival_time_deltas, true, requester);
+                            cacheline_datamov_delay = m_data_movement->computeQueueDelayTrackBytesPotentialPushback(add_cacheline_request_time, m_r_cacheline_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, updated_inflight_page_arrival_time_deltas, true, requester);
                             for (auto it = updated_inflight_page_arrival_time_deltas.begin(); it != updated_inflight_page_arrival_time_deltas.end(); ++it) {
                                 if (m_inflight_pages.count(it->first) && it->second > SubsecondTime::Zero()) {
                                     m_inflight_pages_delay_time += it->second;
@@ -1240,15 +1240,15 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                             }
                         } else if (m_r_partition_queues == 2 || m_r_partition_queues == 4) {
                             // Actually perform the cacheline movement inside the network 
-                            datamov_delay = getPartitionQueueDelayTrackBytes(add_cacheline_request_time, size, QueueModel::CACHELINE, requester);
+                            cacheline_datamov_delay = getPartitionQueueDelayTrackBytes(add_cacheline_request_time, size, QueueModel::CACHELINE, requester);
                         }
-                        datamov_delay += cacheline_decompression_latency;  // decompression latency is 0 if not using cacheline compression
+                        cacheline_datamov_delay += cacheline_decompression_latency;  // decompression latency is 0 if not using cacheline compression
                         ++m_redundant_moves;
                         ++m_redundant_moves_type2;
                         --m_num_recent_local_accesses;
                         ++m_num_recent_remote_additional_accesses;  // this is now an additional remote access
                         m_inflight_redundant[phys_page] += 1;
-                        SubsecondTime new_arrival_time = add_cacheline_request_time + datamov_delay;
+                        SubsecondTime new_arrival_time = add_cacheline_request_time + cacheline_datamov_delay;
                         if (new_arrival_time - pkt_time < access_latency) { 
                             m_redundant_moves_type2_time_savings += access_latency - (new_arrival_time - pkt_time);
                             access_latency = new_arrival_time - pkt_time;  // Only update access_latency if the additional cacheline arrives before the inflight page
