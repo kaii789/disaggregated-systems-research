@@ -101,19 +101,19 @@ private:
    SubsecondTime m_page_utilization_full_injected_delay_max;
    SubsecondTime m_cacheline_utilization_full_injected_delay_max;
    
-   double m_total_page_queue_utilization_during_cacheline_requests = 0;
-   double m_total_cacheline_queue_utilization_during_page_requests = 0;
-   UInt64 m_total_page_queue_utilization_during_cacheline_requests_numerator = 0;
-   UInt64 m_total_page_queue_utilization_during_cacheline_requests_denominator = 1000 * 1000;  // 10^6 as denominator
-   UInt64 m_total_cacheline_queue_utilization_during_page_requests_numerator = 0;
-   UInt64 m_total_cacheline_queue_utilization_during_page_requests_denominator = 1000 * 1000;  // 10^6 as denominator
+   double m_total_page_queue_utilization_during_cacheline_requests = 0.0;
+   double m_total_cacheline_queue_utilization_during_page_requests = 0.0;
+   UInt64 m_total_page_queue_utilization_during_cacheline_requests_numerator;
+   UInt64 m_total_page_queue_utilization_during_cacheline_requests_denominator;  // Set as 10^6 in constructor function
+   UInt64 m_total_cacheline_queue_utilization_during_page_requests_numerator;
+   UInt64 m_total_cacheline_queue_utilization_during_page_requests_denominator;  // Set as 10^6 in constructor function
 
-   double m_total_page_queue_utilization_during_cacheline_no_effect = 0;
-   double m_total_cacheline_queue_utilization_during_page_no_effect = 0;
-   UInt64 m_total_page_queue_utilization_during_cacheline_no_effect_numerator = 0;
-   UInt64 m_total_page_queue_utilization_during_cacheline_no_effect_denominator = 1000 * 1000;  // 10^6 as denominator
-   UInt64 m_total_cacheline_queue_utilization_during_page_no_effect_numerator = 0;
-   UInt64 m_total_cacheline_queue_utilization_during_page_no_effect_denominator = 1000 * 1000;  // 10^6 as denominator
+   double m_total_page_queue_utilization_during_cacheline_no_effect = 0.0;
+   double m_total_cacheline_queue_utilization_during_page_no_effect = 0.0;
+   UInt64 m_total_page_queue_utilization_during_cacheline_no_effect_numerator;
+   UInt64 m_total_page_queue_utilization_during_cacheline_no_effect_denominator;  // Set as 10^6 in constructor function
+   UInt64 m_total_cacheline_queue_utilization_during_page_no_effect_numerator;
+   UInt64 m_total_cacheline_queue_utilization_during_page_no_effect_denominator;  // Set as 10^6 in constructor function
 
    UInt64 m_total_no_effect_page_requests = 0;
    UInt64 m_total_no_effect_cacheline_requests = 0;

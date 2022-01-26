@@ -62,6 +62,14 @@ QueueModelWindowedMG1RemoteIndQueues::QueueModelWindowedMG1RemoteIndQueues(Strin
    , m_cacheline_utilization_full_injected_delay(SubsecondTime::Zero())
    , m_page_utilization_full_injected_delay_max(SubsecondTime::Zero())
    , m_cacheline_utilization_full_injected_delay_max(SubsecondTime::Zero())
+   , m_total_page_queue_utilization_during_cacheline_requests_numerator(0)
+   , m_total_page_queue_utilization_during_cacheline_requests_denominator(0)
+   , m_total_cacheline_queue_utilization_during_page_requests_numerator(0)
+   , m_total_cacheline_queue_utilization_during_page_requests_denominator(0)
+   , m_total_page_queue_utilization_during_cacheline_no_effect_numerator(0)
+   , m_total_page_queue_utilization_during_cacheline_no_effect_denominator(0)
+   , m_total_cacheline_queue_utilization_during_page_no_effect_numerator(0)
+   , m_total_cacheline_queue_utilization_during_page_no_effect_denominator(0)
 {  
    if (m_use_separate_queue_delay_cap) {
       m_queue_delay_cap = SubsecondTime::NS(Sim()->getCfg()->getInt("queue_model/windowed_mg1_remote_ind_queues/queue_delay_cap"));
@@ -126,6 +134,11 @@ QueueModelWindowedMG1RemoteIndQueues::QueueModelWindowedMG1RemoteIndQueues(Strin
    }
    std::cout << std::endl;
    std::cout << "m_page_inject_delay_when_queue_full=" << m_page_inject_delay_when_queue_full << ", m_cacheline_inject_delay_when_queue_full=" << m_cacheline_inject_delay_when_queue_full << std::endl;
+
+   m_total_page_queue_utilization_during_cacheline_requests_denominator += 1000 * 1000;
+   m_total_cacheline_queue_utilization_during_page_requests_denominator += 1000 * 1000;
+   m_total_page_queue_utilization_during_cacheline_no_effect_denominator += 1000 * 1000;
+   m_total_cacheline_queue_utilization_during_page_no_effect_denominator += 1000 * 1000;
 }
 
 QueueModelWindowedMG1RemoteIndQueues::~QueueModelWindowedMG1RemoteIndQueues()
@@ -186,17 +199,11 @@ QueueModelWindowedMG1RemoteIndQueues::~QueueModelWindowedMG1RemoteIndQueues()
 }
 
 void QueueModelWindowedMG1RemoteIndQueues::finalizeStats() {
-   // Try editing the value to trigger the variable to be recorded??
-   m_total_cacheline_queue_utilization_during_page_requests_denominator = 1;
-   m_total_page_queue_utilization_during_cacheline_requests_denominator = 1;
-   m_total_cacheline_queue_utilization_during_page_no_effect_denominator = 1;
-   m_total_page_queue_utilization_during_cacheline_no_effect_denominator = 1;
-
-   m_total_cacheline_queue_utilization_during_page_requests_denominator = 1000 * 1000;
-   m_total_page_queue_utilization_during_cacheline_requests_denominator = 1000 * 1000;
-   m_total_cacheline_queue_utilization_during_page_no_effect_denominator = 1000 * 1000;
-   m_total_page_queue_utilization_during_cacheline_no_effect_denominator = 1000 * 1000;
-   std::cout << "remote_ind_queues finalizeStats(): denominator=" << m_total_cacheline_queue_utilization_during_page_requests_denominator << std::endl;
+   // Doing it again here at the end; only the += here gets the value to show up in the stats for some reason
+   m_total_page_queue_utilization_during_cacheline_requests_denominator += 1000 * 1000;
+   m_total_cacheline_queue_utilization_during_page_requests_denominator += 1000 * 1000;
+   m_total_page_queue_utilization_during_cacheline_no_effect_denominator += 1000 * 1000;
+   m_total_cacheline_queue_utilization_during_page_no_effect_denominator += 1000 * 1000;
 }
 
 void QueueModelWindowedMG1RemoteIndQueues::updateQueues(SubsecondTime pkt_time, bool track_effective_bandwidth, request_t request_type) {
@@ -297,11 +304,11 @@ QueueModelWindowedMG1RemoteIndQueues::computeQueueDelayNoEffect(SubsecondTime pk
    if (request_type == QueueModel::PAGE) {
       ++m_total_no_effect_page_requests;
       m_total_cacheline_queue_utilization_during_page_no_effect += cacheline_queue_utilization_percentage;
-      m_total_cacheline_queue_utilization_during_page_no_effect_numerator = (UInt64)(m_total_cacheline_queue_utilization_during_page_no_effect * m_total_cacheline_queue_utilization_during_page_no_effect_denominator);
+      m_total_cacheline_queue_utilization_during_page_no_effect_numerator += (UInt64)(cacheline_queue_utilization_percentage * m_total_cacheline_queue_utilization_during_page_no_effect_denominator);
    } else {  // request_type == QueueModel::CACHELINE
       ++m_total_no_effect_cacheline_requests;
       m_total_page_queue_utilization_during_cacheline_no_effect += page_queue_utilization_percentage;
-      m_total_page_queue_utilization_during_cacheline_no_effect_numerator = (UInt64)(m_total_page_queue_utilization_during_cacheline_no_effect * m_total_page_queue_utilization_during_cacheline_no_effect_denominator);
+      m_total_page_queue_utilization_during_cacheline_no_effect_numerator += (UInt64)(cacheline_queue_utilization_percentage * m_total_page_queue_utilization_during_cacheline_no_effect_denominator);
    }
 
    return t_queue + utilization_overflow_wait_time;
@@ -367,12 +374,12 @@ QueueModelWindowedMG1RemoteIndQueues::computeQueueDelayTrackBytes(SubsecondTime 
       ++m_total_page_requests;
       m_total_page_queue_delay += t_queue + utilization_overflow_wait_time;
       m_total_cacheline_queue_utilization_during_page_requests += cacheline_queue_utilization_percentage;
-      m_total_cacheline_queue_utilization_during_page_requests_numerator = (UInt64)(m_total_cacheline_queue_utilization_during_page_requests * m_total_cacheline_queue_utilization_during_page_requests_denominator);
+      m_total_cacheline_queue_utilization_during_page_requests_numerator += (UInt64)(cacheline_queue_utilization_percentage * m_total_cacheline_queue_utilization_during_page_requests_denominator);
    } else {  // request_type == QueueModel::CACHELINE
       ++m_total_cacheline_requests;
       m_total_cacheline_queue_delay += t_queue + utilization_overflow_wait_time;
       m_total_page_queue_utilization_during_cacheline_requests += page_queue_utilization_percentage;
-      m_total_page_queue_utilization_during_cacheline_requests_numerator = (UInt64)(m_total_page_queue_utilization_during_cacheline_requests * m_total_page_queue_utilization_during_cacheline_requests_denominator);
+      m_total_page_queue_utilization_during_cacheline_requests_numerator += (UInt64)(cacheline_queue_utilization_percentage * m_total_page_queue_utilization_during_cacheline_requests_denominator);
    }
 
    return t_queue + utilization_overflow_wait_time;
