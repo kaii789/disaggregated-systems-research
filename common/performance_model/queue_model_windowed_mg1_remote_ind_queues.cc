@@ -311,7 +311,7 @@ QueueModelWindowedMG1RemoteIndQueues::computeQueueDelayNoEffect(SubsecondTime pk
       m_total_page_queue_utilization_during_cacheline_no_effect_numerator += (UInt64)(cacheline_queue_utilization_percentage * m_total_page_queue_utilization_during_cacheline_no_effect_denominator);
    }
 
-   return t_queue + utilization_overflow_wait_time;
+   return t_queue + processing_time + utilization_overflow_wait_time;
 }
 
 SubsecondTime
@@ -382,7 +382,7 @@ QueueModelWindowedMG1RemoteIndQueues::computeQueueDelayTrackBytes(SubsecondTime 
       m_total_page_queue_utilization_during_cacheline_requests_numerator += (UInt64)(cacheline_queue_utilization_percentage * m_total_page_queue_utilization_during_cacheline_requests_denominator);
    }
 
-   return t_queue + utilization_overflow_wait_time;
+   return t_queue + processing_time + utilization_overflow_wait_time;
 }
 
 // total_service_time is in ps, total_service_time2 is in ps^2, utilization_window_size is in ps

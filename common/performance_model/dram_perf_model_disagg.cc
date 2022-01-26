@@ -120,9 +120,7 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_total_remote_dram_hardware_latency_pages_count(0)
     , m_total_local_dram_hardware_write_latency_cachelines(SubsecondTime::Zero())
     , m_total_local_dram_hardware_write_latency_pages(SubsecondTime::Zero())
-    , m_cacheline_network_processing_time(SubsecondTime::Zero())
     , m_cacheline_network_queue_delay(SubsecondTime::Zero())
-    , m_page_network_processing_time(SubsecondTime::Zero())
     , m_page_network_queue_delay(SubsecondTime::Zero())
     , m_remote_to_local_cacheline_move_count(0)
     , m_remote_to_local_page_move_count(0)
@@ -215,10 +213,8 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     registerStatsMetric("dram", core_id, "total-local-dram-hardware-write-latency-pages", &m_total_local_dram_hardware_write_latency_pages);
     
     registerStatsMetric("dram", core_id, "total-remote-datamovement-latency", &m_total_remote_datamovement_latency);
-    registerStatsMetric("dram", core_id, "total-network-cacheline-processing-time", &m_cacheline_network_processing_time);
     registerStatsMetric("dram", core_id, "total-network-cacheline-queue-delay", &m_cacheline_network_queue_delay);
     registerStatsMetric("dram", core_id, "total-remote-to-local-cacheline-move-count", &m_remote_to_local_cacheline_move_count);
-    registerStatsMetric("dram", core_id, "total-network-page-processing-time", &m_page_network_processing_time);
     registerStatsMetric("dram", core_id, "total-network-page-queue-delay", &m_page_network_queue_delay);
     registerStatsMetric("dram", core_id, "total-remote-to-local-page-move-count", &m_remote_to_local_page_move_count);
     
@@ -675,22 +671,15 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     }
     // FIXME: datamovement_delay is only added to t_now if(m_r_mode != 4 && !m_r_enable_selective_moves), should we also only add cacheline compression latency if the same condition is true?
 
-    SubsecondTime cacheline_network_processing_time;
-    if (m_r_partition_queues > 0)
-        cacheline_network_processing_time = m_r_cacheline_bandwidth.getRoundedLatency(8*size);
-    else
-        cacheline_network_processing_time = m_r_bus_bandwidth.getRoundedLatency(8*size);
-    SubsecondTime cacheline_queue_delay;
+    SubsecondTime cacheline_delay;
     if (m_r_throttle_redundant_moves) {
         // Use computeQueueDelayNoEffect here, in case need we end up moving the whole page instead and not requesting the cacheline separately
-        cacheline_queue_delay = getPartitionQueueDelayNoEffect(t_remote_queue_request + cacheline_compression_latency, size, QueueModel::CACHELINE, requester);
+        cacheline_delay = getPartitionQueueDelayNoEffect(t_remote_queue_request + cacheline_compression_latency, size, QueueModel::CACHELINE, requester);
     } else {  // always make cacheline queue request
-        cacheline_queue_delay = getPartitionQueueDelayTrackBytes(t_remote_queue_request + cacheline_compression_latency, size, QueueModel::CACHELINE, requester);
+        cacheline_delay = getPartitionQueueDelayTrackBytes(t_remote_queue_request + cacheline_compression_latency, size, QueueModel::CACHELINE, requester);
     }
-    // FIXME: I think that the cacheline_network_processing_time is added twice! Both here (line 688) and also in line 683/685 (cacheline_datamov_delay) where we call the getPartitionQueueDelayTrackBytes/NoEffect (line 521 already includes the network processing time!)
-    SubsecondTime datamovement_delay = (cacheline_queue_delay + cacheline_network_processing_time);
-    m_cacheline_network_processing_time += cacheline_network_processing_time;
-    m_cacheline_network_queue_delay += cacheline_queue_delay;
+    SubsecondTime datamovement_delay = cacheline_delay;
+    m_cacheline_network_queue_delay += cacheline_delay;
     m_remote_to_local_cacheline_move_count++;
     
     // TODO: Currently model decompression by adding decompression latency to inflight page time
@@ -706,7 +695,6 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         m_total_remote_datamovement_latency += datamovement_delay;
     }
 
-    SubsecondTime page_network_processing_time = SubsecondTime::Zero();
     SubsecondTime page_datamovement_delay = SubsecondTime::Zero();
 
     double page_queue_utilization_percentage = m_data_movement->getPageQueueUtilizationPercentage(t_now);
@@ -760,18 +748,10 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             m_total_remote_dram_hardware_latency_pages += page_hw_access_latency;
             m_total_remote_dram_hardware_latency_pages_count++;
             m_total_local_dram_hardware_write_latency_pages += local_page_hw_write_latency;
-
-            // Compute network transmission delay
-            if (m_r_partition_queues > 0)
-                page_network_processing_time = m_r_page_bandwidth.getRoundedLatency(8*page_size);  // default of moving the whole page, use processing time of just the cacheline if we use that in the critical path
-            else
-                page_network_processing_time = m_r_bus_bandwidth.getRoundedLatency(8*page_size);
-
             
             if (m_r_partition_queues == 3) {
                 page_datamovement_delay = m_data_movement->computeQueueDelayTrackBytes(t_remote_queue_request + page_hw_access_latency + page_compression_latency, m_r_page_bandwidth.getRoundedLatency(8*page_size), page_size, QueueModel::PAGE, requester, true, phys_page);
             } else {
-                 // FIXME: I think that the page_network_processing_time is added twice! Both here (line 775) and also in line 768 (See line 795 network processing time is added twice!) where we call the getPartitionQueueDelayTrackBytes/NoEffect (line 521 already includes the network processing time!)
                 page_datamovement_delay = getPartitionQueueDelayTrackBytes(t_remote_queue_request + page_hw_access_latency + page_compression_latency, page_size, QueueModel::PAGE, requester);
             }
 
@@ -784,26 +764,22 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
 
             // Update t_now after page_datamovement_delay includes the decompression latency
             if (m_r_partition_queues > 1) {
-                m_page_network_processing_time += page_network_processing_time;
                 m_page_network_queue_delay += page_datamovement_delay - page_decompression_latency;
                 m_remote_to_local_page_move_count++;
                 
                 // FIXME: The IF condition needs also to add the (local_page_hw_access_latency) cost (not included in submitted results, results could potentially shift slightly)
-                // FIXME: 2. datamovement_delay includes the cacheline network processing time twice!
                 if (page_hw_access_latency + page_compression_latency + page_datamovement_delay <= cacheline_hw_access_latency + cacheline_compression_latency + datamovement_delay) {
                 // if (page_hw_access_latency + page_compression_latency + page_datamovement_delay + local_page_hw_access_latency <= cacheline_hw_access_latency + cacheline_compression_latency + datamovement_delay) {
                     // If the page arrival time via the page queue is faster than the cacheline via the cacheline queue, use the page queue arrival time
                     // (and the cacheline request is not sent)
-                    // FIXME network processing time for the page is added twice!
-                    t_now += (page_datamovement_delay + page_network_processing_time);  // if nonzero, compression latency was earlier added to t_now already
-                    m_total_remote_datamovement_latency += (page_datamovement_delay + page_network_processing_time);
+                    t_now += page_datamovement_delay;  // if nonzero, compression latency was earlier added to t_now already
+                    m_total_remote_datamovement_latency += page_datamovement_delay;
                     t_now -= cacheline_hw_access_latency;  // remove previously added latency
                     t_now += page_hw_access_latency + local_page_hw_write_latency;
                     if (m_r_mode != 4 && !m_r_enable_selective_moves) {
                         t_now -= datamovement_delay;  // only subtract if it was added earlier - Here we cancel the cacheline movement (only page will be moved)
                         m_total_remote_datamovement_latency -= datamovement_delay;
-                        m_cacheline_network_processing_time -= cacheline_network_processing_time;
-                        m_cacheline_network_queue_delay -= cacheline_queue_delay;
+                        m_cacheline_network_queue_delay -= cacheline_delay;
                         m_remote_to_local_cacheline_move_count--;
                     }
                     if (m_use_compression && (m_r_cacheline_gran || m_use_cacheline_compression))
@@ -816,9 +792,9 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
                     if (m_r_throttle_redundant_moves) {
                         if (m_r_partition_queues == 3) {
                             // Delayed inflight pages, if any, updated after m_inflight_pages includes the current page
-                            cacheline_queue_delay = m_data_movement->computeQueueDelayTrackBytesPotentialPushback(t_remote_queue_request + cacheline_compression_latency, m_r_cacheline_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, updated_inflight_page_arrival_time_deltas, true, requester);
+                            cacheline_delay = m_data_movement->computeQueueDelayTrackBytesPotentialPushback(t_remote_queue_request + cacheline_compression_latency, m_r_cacheline_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, updated_inflight_page_arrival_time_deltas, true, requester);
                         } else if (m_r_partition_queues == 2 || m_r_partition_queues == 4) {
-                            cacheline_queue_delay = getPartitionQueueDelayTrackBytes(t_remote_queue_request + cacheline_compression_latency, size, QueueModel::CACHELINE, requester);
+                            cacheline_delay = getPartitionQueueDelayTrackBytes(t_remote_queue_request + cacheline_compression_latency, size, QueueModel::CACHELINE, requester);
                         }
                     }
                     t_now -= page_compression_latency;  // Page compression is not on critical path; this is 0 if compression is off
@@ -834,18 +810,15 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             } else {
                 // PQ == Off - Move data only in a page granularity
                 // Default is requesting the whole page at once (instead of also requesting cacheline), so replace time of cacheline request with the time of the page request
-                // FIXME network processing time for the page is added twice!
-                t_now += (page_datamovement_delay + page_network_processing_time);
-                m_total_remote_datamovement_latency += (page_datamovement_delay + page_network_processing_time);
-                m_page_network_processing_time += page_network_processing_time;
+                t_now += page_datamovement_delay;
+                m_total_remote_datamovement_latency += page_datamovement_delay;
                 m_page_network_queue_delay += page_datamovement_delay - page_decompression_latency;
                 m_remote_to_local_page_move_count++;
                 t_now += page_hw_access_latency + local_page_hw_write_latency;
                 if (m_r_mode != 4 && !m_r_enable_selective_moves) {
                     t_now -= datamovement_delay;  // only subtract if it was added earlier
                     m_total_remote_datamovement_latency -= datamovement_delay;
-                    m_cacheline_network_processing_time -= cacheline_network_processing_time;
-                    m_cacheline_network_queue_delay -= cacheline_queue_delay;
+                    m_cacheline_network_queue_delay -= cacheline_delay;
                     m_remote_to_local_cacheline_move_count--;
                 }
                 if (m_use_compression && (m_r_cacheline_gran || m_use_cacheline_compression))
@@ -862,8 +835,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             if (m_r_mode != 4 && !m_r_enable_selective_moves) {
                 t_now -= datamovement_delay;  // only subtract if it was added earlier
                 m_total_remote_datamovement_latency -= datamovement_delay;
-                m_cacheline_network_processing_time -= cacheline_network_processing_time;
-                m_cacheline_network_queue_delay -= cacheline_queue_delay;
+                m_cacheline_network_queue_delay -= cacheline_delay;
                 m_remote_to_local_cacheline_move_count--;
             }
             // FIXME I think here we also need to remove the cacheline_compression_latency, i.e., to add the following commented lines - Needs to be added
@@ -887,8 +859,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
 
 
         SubsecondTime global_time = Sim()->getClockSkewMinimizationServer()->getGlobalTime();
-        // FIXME 2. page_network_processing_time is added twice (also included inside page_datamovement_delay)!
-        SubsecondTime page_arrival_time = t_remote_queue_request + page_hw_access_latency + page_compression_latency + page_datamovement_delay + page_network_processing_time + local_page_hw_write_latency;  // page_datamovement_delay already contains the page decompression latency
+        SubsecondTime page_arrival_time = t_remote_queue_request + page_hw_access_latency + page_compression_latency + page_datamovement_delay + local_page_hw_write_latency;  // page_datamovement_delay already contains the page decompression latency
         if (global_time > page_arrival_time + SubsecondTime::NS(50)) {  // if global time is more than 50 ns ahead of page_arrival_time
             ++m_global_time_much_larger_than_page_arrival;
             m_sum_global_time_much_larger += global_time - page_arrival_time;
@@ -966,7 +937,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             // Actually put the cacheline request on the queue
             if (m_r_partition_queues == 3) {
                 std::vector<std::pair<UInt64, SubsecondTime>> updated_inflight_page_arrival_time_deltas;
-                cacheline_queue_delay = m_data_movement->computeQueueDelayTrackBytesPotentialPushback(t_remote_queue_request + cacheline_compression_latency, m_r_cacheline_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, updated_inflight_page_arrival_time_deltas, true, requester);
+                cacheline_delay = m_data_movement->computeQueueDelayTrackBytesPotentialPushback(t_remote_queue_request + cacheline_compression_latency, m_r_cacheline_bandwidth.getRoundedLatency(8*size), size, QueueModel::CACHELINE, updated_inflight_page_arrival_time_deltas, true, requester);
                 for (auto it = updated_inflight_page_arrival_time_deltas.begin(); it != updated_inflight_page_arrival_time_deltas.end(); ++it) {
                     if (m_inflight_pages.count(it->first) && it->second > SubsecondTime::Zero()) {
                         m_inflight_pages_delay_time += it->second;
@@ -978,7 +949,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
                 // Only cacheline is moved 
                 // move_page == false so if PQ=off/on actually put the cacheline request on the queue
                 // No need to update the t_now here. Queue delay has already been added as latency in lines 681-688
-                cacheline_queue_delay = getPartitionQueueDelayTrackBytes(t_remote_queue_request + cacheline_compression_latency, size, QueueModel::CACHELINE, requester);
+                cacheline_delay = getPartitionQueueDelayTrackBytes(t_remote_queue_request + cacheline_compression_latency, size, QueueModel::CACHELINE, requester);
             }
         }
 
@@ -1238,9 +1209,6 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                     if (m_use_compression && (m_r_cacheline_gran || m_use_cacheline_compression)) {
                         cacheline_decompression_latency = m_compression_controller.decompress(!m_r_cacheline_gran, phys_page);
                     }
-
-                    // Network transmission cost
-                    SubsecondTime cacheline_network_processing_time = m_r_cacheline_bandwidth.getRoundedLatency(8*size);
                     
                     SubsecondTime add_cacheline_request_time = t_remote_queue_request + add_cacheline_hw_access_latency + cacheline_compression_latency;  // cacheline_compression_latency is 0 if compression not enabled
                     bool make_add_cacheline_request = true;
@@ -1248,8 +1216,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                     if (m_r_throttle_redundant_moves) {
                         // Don't request cacheline via the cacheline queue if the inflight page arrives sooner
                         SubsecondTime datamov_delay = getPartitionQueueDelayNoEffect(add_cacheline_request_time, size, QueueModel::CACHELINE, requester);
-                        // FIXME: I think that the cacheline_network_processing_time is added twice! Both here (line 1236) and also in line 1234 (datamov_delay) where we call the getPartitionQueueDelayTrackBytes (line 521 already includes the network processing time!)
-                        datamov_delay += cacheline_network_processing_time + cacheline_decompression_latency;  // decompression latency is 0 if not using cacheline compression
+                        datamov_delay += cacheline_decompression_latency;  // decompression latency is 0 if not using cacheline compression
                         // If the estimated cacheline arrival time is larger than the arrival time of the inflight page, then throttle the cacheline granularity data movement (move only the corresponding page).
                         // Otherwise, move both cacheline and the corresponding page to local memory.
                         if (add_cacheline_request_time + datamov_delay - pkt_time >= access_latency) {
@@ -1275,9 +1242,7 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
                             // Actually perform the cacheline movement inside the network 
                             datamov_delay = getPartitionQueueDelayTrackBytes(add_cacheline_request_time, size, QueueModel::CACHELINE, requester);
                         }
-                        // FIXME: I think that the cacheline_network_processing_time is added twice! Both here (line 1261) and also in line 1259 where we call the getPartitionQueueDelayTrackBytes (line 521 already includes the network processing time!)
-                        // Does this issue happened because of the code cleanup or was it also accounted for twice in our previous/old code?
-                        datamov_delay += cacheline_network_processing_time + cacheline_decompression_latency;  // decompression latency is 0 if not using cacheline compression
+                        datamov_delay += cacheline_decompression_latency;  // decompression latency is 0 if not using cacheline compression
                         ++m_redundant_moves;
                         ++m_redundant_moves_type2;
                         --m_num_recent_local_accesses;
@@ -1399,8 +1364,6 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
     UInt64 num_local_pages = m_localdram_size / m_page_size;
     if (m_r_cacheline_gran)
         num_local_pages = m_localdram_size / m_cache_line_size;
-        
-    SubsecondTime page_network_processing_time = SubsecondTime::Zero();
 
     QueueModel::request_t queue_request_type = m_r_cacheline_gran ? QueueModel::CACHELINE : QueueModel::PAGE;
     SubsecondTime t_remote_queue_request = t_now;  // Use this instead of incrementing t_now throughout, if need to send page requests in parallel
@@ -1471,14 +1434,7 @@ DramPerfModelDisagg::possiblyEvict(UInt64 phys_page, SubsecondTime t_now, core_i
                 page_datamovement_delay += m_compression_controller.decompress(false, evicted_page);
             }
 
-            // Compute network transmission delay
-            if (m_r_partition_queues > 0)
-                page_network_processing_time = m_r_page_bandwidth.getRoundedLatency(8*size);
-            else
-                page_network_processing_time = m_r_bus_bandwidth.getRoundedLatency(8*size);
-
-            // FIXME I think page_network_processing time is added twice! The page_datamovement_delay (getPartitionQueueDelayTrackBytes) already includes the cost of network processing time of the page!
-            m_inflightevicted_pages[evicted_page] = t_remote_queue_request + evict_compression_latency + page_datamovement_delay + page_network_processing_time;
+            m_inflightevicted_pages[evicted_page] = t_remote_queue_request + evict_compression_latency + page_datamovement_delay;
             if (m_inflightevicted_pages.size() > m_max_inflightevicted_bufferspace)
                 m_max_inflightevicted_bufferspace++;
             if (m_inflight_pages.size() + m_inflightevicted_pages.size() > m_max_total_bufferspace)
@@ -1654,8 +1610,6 @@ DramPerfModelDisagg::possiblyPrefetch(UInt64 phys_page, SubsecondTime t_now, cor
         ++m_page_prefetches;
         ++m_page_moves;
 
-        SubsecondTime page_network_processing_time = SubsecondTime::Zero();
-
         // TODO: enable Hardware DRAM access cost for prefetched pages; need way to find ddr address from phys_page?
         // SubsecondTime page_hw_access_latency = m_dram_hardware_cntlr.getDramAccessCost(t_remote_queue_request, m_page_size, requester, address, perf, true, false, true);
 
@@ -1680,12 +1634,6 @@ DramPerfModelDisagg::possiblyPrefetch(UInt64 phys_page, SubsecondTime t_now, cor
             }
         }
 
-        // Compute network transmission delay
-        if (m_r_partition_queues > 0)
-            page_network_processing_time = m_r_page_bandwidth.getRoundedLatency(8*size);
-        else
-            page_network_processing_time = m_r_bus_bandwidth.getRoundedLatency(8*size);
-
         // TODO: Currently model decompression by adding decompression latency to inflight page time
         if (m_use_compression) {
             page_datamovement_delay += m_compression_controller.decompress(false, pref_page);
@@ -1699,7 +1647,7 @@ DramPerfModelDisagg::possiblyPrefetch(UInt64 phys_page, SubsecondTime t_now, cor
             m_remote_pages.erase(pref_page);
         // if (!m_speed_up_simulation)
         //     m_local_pages_remote_origin[pref_page] = 1;
-        m_inflight_pages[pref_page] = t_remote_queue_request + page_compression_latency + page_datamovement_delay + page_network_processing_time;  // use max of this time with Sim()->getClockSkewMinimizationServer()->getGlobalTime() here as well?
+        m_inflight_pages[pref_page] = t_remote_queue_request + page_compression_latency + page_datamovement_delay;  // use max of this time with Sim()->getClockSkewMinimizationServer()->getGlobalTime() here as well?
         m_inflight_redundant[pref_page] = 0; 
         if (m_inflight_pages.size() > m_max_inflight_bufferspace)
             m_max_inflight_bufferspace++;

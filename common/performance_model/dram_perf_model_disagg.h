@@ -186,9 +186,7 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_total_remote_dram_hardware_latency_pages_count;
         SubsecondTime m_total_local_dram_hardware_write_latency_cachelines;
         SubsecondTime m_total_local_dram_hardware_write_latency_pages;
-        SubsecondTime m_cacheline_network_processing_time;
         SubsecondTime m_cacheline_network_queue_delay;
-        SubsecondTime m_page_network_processing_time;
         SubsecondTime m_page_network_queue_delay;
         UInt64 m_remote_to_local_cacheline_move_count;
         UInt64 m_remote_to_local_page_move_count;
