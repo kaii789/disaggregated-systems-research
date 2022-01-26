@@ -155,6 +155,7 @@ def generate_simout(jobid = None, resultsdir = None, partial = None, output = sy
     results['dram.remoteavghardwarelatency_pages_processing_time'] = map(lambda (a,b): a/b if b else 0.0, zip(results['dram.total-remote-dram-hardware-latency-pages-processing-time'], results['dram.total-remote-dram-hardware-latency-pages-count']))  # Prefetched pages not currently accounted for in sniper stats
     results['dram.remoteavghardwarelatency_pages_queue_delay'] = map(lambda (a,b): a/b if b else 0.0, zip(results['dram.total-remote-dram-hardware-latency-pages-queue-delay'], results['dram.total-remote-dram-hardware-latency-pages-count']))  # Prefetched pages not currently accounted for in sniper stats
     
+    results['dram.localavghardwarewritelatency_cachelines'] = map(lambda (a,b): a/b if b else 0.0, zip(results['dram.total-local-dram-hardware-write-latency-cachelines'], results['dram.total-remote-dram-hardware-latency-cachelines-count']))
     results['dram.localavghardwarewritelatency_pages'] = map(lambda (a,b): a/b if b else 0.0, zip(results['dram.total-local-dram-hardware-write-latency-pages'], results['dram.total-remote-dram-hardware-latency-pages-count']))  # Prefetched pages not currently accounted for in sniper stats
     
     results['dram.remoteavghardwarelatency_cachelines'] = map(lambda (a,b): (a)/b if b else 0.0, zip(results['dram.total-remote-dram-hardware-latency-cachelines'], results['dram.total-remote-dram-hardware-latency-cachelines-count']))
