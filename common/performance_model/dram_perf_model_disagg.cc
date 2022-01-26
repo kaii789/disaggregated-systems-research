@@ -669,7 +669,7 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             t_now += cacheline_compression_latency;
         }
     }
-    // FIXME: datamovement_delay is only added to t_now if(m_r_mode != 4 && !m_r_enable_selective_moves), should we also only add cacheline compression latency if the same condition is true?
+    // FIXME: cacheline_datamovement_delay is only added to t_now if(m_r_mode != 4 && !m_r_enable_selective_moves), should we also only add cacheline compression latency if the same condition is true?
 
     SubsecondTime cacheline_delay;
     if (m_r_throttle_redundant_moves) {
@@ -678,21 +678,21 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
     } else {  // always make cacheline queue request
         cacheline_delay = getPartitionQueueDelayTrackBytes(t_remote_queue_request + cacheline_compression_latency, size, QueueModel::CACHELINE, requester);
     }
-    SubsecondTime datamovement_delay = cacheline_delay;
+    SubsecondTime cacheline_datamovement_delay = cacheline_delay;
     m_cacheline_network_queue_delay += cacheline_delay;
     m_remote_to_local_cacheline_move_count++;
     
     // TODO: Currently model decompression by adding decompression latency to inflight page time
     if (m_use_compression && (m_r_cacheline_gran || m_use_cacheline_compression)) {
-        datamovement_delay += m_compression_controller.decompress(!m_r_cacheline_gran, phys_page);
+        cacheline_datamovement_delay += m_compression_controller.decompress(!m_r_cacheline_gran, phys_page);
     }
    
     if (!m_r_use_separate_queue_model) {  // when a separate remote QueueModel is used, the network latency is added there
         t_now += m_r_added_latency;
     }
     if (m_r_mode != 4 && !m_r_enable_selective_moves) {
-        t_now += datamovement_delay;
-        m_total_remote_datamovement_latency += datamovement_delay;
+        t_now += cacheline_datamovement_delay;
+        m_total_remote_datamovement_latency += cacheline_datamovement_delay;
     }
 
     SubsecondTime page_datamovement_delay = SubsecondTime::Zero();
@@ -768,8 +768,8 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
                 m_remote_to_local_page_move_count++;
                 
                 // FIXME: The IF condition needs also to add the (local_page_hw_access_latency) cost (not included in submitted results, results could potentially shift slightly)
-                if (page_hw_access_latency + page_compression_latency + page_datamovement_delay <= cacheline_hw_access_latency + cacheline_compression_latency + datamovement_delay) {
-                // if (page_hw_access_latency + page_compression_latency + page_datamovement_delay + local_page_hw_access_latency <= cacheline_hw_access_latency + cacheline_compression_latency + datamovement_delay) {
+                if (page_hw_access_latency + page_compression_latency + page_datamovement_delay <= cacheline_hw_access_latency + cacheline_compression_latency + cacheline_datamovement_delay) {
+                // if (page_hw_access_latency + page_compression_latency + page_datamovement_delay + local_page_hw_access_latency <= cacheline_hw_access_latency + cacheline_compression_latency + cacheline_datamovement_delay) {
                     // If the page arrival time via the page queue is faster than the cacheline via the cacheline queue, use the page queue arrival time
                     // (and the cacheline request is not sent)
                     t_now += page_datamovement_delay;  // if nonzero, compression latency was earlier added to t_now already
@@ -777,8 +777,8 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
                     t_now -= cacheline_hw_access_latency;  // remove previously added latency
                     t_now += page_hw_access_latency + local_page_hw_write_latency;
                     if (m_r_mode != 4 && !m_r_enable_selective_moves) {
-                        t_now -= datamovement_delay;  // only subtract if it was added earlier - Here we cancel the cacheline movement (only page will be moved)
-                        m_total_remote_datamovement_latency -= datamovement_delay;
+                        t_now -= cacheline_datamovement_delay;  // only subtract if it was added earlier - Here we cancel the cacheline movement (only page will be moved)
+                        m_total_remote_datamovement_latency -= cacheline_datamovement_delay;
                         m_cacheline_network_queue_delay -= cacheline_delay;
                         m_remote_to_local_cacheline_move_count--;
                     }
@@ -800,11 +800,11 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
                     t_now -= page_compression_latency;  // Page compression is not on critical path; this is 0 if compression is off
                     ++m_redundant_moves;
                     ++m_redundant_moves_type1;
-                    m_redundant_moves_type1_time_savings += (page_hw_access_latency + page_compression_latency + page_datamovement_delay) - (cacheline_hw_access_latency + cacheline_compression_latency + datamovement_delay);
+                    m_redundant_moves_type1_time_savings += (page_hw_access_latency + page_compression_latency + page_datamovement_delay) - (cacheline_hw_access_latency + cacheline_compression_latency + cacheline_datamovement_delay);
 
                     if (m_track_inflight_cachelines) {
-                        // datamovement_delay includes cacheline network processing time; for PQ=on, cacheline hw latency already included in t_remote_queue_request 
-                        addInflightCacheline(cacheline, t_remote_queue_request + cacheline_compression_latency + datamovement_delay, access_type);
+                        // cacheline_datamovement_delay includes cacheline network processing time; for PQ=on, cacheline hw latency already included in t_remote_queue_request 
+                        addInflightCacheline(cacheline, t_remote_queue_request + cacheline_compression_latency + cacheline_datamovement_delay, access_type);
                     }
                 }
             } else {
@@ -816,8 +816,8 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
                 m_remote_to_local_page_move_count++;
                 t_now += page_hw_access_latency + local_page_hw_write_latency;
                 if (m_r_mode != 4 && !m_r_enable_selective_moves) {
-                    t_now -= datamovement_delay;  // only subtract if it was added earlier
-                    m_total_remote_datamovement_latency -= datamovement_delay;
+                    t_now -= cacheline_datamovement_delay;  // only subtract if it was added earlier
+                    m_total_remote_datamovement_latency -= cacheline_datamovement_delay;
                     m_cacheline_network_queue_delay -= cacheline_delay;
                     m_remote_to_local_cacheline_move_count--;
                 }
@@ -833,8 +833,8 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
             m_total_remote_dram_hardware_latency_pages_count++;
             m_total_local_dram_hardware_write_latency_pages += local_page_hw_write_latency;
             if (m_r_mode != 4 && !m_r_enable_selective_moves) {
-                t_now -= datamovement_delay;  // only subtract if it was added earlier
-                m_total_remote_datamovement_latency -= datamovement_delay;
+                t_now -= cacheline_datamovement_delay;  // only subtract if it was added earlier
+                m_total_remote_datamovement_latency -= cacheline_datamovement_delay;
                 m_cacheline_network_queue_delay -= cacheline_delay;
                 m_remote_to_local_cacheline_move_count--;
             }
@@ -929,8 +929,8 @@ DramPerfModelDisagg::getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_s
         }
 
         if (m_track_inflight_cachelines) {
-            // datamovement_delay includes cacheline network processing time; for PQ=on, cacheline hw latency already included in t_remote_queue_request 
-            addInflightCacheline(cacheline, t_remote_queue_request + cacheline_compression_latency + datamovement_delay, access_type);            
+            // cacheline_datamovement_delay includes cacheline network processing time; for PQ=on, cacheline hw latency already included in t_remote_queue_request 
+            addInflightCacheline(cacheline, t_remote_queue_request + cacheline_compression_latency + cacheline_datamovement_delay, access_type);            
         }
 
         if (m_r_throttle_redundant_moves) {
