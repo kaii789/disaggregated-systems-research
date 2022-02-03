@@ -1,11 +1,7 @@
 #!/usr/bin/env python3
 
 ##import pandas as pd
-<<<<<<< HEAD
 ##import numpy as np
-=======
-import numpy as np
->>>>>>> cf90d23c134a27528ae85daa0b5c435e5ae57485
 ##import matplotlib as plt
 ##plt.use('Agg')
 import os
