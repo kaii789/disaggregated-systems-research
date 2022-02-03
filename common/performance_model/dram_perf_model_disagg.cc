@@ -1553,7 +1553,7 @@ DramPerfModelDisagg::updateLocalRemoteLatencyStat(SubsecondTime access_latency)
 }
 
 void
-DramPerfModelDisagg::updateLocalIpcStat(UInt64 instr_count)
+DramPerfModelDisagg::updateLocalStats(UInt64 instr_count)
 {
     if (m_ipc_window_cur_size == 0)
         m_ipc_window_start_instr_count = instr_count;

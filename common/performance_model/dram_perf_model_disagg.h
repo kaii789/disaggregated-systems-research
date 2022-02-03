@@ -268,7 +268,7 @@ class DramPerfModelDisagg : public DramPerfModel
         void finalizeStats();
         void updateBandwidth();
         void updateLatency();
-        void updateLocalIpcStat(UInt64 instr_count);
+        void updateLocalStats(UInt64 instr_count);
 
         bool isRemoteAccess(IntPtr address, core_id_t requester, DramCntlrInterface::access_t access_type); 
         SubsecondTime getAccessLatencyRemote(SubsecondTime pkt_time, UInt64 pkt_size, core_id_t requester, IntPtr address, DramCntlrInterface::access_t access_type, ShmemPerf *perf);

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
-import pandas as pd
-import numpy as np
-import matplotlib as plt
-plt.use('Agg')
+##import pandas as pd
+##import numpy as np
+##import matplotlib as plt
+##plt.use('Agg')
 import os
 # For timezones
 import pytz
@@ -1272,7 +1272,7 @@ def run_particle_filter():
 experiments = []
 
 # experiments.extend(run_ligra_sym("Triangle"))
-# experiments.extend(run_ligra_nonsym("PageRank"))
+experiments.extend(run_ligra_nonsym("PageRank"))
 # experiments.extend(run_ligra_nonsym("BFS"))
 # experiments.extend(run_timeseries("randomSerie262144.txt"))
 # experiments.extend(run_ligra_nonsym("BC"))
