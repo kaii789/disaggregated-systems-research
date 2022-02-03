@@ -134,6 +134,8 @@ class DramPerfModelDisagg : public DramPerfModel
         // Variables to keep track of stats
         UInt64 m_local_reads_remote_origin;
         UInt64 m_local_writes_remote_origin;
+        UInt64 m_local_reads;
+        UInt64 m_local_writes;
         UInt64 m_remote_reads;
         UInt64 m_remote_writes;
         UInt64 m_page_moves;
@@ -212,6 +214,7 @@ class DramPerfModelDisagg : public DramPerfModel
         UInt64 m_ipc_window_cur_size = 0;
         std::vector<double> m_local_ipcs;
         std::vector<UInt64> m_instruction_count_x_axis;
+        std::vector<double> m_local_hitrate;
 
         std::unordered_map<UInt64, UInt64> m_inflight_page_to_dirty_write_count; // Evicted paged from local to remote which are inflight and dirty.
         UInt64 m_dirty_write_buffer_size = 0;

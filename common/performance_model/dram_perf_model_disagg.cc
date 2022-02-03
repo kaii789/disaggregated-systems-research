@@ -70,6 +70,8 @@ DramPerfModelDisagg::DramPerfModelDisagg(core_id_t core_id, UInt32 cache_block_s
     , m_num_accesses(0)
     , m_local_reads_remote_origin(0)
     , m_local_writes_remote_origin(0)
+    , m_local_reads        (0)
+    , m_local_writes       (0)
     , m_remote_reads        (0)
     , m_remote_writes       (0)
     , m_page_moves          (0)
@@ -353,6 +355,16 @@ DramPerfModelDisagg::~DramPerfModelDisagg()
             std::cout << instruction_count << ' ';
         }
         std::cout << "\n\n";
+
+        // Local HitRate Stats
+        std::cout << "\nLocal HitRate:\n";
+        for (std::vector<double>::iterator it = m_local_hitrate.begin(); it != m_local_hitrate.end(); ++it) {
+            double local_hitrate = *it;
+            std::cout << local_hitrate << ' ';
+        }
+        std::cout << "\n\n";
+
+
     }
 
     delete m_data_movement;
@@ -1110,6 +1122,14 @@ DramPerfModelDisagg::getAccessLatency(SubsecondTime pkt_time, UInt64 pkt_size, c
         ++m_num_recent_remote_accesses;
         return (getAccessLatencyRemote(pkt_time, pkt_size, requester, address, access_type, perf)); 
     }
+
+    // Update local stats 
+    if (access_type == DramCntlrInterface::READ) {
+        ++m_local_reads;
+    } else {  // access_type == DramCntlrInterface::WRITE
+	++m_local_writes;
+    }
+   
     // if (!m_speed_up_simulation) {
     //     // m_local_reads_remote_origin
     //     if (m_local_pages_remote_origin.count(phys_page)) {
@@ -1559,9 +1579,9 @@ DramPerfModelDisagg::updateLocalStats(UInt64 instr_count)
         m_ipc_window_start_instr_count = instr_count;
     m_ipc_window_cur_size += 1;
     if (m_ipc_window_cur_size == m_ipc_window_capacity) {
+	// Track IPC
         ComponentPeriod cp = ComponentPeriod::fromFreqHz(1000000000 * Sim()->getCfg()->getFloat("perf_model/core/frequency"));
         SubsecondTimeCycleConverter converter = SubsecondTimeCycleConverter(&cp);
-
         m_ipc_window_end_instr_count = instr_count;
         UInt64 instructions = m_ipc_window_end_instr_count - m_ipc_window_start_instr_count;
         UInt64 cycles = converter.subsecondTimeToCycles(SubsecondTime::NS(1000) * m_ipc_window_capacity);
@@ -1570,6 +1590,12 @@ DramPerfModelDisagg::updateLocalStats(UInt64 instr_count)
         m_local_ipcs.push_back(ipc);
         m_instruction_count_x_axis.push_back(m_ipc_window_end_instr_count);
 
+	// Track Hit Rate
+	double hit_rate = (m_local_reads + m_local_writes) / (double) m_num_accesses;
+        hit_rate = std::round(hit_rate * 100000.0) / 100000.0;
+        m_local_hitrate.push_back(hit_rate);
+	
+	// Initialization
         m_ipc_window_cur_size = 0;
     }
 }

@@ -198,7 +198,7 @@ srad_base_options = "{sniper_root}/run-sniper -d {{{{sniper_output_dir}}}} -c {s
 
 # TODO:
 page_size_list = [4096]
-bw_scalefactor_list = [2]
+bw_scalefactor_list = [2, 4]
 netlat_list = [100]
 
 def input_file_checker(experiments):
@@ -270,39 +270,39 @@ def run_ligra_nonsym(application_name):
     }
 
     # Remote memory off case
-    #num_MB = 8
-    #page_size = 4096
-    #net_lat = 120
-    #bw_scalefactor = 4
-    #localdram_size_str = "{}MB".format(num_MB)
-    #command_str = ligra_base_str_options_nonsym.format(
-    #    application_name,
-    #    ligra_input_file,
-    #    sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
-    #        page_size,
-    #        int(num_MB * ONE_MB_TO_BYTES),
-    #        int(net_lat),
-    #        float(bw_scalefactor),
-    #        int(1 * ONE_BILLION),
-    #    ),
-    #)
-    #experiments.append(
-    #    automation.Experiment(
-    #        experiment_name="ligra_{}_{}localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_noremotemem".format(
-    #            application_name.lower(),
-    #            ""
-    #            if ligra_input_selection == "regular_input"
-    #            else ligra_input_selection + "_",
-    #            localdram_size_str,
-    #            net_lat,
-    #            bw_scalefactor,
-    #            page_size
-    #        ),
-    #        command_str=command_str,
-    #        experiment_run_configs=no_remote_memory_list,
-    #        output_root_directory=".",
-    #    )
-    #)
+    num_MB = 8
+    page_size = 4096
+    net_lat = 120
+    bw_scalefactor = 4
+    localdram_size_str = "{}MB".format(num_MB)
+    command_str = ligra_base_str_options_nonsym.format(
+        application_name,
+        ligra_input_file,
+        sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+            page_size,
+            int(num_MB * ONE_MB_TO_BYTES),
+            int(net_lat),
+            float(bw_scalefactor),
+            int(1 * ONE_BILLION),
+        ),
+    )
+    experiments.append(
+        automation.Experiment(
+            experiment_name="ligra_{}_{}localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_noremotemem".format(
+                application_name.lower(),
+                ""
+                if ligra_input_selection == "regular_input"
+                else ligra_input_selection + "_",
+                localdram_size_str,
+                net_lat,
+                bw_scalefactor,
+                page_size
+            ),
+            command_str=command_str,
+            experiment_run_configs=no_remote_memory_list,
+            output_root_directory=".",
+        )
+    )
     # Everything else
     for num_MB in app_to_local_dram_size[application_name]:
         for page_size in page_size_list:
@@ -529,31 +529,31 @@ def run_nw(dimension):
     }
 
     # Remote memory off case
-    #num_MB = 8
-    #page_size = 4096
-    #net_lat = 120
-    #bw_scalefactor = 4
-    #localdram_size_str = "{}MB".format(num_MB)
-    #command_str = nw_base_options.format(
-    #    dimension,
-    #    sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
-    #        page_size,
-    #        int(num_MB * ONE_MB_TO_BYTES),
-    #        int(net_lat),
-    #        float(bw_scalefactor),
-    #        int(1 * ONE_BILLION),
-    #    ),
-    #)
-    #experiments.append(
-    #automation.Experiment(
-    #    experiment_name="nw_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_noremotemem".format(
-    #        localdram_size_str, net_lat, bw_scalefactor, page_size
-    #    ),
-    #    command_str=command_str,
-    #    experiment_run_configs=no_remote_memory_list,
-    #    output_root_directory=".",
-    #    )
-    #)
+    num_MB = 8
+    page_size = 4096
+    net_lat = 120
+    bw_scalefactor = 4
+    localdram_size_str = "{}MB".format(num_MB)
+    command_str = nw_base_options.format(
+        dimension,
+        sniper_options="-g perf_model/dram/page_size={} -g perf_model/dram/localdram_size={} -g perf_model/dram/remote_mem_add_lat={} -g perf_model/dram/remote_mem_bw_scalefactor={} -s stop-by-icount:{}".format(
+            page_size,
+            int(num_MB * ONE_MB_TO_BYTES),
+            int(net_lat),
+            float(bw_scalefactor),
+            int(1 * ONE_BILLION),
+        ),
+    )
+    experiments.append(
+    automation.Experiment(
+        experiment_name="nw_localdram_{}_netlat_{}_bw_scalefactor_{}_page_size_{}_noremotemem".format(
+            localdram_size_str, net_lat, bw_scalefactor, page_size
+        ),
+        command_str=command_str,
+        experiment_run_configs=no_remote_memory_list,
+        output_root_directory=".",
+        )
+    )
 
     # Everything else
     for num_MB in dimension_to_local_dram_size[dimension]:
@@ -1313,7 +1313,7 @@ with open(log_filename, "w") as log_file:
     print(log_str, file=log_file)
 
     experiment_manager = automation.ExperimentManager(
-        output_root_directory=".", max_concurrent_processes=48, log_file=log_file
+        output_root_directory=".", max_concurrent_processes=16, log_file=log_file
     )
     experiment_manager.add_experiments(experiments)
     # compiled_application_checker(experiments)
